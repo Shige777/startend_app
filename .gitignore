@@ -1,0 +1,44 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+**/android/app/google-services.json
+**/ios/Runner/GoogleService-Info.plist
+**/macos/Runner/GoogleService-Info.plist
+
+# Sensitive files
+.env
+*.key
+*.keystore
+*.p8
+*.p12
+*.jks
+
+# Generated files
+**/*.g.dart
+**/*.freezed.dart
+**/*.mocks.dart
+
+# Coverage
+coverage/
+lcov.info
+
+# Logs
+*.log 
