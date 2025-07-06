@@ -1,19 +1,101 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
 
 class UserProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  AuthProvider? _authProvider;
 
   UserModel? _currentUser;
   List<UserModel> _users = [];
+  List<UserModel> _searchResults = [];
   bool _isLoading = false;
   String? _errorMessage;
 
   UserModel? get currentUser => _currentUser;
   List<UserModel> get users => _users;
+  List<UserModel> get searchResults => _searchResults;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
+  void setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
+    _initializeCurrentUser();
+  }
+
+  // 現在のユーザーを初期化
+  Future<void> _initializeCurrentUser() async {
+    final userId = _authProvider?.effectiveUserId;
+    if (userId != null) {
+      // テスト用ユーザーの場合はダミーユーザーを作成
+      if (kDebugMode && userId == 'test_user_001') {
+        _currentUser = UserModel(
+          id: userId,
+          displayName: 'テストユーザー',
+          email: 'test@example.com',
+          profileImageUrl: 'https://picsum.photos/150/150?random=user',
+          bio: 'テスト用のユーザーです',
+          isPrivate: false,
+          requiresApproval: false,
+          followerIds: [],
+          followingIds: [],
+          communityIds: [],
+          createdAt: DateTime.now().subtract(const Duration(days: 30)),
+          updatedAt: DateTime.now(),
+        );
+        notifyListeners();
+      } else {
+        // 実際のFirestoreからユーザーを取得または作成
+        await _getOrCreateUser(userId);
+      }
+    }
+  }
+
+  // ユーザーを取得または作成
+  Future<void> _getOrCreateUser(String userId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        _currentUser = UserModel.fromFirestore(doc);
+      } else {
+        // ユーザーが存在しない場合は新規作成
+        final authUser = _authProvider?.user;
+        if (authUser != null) {
+          _currentUser = UserModel(
+            id: userId,
+            displayName: authUser.displayName ?? 'ユーザー',
+            email: authUser.email ?? '',
+            profileImageUrl: authUser.photoURL,
+            bio: '',
+            isPrivate: false,
+            requiresApproval: false,
+            followerIds: [],
+            followingIds: [],
+            communityIds: [],
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+
+          // Firestoreに保存
+          await _firestore
+              .collection('users')
+              .doc(userId)
+              .set(_currentUser!.toFirestore());
+        }
+      }
+    } catch (e) {
+      _setError('ユーザー情報の取得に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('Error getting or creating user: $e');
+      }
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -87,11 +169,23 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  // 現在のユーザー情報を再読み込み
+  Future<void> refreshCurrentUser() async {
+    if (_currentUser?.id != null) {
+      await getUser(_currentUser!.id);
+    }
+  }
+
   // ユーザー検索
   Future<List<UserModel>> searchUsers(String query) async {
     try {
       _setLoading(true);
       _setError(null);
+
+      if (query.isEmpty) {
+        _searchResults = [];
+        return _searchResults;
+      }
 
       final querySnapshot = await _firestore
           .collection('users')
@@ -100,13 +194,14 @@ class UserProvider extends ChangeNotifier {
           .limit(20)
           .get();
 
-      _users = querySnapshot.docs
+      _searchResults = querySnapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
 
-      return _users;
+      return _searchResults;
     } catch (e) {
       _setError('ユーザー検索に失敗しました');
+      _searchResults = [];
       return [];
     } finally {
       _setLoading(false);
@@ -256,6 +351,7 @@ class UserProvider extends ChangeNotifier {
   // 現在のユーザーをクリア
   void clearCurrentUser() {
     _currentUser = null;
+    _searchResults = [];
     notifyListeners();
   }
 }

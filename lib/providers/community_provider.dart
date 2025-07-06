@@ -27,12 +27,48 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   // コミュニティ作成
-  Future<bool> createCommunity(CommunityModel community) async {
+  Future<bool> createCommunity({
+    required String name,
+    required String description,
+    required String userId,
+    bool requiresApproval = false,
+    String? imageUrl,
+  }) async {
     try {
       _setLoading(true);
       _setError(null);
 
-      await _firestore.collection('communities').add(community.toFirestore());
+      final community = CommunityModel(
+        id: '',
+        name: name,
+        description: description,
+        leaderId: userId,
+        memberIds: [userId], // 作成者は自動でメンバーになる
+        pendingMemberIds: [],
+        genre: 'その他',
+        maxMembers: 8,
+        isPrivate: requiresApproval, // 承認制の場合はプライベートに設定
+        imageUrl: imageUrl,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final docRef = await _firestore
+          .collection('communities')
+          .add(community.toFirestore());
+
+      // ユーザーのコミュニティリストにも追加
+      await _firestore.collection('users').doc(userId).update({
+        'communityIds': FieldValue.arrayUnion([docRef.id]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // コミュニティ一覧を更新
+      await searchCommunities();
+
+      // ユーザーのコミュニティ一覧も更新
+      await getUserCommunities(userId);
+
       return true;
     } catch (e) {
       _setError('コミュニティ作成に失敗しました');
@@ -192,8 +228,81 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  // コミュニティ参加
+  Future<bool> joinCommunity(String communityId, {String? userId}) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // userIdが指定されていない場合は現在のユーザーIDを使用
+      final targetUserId = userId ?? 'test_user_001'; // TODO: 実際のユーザーIDを取得
+
+      final batch = _firestore.batch();
+
+      // コミュニティのメンバーリストに追加
+      batch.update(_firestore.collection('communities').doc(communityId), {
+        'memberIds': FieldValue.arrayUnion([targetUserId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // ユーザーのコミュニティリストに追加
+      batch.update(_firestore.collection('users').doc(targetUserId), {
+        'communityIds': FieldValue.arrayUnion([communityId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      return true;
+    } catch (e) {
+      _setError('コミュニティ参加に失敗しました');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // コミュニティ脱退
-  Future<bool> leaveCommunity(String communityId, String userId) async {
+  Future<bool> leaveCommunity(String communityId, {String? userId}) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // userIdが指定されていない場合はエラー
+      if (userId == null) {
+        _setError('ユーザーIDが指定されていません');
+        return false;
+      }
+
+      final batch = _firestore.batch();
+
+      // コミュニティのメンバーリストから削除
+      batch.update(_firestore.collection('communities').doc(communityId), {
+        'memberIds': FieldValue.arrayRemove([userId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // ユーザーのコミュニティリストから削除
+      batch.update(_firestore.collection('users').doc(userId), {
+        'communityIds': FieldValue.arrayRemove([communityId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      // ユーザーコミュニティリストを更新
+      await getUserCommunities(userId);
+
+      return true;
+    } catch (e) {
+      _setError('コミュニティ脱退に失敗しました: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // メンバーを脱退させる（リーダー権限）
+  Future<bool> removeMember(String communityId, String userId) async {
     try {
       _setLoading(true);
       _setError(null);
@@ -213,9 +322,38 @@ class CommunityProvider extends ChangeNotifier {
       });
 
       await batch.commit();
+
+      // ユーザーコミュニティリストを更新
+      await getUserCommunities(userId);
+
       return true;
     } catch (e) {
-      _setError('コミュニティ脱退に失敗しました');
+      _setError('メンバー削除に失敗しました: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // コミュニティ設定更新（リーダー権限）
+  Future<bool> updateCommunitySettings({
+    required String communityId,
+    required bool isPrivate,
+    required int maxMembers,
+  }) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      await _firestore.collection('communities').doc(communityId).update({
+        'isPrivate': isPrivate,
+        'maxMembers': maxMembers,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      _setError('コミュニティ設定更新に失敗しました');
       return false;
     } finally {
       _setLoading(false);

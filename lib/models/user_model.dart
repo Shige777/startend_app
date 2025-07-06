@@ -9,6 +9,7 @@ class UserModel {
   final List<String> followerIds;
   final List<String> followingIds;
   final List<String> communityIds;
+  final int postCount;
   final bool isPrivate;
   final bool requiresApproval;
   final DateTime createdAt;
@@ -23,6 +24,7 @@ class UserModel {
     required this.followerIds,
     required this.followingIds,
     required this.communityIds,
+    this.postCount = 0,
     required this.isPrivate,
     required this.requiresApproval,
     required this.createdAt,
@@ -40,6 +42,7 @@ class UserModel {
       followerIds: List<String>.from(data['followerIds'] ?? []),
       followingIds: List<String>.from(data['followingIds'] ?? []),
       communityIds: List<String>.from(data['communityIds'] ?? []),
+      postCount: data['postCount'] ?? 0,
       isPrivate: data['isPrivate'] ?? false,
       requiresApproval: data['requiresApproval'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
@@ -56,6 +59,7 @@ class UserModel {
       'followerIds': followerIds,
       'followingIds': followingIds,
       'communityIds': communityIds,
+      'postCount': postCount,
       'isPrivate': isPrivate,
       'requiresApproval': requiresApproval,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -72,6 +76,7 @@ class UserModel {
     List<String>? followerIds,
     List<String>? followingIds,
     List<String>? communityIds,
+    int? postCount,
     bool? isPrivate,
     bool? requiresApproval,
     DateTime? createdAt,
@@ -86,6 +91,7 @@ class UserModel {
       followerIds: followerIds ?? this.followerIds,
       followingIds: followingIds ?? this.followingIds,
       communityIds: communityIds ?? this.communityIds,
+      postCount: postCount ?? this.postCount,
       isPrivate: isPrivate ?? this.isPrivate,
       requiresApproval: requiresApproval ?? this.requiresApproval,
       createdAt: createdAt ?? this.createdAt,

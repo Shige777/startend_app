@@ -11,6 +11,7 @@ class PostProvider extends ChangeNotifier {
   List<PostModel> _userPosts = [];
   bool _isLoading = false;
   String? _errorMessage;
+  String? _currentUserId; // 現在読み込み中のユーザーID
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;
@@ -35,10 +36,61 @@ class PostProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
-      await _firestore.collection('posts').add(post.toFirestore());
+      // ドキュメントIDを生成してから投稿を保存
+      final docRef = _firestore.collection('posts').doc();
+      final postWithId = post.copyWith(id: docRef.id);
+
+      await docRef.set(postWithId.toFirestore());
+
+      // ローカルの投稿リストに追加
+      _userPosts.insert(0, postWithId);
+      notifyListeners();
+
       return true;
     } catch (e) {
-      _setError('投稿作成に失敗しました');
+      _setError('投稿作成に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('投稿作成エラー: $e');
+      }
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // END投稿作成（START投稿を更新）
+  Future<bool> createEndPost(
+      String startPostId, String endComment, String? endImageUrl) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // START投稿にEND投稿の情報を追加
+      await _firestore.collection('posts').doc(startPostId).update({
+        'endComment': endComment,
+        'endImageUrl': endImageUrl,
+        'actualEndTime': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // ローカルの投稿リストも更新
+      final index = _userPosts.indexWhere((post) => post.id == startPostId);
+      if (index != -1) {
+        _userPosts[index] = _userPosts[index].copyWith(
+          endComment: endComment,
+          endImageUrl: endImageUrl,
+          actualEndTime: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        notifyListeners();
+      }
+
+      return true;
+    } catch (e) {
+      _setError('END投稿作成に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('END投稿作成エラー: $e');
+      }
       return false;
     } finally {
       _setLoading(false);
@@ -96,8 +148,35 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
-  // コミュニティ投稿取得
-  Future<List<PostModel>> getCommunityPosts(List<String> communityIds) async {
+  // コミュニティ投稿取得（単一コミュニティ）
+  Future<List<PostModel>> getCommunityPosts(String communityId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .where('communityIds', arrayContains: communityId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      final posts = querySnapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+
+      return posts;
+    } catch (e) {
+      _setError('コミュニティ投稿取得に失敗しました');
+      return [];
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // コミュニティ投稿取得（複数コミュニティ）
+  Future<List<PostModel>> getMultipleCommunityPosts(
+      List<String> communityIds) async {
     try {
       _setLoading(true);
       _setError(null);
@@ -127,11 +206,24 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
-  // ユーザーの投稿取得
+  // ユーザーの投稿取得（コミュニティ投稿も含む）
   Future<List<PostModel>> getUserPosts(String userId) async {
+    // 同じユーザーIDで既に読み込み中の場合は重複実行を防ぐ
+    if (_currentUserId == userId && _isLoading) {
+      if (kDebugMode) {
+        print('ユーザー投稿取得スキップ（既に読み込み中）: $userId');
+      }
+      return _userPosts;
+    }
+
     try {
       _setLoading(true);
       _setError(null);
+      _currentUserId = userId;
+
+      if (kDebugMode) {
+        print('ユーザー投稿取得開始: $userId');
+      }
 
       final querySnapshot = await _firestore
           .collection('posts')
@@ -143,12 +235,23 @@ class PostProvider extends ChangeNotifier {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
+      if (kDebugMode) {
+        print('ユーザー投稿取得完了: ${_userPosts.length}件');
+        for (final post in _userPosts) {
+          print('- ${post.title} (${post.status})');
+        }
+      }
+
       return _userPosts;
     } catch (e) {
-      _setError('ユーザー投稿取得に失敗しました');
+      _setError('ユーザー投稿取得に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('ユーザー投稿取得エラー: $e');
+      }
       return [];
     } finally {
       _setLoading(false);
+      _currentUserId = null;
     }
   }
 
@@ -218,33 +321,28 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
-  // END投稿追加
-  Future<bool> addEndPost(String startPostId, PostModel endPost) async {
+  // 投稿削除
+  Future<bool> deletePost(String postId) async {
     try {
       _setLoading(true);
       _setError(null);
 
-      final batch = _firestore.batch();
+      await _firestore.collection('posts').doc(postId).delete();
 
-      // END投稿を作成
-      final endPostRef = _firestore.collection('posts').doc();
-      batch.set(
-        endPostRef,
-        endPost
-            .copyWith(id: endPostRef.id, startPostId: startPostId)
-            .toFirestore(),
-      );
+      // ローカルの投稿リストからも削除
+      _userPosts.removeWhere((post) => post.id == postId);
+      _posts.removeWhere((post) => post.id == postId);
+      _followingPosts.removeWhere((post) => post.id == postId);
+      _communityPosts.removeWhere((post) => post.id == postId);
 
-      // START投稿にEND投稿IDを追加
-      batch.update(_firestore.collection('posts').doc(startPostId), {
-        'endPostId': endPostRef.id,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      notifyListeners();
 
-      await batch.commit();
       return true;
     } catch (e) {
-      _setError('END投稿追加に失敗しました');
+      _setError('投稿削除に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('投稿削除エラー: $e');
+      }
       return false;
     } finally {
       _setLoading(false);
@@ -255,24 +353,17 @@ class PostProvider extends ChangeNotifier {
   bool _shouldShowInFollowing(PostModel post) {
     final now = DateTime.now();
 
-    // START投稿の場合
-    if (post.type == PostType.start) {
-      // END投稿が完了している場合、24時間以内なら表示
-      if (post.endPostId != null) {
-        // END投稿完了から24時間以内
-        return now.difference(post.updatedAt).inHours <= 24;
-      }
-
-      // 完了予定時刻から24時間経過したら非表示
-      if (post.scheduledEndTime != null) {
-        return now.difference(post.scheduledEndTime!).inHours <= 24;
-      }
-
-      return true;
+    // 完了している場合、24時間以内なら表示
+    if (post.isCompleted) {
+      return now.difference(post.updatedAt).inHours <= 24;
     }
 
-    // END投稿の場合、24時間以内なら表示
-    return now.difference(post.createdAt).inHours <= 24;
+    // 完了予定時刻から24時間経過したら非表示
+    if (post.scheduledEndTime != null) {
+      return now.difference(post.scheduledEndTime!).inHours <= 24;
+    }
+
+    return true;
   }
 
   // 投稿の分類取得

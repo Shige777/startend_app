@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +9,10 @@ import '../../providers/user_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
-import '../../models/user_model.dart';
+
 import '../../models/post_model.dart';
+import '../../widgets/platform_image_picker.dart';
+import '../../services/storage_service.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -22,6 +27,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final _bioController = TextEditingController();
 
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageFileName;
   bool _isPrivate = false;
   bool _requiresApproval = false;
   bool _isLoading = false;
@@ -44,6 +51,58 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     }
   }
 
+  // 画像URLがネットワークURLかローカルファイルパスかを判別
+  bool _isNetworkUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
+  // プロフィール画像を表示するWidgetを構築
+  Widget _buildProfileImage() {
+    if (_selectedImageBytes != null) {
+      // Web環境で選択した画像
+      return CircleAvatar(
+        radius: 60,
+        backgroundImage: MemoryImage(_selectedImageBytes!),
+      );
+    } else if (_selectedImagePath != null) {
+      if (_isNetworkUrl(_selectedImagePath!)) {
+        // ネットワーク画像
+        return CircleAvatar(
+          radius: 60,
+          backgroundImage: NetworkImage(_selectedImagePath!),
+        );
+      } else {
+        // ローカルファイル
+        if (kIsWeb) {
+          // Webの場合はエラー表示
+          return const CircleAvatar(
+            radius: 60,
+            child: Icon(Icons.error, size: 60),
+          );
+        } else {
+          // モバイルの場合はFileImageを使用
+          try {
+            return CircleAvatar(
+              radius: 60,
+              backgroundImage: FileImage(File(_selectedImagePath!)),
+            );
+          } catch (e) {
+            return const CircleAvatar(
+              radius: 60,
+              child: Icon(Icons.error, size: 60),
+            );
+          }
+        }
+      }
+    } else {
+      // 画像なし
+      return const CircleAvatar(
+        radius: 60,
+        child: Icon(Icons.person, size: 60),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _displayNameController.dispose();
@@ -57,6 +116,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('プロフィール設定'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/profile');
+            }
+          },
+        ),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveProfile,
@@ -79,37 +148,61 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             children: [
               // プロフィール画像
               Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundImage: _selectedImagePath != null
-                          ? NetworkImage(_selectedImagePath!)
-                          : null,
-                      child: _selectedImagePath == null
-                          ? const Icon(Icons.person, size: 60)
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.camera_alt,
-                            color: AppColors.textOnPrimary,
-                            size: 20,
+                child: kIsWeb
+                    ? Column(
+                        children: [
+                          _buildProfileImage(),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _pickImageWeb,
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('画像を選択'),
                           ),
-                          onPressed: _pickImage,
-                        ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '※ 大きな画像は自動的に圧縮されます',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          Stack(
+                            children: [
+                              _buildProfileImage(),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.camera_alt,
+                                      color: AppColors.textOnPrimary,
+                                      size: 20,
+                                    ),
+                                    onPressed: _pickImage,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '※ 大きな画像は自動的に圧縮されます',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 32),
 
@@ -249,6 +342,37 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     }
   }
 
+  void _pickImageWeb() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('プロフィール画像を選択'),
+        content: SizedBox(
+          width: 300,
+          height: 300,
+          child: PlatformImagePicker(
+            width: 300,
+            height: 300,
+            placeholder: 'プロフィール画像を選択',
+            onImageSelected: (bytes, fileName) {
+              setState(() {
+                _selectedImageBytes = bytes;
+                _selectedImageFileName = fileName;
+              });
+              Navigator.of(context).pop();
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getPrivacyLevelText(PrivacyLevel level) {
     switch (level) {
       case PrivacyLevel.public:
@@ -278,12 +402,38 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         throw Exception('ユーザー情報が取得できません');
       }
 
-      // TODO: 画像をFirebase Storageにアップロード
+      // 画像をFirebase Storageにアップロード
       String? imageUrl = _selectedImagePath;
-      if (_selectedImagePath != null &&
+
+      if (kIsWeb && _selectedImageBytes != null) {
+        // Web環境：バイトデータからアップロード
+        try {
+          imageUrl = await StorageService.uploadProfileImageFromBytes(
+            bytes: _selectedImageBytes!,
+            userId: currentUser.id,
+            fileName: _selectedImageFileName ?? 'profile.jpg',
+          );
+          if (imageUrl == null) {
+            throw Exception('画像のアップロードに失敗しました');
+          }
+        } catch (e) {
+          throw Exception('画像アップロードエラー: $e');
+        }
+      } else if (!kIsWeb &&
+          _selectedImagePath != null &&
           !_selectedImagePath!.startsWith('http')) {
-        // 新しい画像が選択された場合のアップロード処理
-        // imageUrl = await uploadImageToStorage(_selectedImagePath!);
+        // モバイル環境：ファイルパスからアップロード
+        try {
+          imageUrl = await StorageService.uploadProfileImage(
+            filePath: _selectedImagePath!,
+            userId: currentUser.id,
+          );
+          if (imageUrl == null) {
+            throw Exception('画像のアップロードに失敗しました');
+          }
+        } catch (e) {
+          throw Exception('画像アップロードエラー: $e');
+        }
       }
 
       final updatedUser = currentUser.copyWith(
@@ -301,10 +451,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
       if (success) {
         if (mounted) {
-          context.pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('プロフィールを更新しました')),
           );
+
+          // 安全なナビゲーション
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            context.go('/profile');
+          }
         }
       } else {
         if (mounted) {
@@ -317,8 +473,37 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'エラーが発生しました';
+
+        // エラーメッセージを解析してユーザーフレンドリーなメッセージに変換
+        final errorString = e.toString();
+        if (errorString.contains('圧縮後もファイルサイズが大きすぎます')) {
+          errorMessage = '画像が非常に大きいため、圧縮後も制限を超えています。\nより小さい画像を選択してください。';
+        } else if (errorString.contains('画像の圧縮に失敗しました')) {
+          errorMessage = '画像の圧縮に失敗しました。\n別の画像を選択してください。';
+        } else if (errorString.contains('Message too long')) {
+          errorMessage = '画像が大きすぎます。\nより小さいサイズの画像を選択してください。';
+        } else if (errorString.contains('画像アップロードエラー')) {
+          errorMessage = '画像のアップロードに失敗しました。\nネットワーク接続を確認してください。';
+        } else if (errorString.contains('アップロード権限がありません')) {
+          errorMessage = 'アップロード権限がありません。\nアプリを再起動してください。';
+        } else if (errorString.contains('ネットワークエラー')) {
+          errorMessage = 'ネットワークエラーが発生しました。\n接続を確認してから再試行してください。';
+        } else if (errorString.contains('タイムアウト')) {
+          errorMessage = 'アップロードがタイムアウトしました。\nファイルサイズを小さくしてください。';
+        } else if (errorString.contains('ファイルが空です')) {
+          errorMessage = '選択した画像ファイルが無効です。\n別の画像を選択してください。';
+        } else {
+          errorMessage =
+              'エラーが発生しました: ${e.toString().replaceAll('Exception: ', '')}';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('エラーが発生しました: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {

@@ -4,9 +4,19 @@ import 'package:go_router/go_router.dart';
 import '../models/community_model.dart';
 import '../providers/community_provider.dart';
 import '../constants/app_colors.dart';
+import '../providers/user_provider.dart';
 
 class CommunityListWidget extends StatefulWidget {
-  const CommunityListWidget({super.key});
+  final List<CommunityModel>? communities;
+  final Function(CommunityModel)? onCommunityTap;
+  final String? searchQuery;
+
+  const CommunityListWidget({
+    super.key,
+    this.communities,
+    this.onCommunityTap,
+    this.searchQuery,
+  });
 
   @override
   State<CommunityListWidget> createState() => _CommunityListWidgetState();
@@ -15,6 +25,33 @@ class CommunityListWidget extends StatefulWidget {
 class _CommunityListWidgetState extends State<CommunityListWidget> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchQuery = widget.searchQuery ?? '';
+    _searchController.text = _searchQuery;
+
+    // コミュニティ一覧を初期読み込み
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.communities == null) {
+        final userProvider = context.read<UserProvider>();
+        final currentUser = userProvider.currentUser;
+        if (currentUser != null) {
+          context.read<CommunityProvider>().getUserCommunities(currentUser.id);
+        }
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(CommunityListWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.searchQuery != oldWidget.searchQuery) {
+      _searchQuery = widget.searchQuery ?? '';
+      _searchController.text = _searchQuery;
+    }
+  }
 
   @override
   void dispose() {
@@ -26,29 +63,33 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 検索バー
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-              hintText: 'コミュニティを検索...',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+        // HomeScreenから検索バーが提供される場合は表示しない
+        if (widget.searchQuery == null) ...[
+          // 検索バー
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'コミュニティを検索...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.trim().toLowerCase();
+                });
+              },
             ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.trim().toLowerCase();
-              });
-            },
           ),
-        ),
+        ],
         // コミュニティ一覧
         Expanded(
           child: Consumer<CommunityProvider>(
             builder: (context, communityProvider, child) {
-              final communities =
-                  _getFilteredCommunities(communityProvider.joinedCommunities);
+              final communities = _getFilteredCommunities(
+                widget.communities ?? communityProvider.userCommunities,
+              );
 
               if (communityProvider.isLoading) {
                 return const Center(child: CircularProgressIndicator());
@@ -69,7 +110,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
                       const SizedBox(height: 16),
                       Text(
                         _searchQuery.isEmpty
-                            ? '参加しているコミュニティはありません'
+                            ? '参加しているコミュニティがありません'
                             : '検索結果が見つかりませんでした',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppColors.textSecondary,
@@ -96,14 +137,14 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
 
   List<CommunityModel> _getFilteredCommunities(
       List<CommunityModel> communities) {
-    if (_searchQuery.isEmpty) {
+    final query = _searchQuery.toLowerCase();
+    if (query.isEmpty) {
       return communities;
     }
 
     return communities.where((community) {
-      return community.name.toLowerCase().contains(_searchQuery) ||
-          (community.description?.toLowerCase().contains(_searchQuery) ??
-              false);
+      return community.name.toLowerCase().contains(query) ||
+          (community.description?.toLowerCase().contains(query) ?? false);
     }).toList();
   }
 
@@ -111,16 +152,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary,
-          child: Text(
-            community.name.isNotEmpty ? community.name[0].toUpperCase() : 'C',
-            style: const TextStyle(
-              color: AppColors.textOnPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+        leading: _buildCommunityImage(community.imageUrl),
         title: Text(
           community.name,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -128,7 +160,8 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (community.description != null) ...[
+            if (community.description != null &&
+                community.description!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
                 community.description!,
@@ -146,7 +179,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${community.memberCount}人',
+                  '${community.memberIds.length}人',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -172,9 +205,45 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
-          context.go('/community/${community.id}');
+          if (widget.onCommunityTap != null) {
+            widget.onCommunityTap!(community);
+          } else {
+            context.go('/community/${community.id}');
+          }
         },
       ),
     );
+  }
+
+  // コミュニティ画像を表示するWidgetを構築
+  Widget _buildCommunityImage(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return CircleAvatar(
+        backgroundColor: AppColors.primary,
+        child: Icon(
+          Icons.group,
+          color: AppColors.textOnPrimary,
+        ),
+      );
+    }
+
+    try {
+      return CircleAvatar(
+        backgroundImage: NetworkImage(imageUrl),
+        backgroundColor: AppColors.primary,
+        onBackgroundImageError: (exception, stackTrace) {
+          // エラー時はアイコンを表示
+        },
+        child: null,
+      );
+    } catch (e) {
+      return CircleAvatar(
+        backgroundColor: AppColors.primary,
+        child: Icon(
+          Icons.group,
+          color: AppColors.textOnPrimary,
+        ),
+      );
+    }
   }
 }

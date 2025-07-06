@@ -4,7 +4,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // 投稿関連
-  static const int maxImageSize = 5 * 1024 * 1024; // 5MB
+  static const int maxImageSize = 5 * 1024 * 1024; // 5MB（圧縮後）
   static const int maxTitleLength = 100;
   static const int maxCommentLength = 500;
   static const Duration concentrationPeriod = Duration(hours: 24);

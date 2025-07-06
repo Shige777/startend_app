@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PostType { start, end }
+enum PostType { start, end } // endは廃止予定（互換性のため残す）
 
 enum PostStatus {
   concentration, // 集中 (24時間以内)
@@ -19,12 +19,14 @@ enum PrivacyLevel {
 class PostModel {
   final String id;
   final String userId;
-  final String? startPostId; // END投稿の場合、対応するSTART投稿のID
-  final String? endPostId; // START投稿の場合、対応するEND投稿のID
-  final PostType type;
+  final String? startPostId; // 廃止予定（互換性のため残す）
+  final String? endPostId; // 廃止予定（互換性のため残す）
+  final PostType type; // START投稿のみ使用
   final String title;
-  final String? comment;
-  final String? imageUrl;
+  final String? comment; // START投稿時のコメント
+  final String? imageUrl; // START投稿の画像
+  final String? endComment; // END投稿時のコメント
+  final String? endImageUrl; // END投稿の画像
   final DateTime? scheduledEndTime;
   final DateTime? actualEndTime;
   final PrivacyLevel privacyLevel;
@@ -43,6 +45,8 @@ class PostModel {
     required this.title,
     this.comment,
     this.imageUrl,
+    this.endComment,
+    this.endImageUrl,
     this.scheduledEndTime,
     this.actualEndTime,
     required this.privacyLevel,
@@ -67,6 +71,8 @@ class PostModel {
       title: data['title'] ?? '',
       comment: data['comment'],
       imageUrl: data['imageUrl'],
+      endComment: data['endComment'],
+      endImageUrl: data['endImageUrl'],
       scheduledEndTime: data['scheduledEndTime'] != null
           ? (data['scheduledEndTime'] as Timestamp).toDate()
           : null,
@@ -94,12 +100,13 @@ class PostModel {
       'title': title,
       'comment': comment,
       'imageUrl': imageUrl,
+      'endComment': endComment,
+      'endImageUrl': endImageUrl,
       'scheduledEndTime': scheduledEndTime != null
           ? Timestamp.fromDate(scheduledEndTime!)
           : null,
-      'actualEndTime': actualEndTime != null
-          ? Timestamp.fromDate(actualEndTime!)
-          : null,
+      'actualEndTime':
+          actualEndTime != null ? Timestamp.fromDate(actualEndTime!) : null,
       'privacyLevel': privacyLevel.toString().split('.').last,
       'communityIds': communityIds,
       'likedByUserIds': likedByUserIds,
@@ -118,6 +125,8 @@ class PostModel {
     String? title,
     String? comment,
     String? imageUrl,
+    String? endComment,
+    String? endImageUrl,
     DateTime? scheduledEndTime,
     DateTime? actualEndTime,
     PrivacyLevel? privacyLevel,
@@ -136,6 +145,8 @@ class PostModel {
       title: title ?? this.title,
       comment: comment ?? this.comment,
       imageUrl: imageUrl ?? this.imageUrl,
+      endComment: endComment ?? this.endComment,
+      endImageUrl: endImageUrl ?? this.endImageUrl,
       scheduledEndTime: scheduledEndTime ?? this.scheduledEndTime,
       actualEndTime: actualEndTime ?? this.actualEndTime,
       privacyLevel: privacyLevel ?? this.privacyLevel,
@@ -151,7 +162,8 @@ class PostModel {
   PostStatus get status {
     final now = DateTime.now();
 
-    if (type == PostType.end) {
+    // 投稿が完了している場合
+    if (isCompleted) {
       return PostStatus.completed;
     }
 
@@ -177,7 +189,7 @@ class PostModel {
     return PostStatus.inProgress;
   }
 
-  bool get isCompleted => type == PostType.end || actualEndTime != null;
+  bool get isCompleted => actualEndTime != null;
   bool get isOverdue =>
       scheduledEndTime != null &&
       DateTime.now().isAfter(scheduledEndTime!) &&

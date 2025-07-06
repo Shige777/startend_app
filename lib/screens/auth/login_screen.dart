@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
+import '../../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -45,17 +46,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   AppConstants.appName,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'START/END投稿を軸とした進捗共有SNS',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                        color: AppColors.textSecondary,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 60),
@@ -232,6 +233,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
+      // 通知サービスを初期化
+      await NotificationService.initialize();
       context.go('/home');
     }
   }
@@ -242,6 +245,8 @@ class _LoginScreenState extends State<LoginScreen> {
   ) async {
     final success = await authProvider.signInWithGoogle();
     if (success && mounted) {
+      // 通知サービスを初期化
+      await NotificationService.initialize();
       context.go('/home');
     }
   }
@@ -252,6 +257,8 @@ class _LoginScreenState extends State<LoginScreen> {
   ) async {
     final success = await authProvider.signInWithApple();
     if (success && mounted) {
+      // 通知サービスを初期化
+      await NotificationService.initialize();
       context.go('/home');
     }
   }

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import '../../providers/auth_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/community_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
+import '../../services/storage_service.dart';
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/custom_tab_bar.dart';
 import '../../widgets/community_list_widget.dart';
+import '../../widgets/platform_image_picker.dart';
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,14 +25,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int _selectedIndex = 0; // 0: 投稿, 1: 軌跡
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
+
+    // URLパラメータからタブを設定
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uri = GoRouterState.of(context).uri;
+      final tabParam = uri.queryParameters['tab'];
+      if (tabParam == '1') {
+        setState(() {
+          _selectedIndex = 1;
+        });
+      }
+    });
   }
 
   @override
@@ -40,24 +58,50 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      body: _buildCurrentScreen(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: '投稿'),
+          BottomNavigationBarItem(icon: Icon(Icons.timeline), label: '軌跡'),
+        ],
+      ),
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+
+  Widget _buildCurrentScreen() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildPostScreen();
+      case 1:
+        // 軌跡画面：自分のプロフィールのみ表示
+        return Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final currentUser = userProvider.currentUser;
+            if (currentUser == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return ProfileScreen(userId: currentUser.id, isOwnProfile: true);
+          },
+        );
+      default:
+        return _buildPostScreen();
+    }
+  }
+
+  Widget _buildPostScreen() {
+    return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('startend'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _showSearchDialog,
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') {
-                _handleLogout(context);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'logout', child: Text('ログアウト')),
-            ],
-          ),
-        ],
+        backgroundColor: AppColors.surface,
+        elevation: 0,
         bottom: CustomTabBar(
           controller: _tabController,
           tabs: const [
@@ -66,75 +110,97 @@ class _HomeScreenState extends State<HomeScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          PostListWidget(
-            type: PostListType.following,
-            searchQuery: _searchQuery,
+          // 検索バー
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: _tabController.index == 0
+                    ? '投稿・ユーザーを検索...'
+                    : 'コミュニティを検索...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _performSearch('');
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              onChanged: _performSearch,
+            ),
           ),
-          const CommunityListWidget(),
+          // タブビュー
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                PostListWidget(
+                  type: PostListType.following,
+                  searchQuery: _searchQuery,
+                ),
+                CommunityListWidget(
+                  searchQuery: _searchQuery,
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-          _handleNavigation(context, index);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: '投稿'),
-          BottomNavigationBarItem(icon: Icon(Icons.timeline), label: '軌跡'),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          context.go('/create-post');
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: AppColors.textOnPrimary),
       ),
     );
   }
 
-  void _showSearchDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('投稿を検索'),
-        content: TextField(
-          controller: _searchController,
-          decoration: const InputDecoration(
-            hintText: 'タイトルやコメントで検索...',
-            prefixIcon: Icon(Icons.search),
-          ),
-          autofocus: true,
-          onSubmitted: (value) {
-            _performSearch(value);
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          TextButton(
+  Widget? _buildFloatingActionButton() {
+    switch (_selectedIndex) {
+      case 0:
+        // 投稿画面：タブに応じてアクションを変更
+        if (_tabController.index == 0) {
+          // フォロー中タブ：投稿作成
+          return FloatingActionButton(
             onPressed: () {
-              _searchController.clear();
-              _performSearch('');
-              Navigator.pop(context);
+              context.go('/post/create');
             },
-            child: const Text('クリア'),
-          ),
-          TextButton(
+            backgroundColor: AppColors.primary,
+            child: const Icon(
+              Icons.add,
+              color: AppColors.textOnPrimary,
+            ),
+          );
+        } else {
+          // コミュニティタブ：コミュニティ作成
+          return FloatingActionButton(
             onPressed: () {
-              _performSearch(_searchController.text);
-              Navigator.pop(context);
+              _showCreateCommunityDialog(context);
             },
-            child: const Text('検索'),
-          ),
-        ],
-      ),
-    );
+            backgroundColor: AppColors.primary,
+            child: const Icon(
+              Icons.group_add,
+              color: AppColors.textOnPrimary,
+            ),
+          );
+        }
+      default:
+        return null;
+    }
   }
 
   void _performSearch(String query) {
@@ -143,44 +209,226 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     if (_tabController.index == 0) {
-      // フォロー中タブでの検索
-      context.read<PostProvider>().searchPosts(_searchQuery);
+      // フォロー中タブでの検索（投稿とユーザーを検索）
+      if (_searchQuery.isNotEmpty) {
+        context.read<PostProvider>().searchPosts(_searchQuery);
+        context.read<UserProvider>().searchUsers(_searchQuery);
+      }
     }
   }
 
-  void _handleNavigation(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        // 投稿画面 (現在の画面)
-        break;
-      case 1:
-        // 軌跡画面
-        context.go('/profile');
-        break;
-    }
-  }
+  void _showCreateCommunityDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+    bool requiresApproval = false;
+    Uint8List? selectedImageBytes;
+    String? selectedImageName;
 
-  void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ログアウト'),
-        content: const Text('ログアウトしますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<AuthProvider>().signOut();
-              context.go('/login');
-            },
-            child: const Text('ログアウト'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('コミュニティ作成'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // アイコン選択
+                    GestureDetector(
+                      onTap: () async {
+                        // 直接画像選択ダイアログを表示
+                        final result = await showDialog<Map<String, dynamic>>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('画像を選択'),
+                            content: SizedBox(
+                              width: 300,
+                              height: 300,
+                              child: PlatformImagePicker(
+                                onImageSelected: (bytes, fileName) {
+                                  Navigator.of(context).pop({
+                                    'bytes': bytes,
+                                    'fileName': fileName,
+                                  });
+                                },
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('キャンセル'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (result != null) {
+                          setState(() {
+                            selectedImageBytes = result['bytes'];
+                            selectedImageName = result['fileName'];
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(40),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: selectedImageBytes != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(40),
+                                child: Image.memory(
+                                  selectedImageBytes!,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.add_a_photo,
+                                size: 32,
+                                color: AppColors.textSecondary,
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'アイコンを選択',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '※ 大きな画像は自動的に圧縮されます',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'コミュニティ名',
+                        hintText: '例: 朝活コミュニティ',
+                      ),
+                      maxLength: 50,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: '説明',
+                        hintText: 'コミュニティの説明を入力してください',
+                      ),
+                      maxLines: 3,
+                      maxLength: 200,
+                    ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      title: const Text('承認制'),
+                      subtitle: const Text('新しいメンバーの参加に承認が必要'),
+                      value: requiresApproval,
+                      onChanged: (value) {
+                        setState(() {
+                          requiresApproval = value ?? false;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('キャンセル'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('コミュニティ名を入力してください')),
+                      );
+                      return;
+                    }
+
+                    final userProvider = context.read<UserProvider>();
+                    final currentUser = userProvider.currentUser;
+
+                    if (currentUser == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('ログインが必要です')),
+                      );
+                      return;
+                    }
+
+                    // 画像をアップロード
+                    String? imageUrl;
+                    if (selectedImageBytes != null &&
+                        selectedImageName != null) {
+                      try {
+                        // 一時的なコミュニティIDを生成
+                        final tempCommunityId =
+                            DateTime.now().millisecondsSinceEpoch.toString();
+
+                        imageUrl =
+                            await StorageService.uploadCommunityIconFromBytes(
+                          bytes: selectedImageBytes!,
+                          userId: currentUser.id,
+                          communityId: tempCommunityId,
+                          fileName: selectedImageName!,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('アイコンのアップロードに失敗しました: $e')),
+                          );
+                        }
+                        return;
+                      }
+                    }
+
+                    final success =
+                        await context.read<CommunityProvider>().createCommunity(
+                              name: nameController.text.trim(),
+                              description: descriptionController.text.trim(),
+                              userId: currentUser.id,
+                              requiresApproval: requiresApproval,
+                              imageUrl: imageUrl,
+                            );
+
+                    if (success && context.mounted) {
+                      // UserProviderのcurrentUserも更新
+                      await context.read<UserProvider>().refreshCurrentUser();
+
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('コミュニティを作成しました')),
+                      );
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('コミュニティの作成に失敗しました')),
+                      );
+                    }
+                  },
+                  child: const Text('作成'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+  }
+
+  void _onTabChanged() {
+    // タブが変更されたときの処理
+    setState(() {}); // FloatingActionButtonのアイコンを更新
   }
 }

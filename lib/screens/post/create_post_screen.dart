@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -8,9 +10,13 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/post_model.dart';
 import '../../utils/date_time_utils.dart';
+import '../../services/storage_service.dart';
+import '../../widgets/platform_image_picker.dart';
 
 class CreatePostScreen extends StatefulWidget {
-  const CreatePostScreen({super.key});
+  final String? communityId;
+
+  const CreatePostScreen({super.key, this.communityId});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -23,6 +29,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   DateTime? _selectedDateTime;
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageFileName;
   PrivacyLevel _selectedPrivacyLevel = PrivacyLevel.public;
   bool _isLoading = false;
 
@@ -38,7 +46,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('START投稿'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(widget.communityId != null ? 'コミュニティ投稿' : 'START投稿'),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _handleSubmit,
@@ -60,46 +72,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // 画像選択
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(
-                      AppConstants.borderRadius,
-                    ),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: _selectedImagePath != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            AppConstants.borderRadius,
-                          ),
-                          child: Image.network(
-                            _selectedImagePath!,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_photo_alternate,
-                              size: 48,
-                              color: AppColors.textHint,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              '画像を選択',
-                              style: TextStyle(
-                                color: AppColors.textHint,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
+              PlatformImagePicker(
+                height: 200,
+                placeholder: '画像を選択してください',
+                onImageSelected: (bytes, fileName) {
+                  setState(() {
+                    _selectedImageBytes = bytes;
+                    _selectedImageFileName = fileName;
+                    // モバイル環境では従来のパスも保持
+                    if (!kIsWeb) {
+                      _selectedImagePath = fileName;
+                    }
+                  });
+                },
               ),
               const SizedBox(height: 24),
 
@@ -191,17 +176,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImagePath = pickedFile.path;
-      });
-    }
-  }
-
   Future<void> _selectDateTime() async {
     final date = await showDatePicker(
       context: context,
@@ -246,7 +220,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedImagePath == null) {
+    // 画像が選択されているかチェック
+    if (_selectedImageBytes == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('画像を選択してください')));
@@ -272,8 +247,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         throw Exception('ユーザー情報が取得できません');
       }
 
-      // TODO: 画像をFirebase Storageにアップロード
-      final imageUrl = _selectedImagePath!; // 仮の実装
+      // 画像をFirebase Storageにアップロード
+      String? imageUrl;
+
+      if (_selectedImageBytes != null) {
+        // バイトデータからアップロード（Web・モバイル共通）
+        imageUrl = await StorageService.uploadPostImageFromBytes(
+          bytes: _selectedImageBytes!,
+          userId: userProvider.currentUser!.id,
+          postId: DateTime.now().millisecondsSinceEpoch.toString(),
+          fileName: _selectedImageFileName ?? 'image.jpg',
+        );
+      }
+
+      if (imageUrl == null) {
+        throw Exception('画像のアップロードに失敗しました');
+      }
 
       final post = PostModel(
         id: '', // Firestoreで自動生成
@@ -283,18 +272,35 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         imageUrl: imageUrl,
         scheduledEndTime: _selectedDateTime,
         privacyLevel: _selectedPrivacyLevel,
-        communityIds: [], // TODO: 選択されたコミュニティIDを設定
+        communityIds: widget.communityId != null ? [widget.communityId!] : [],
         likedByUserIds: [],
         likeCount: 0,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
+      if (kDebugMode) {
+        print('投稿作成開始: ${post.title}');
+        print('ユーザーID: ${post.userId}');
+        print('投稿タイプ: ${post.type}');
+      }
+
       final success = await postProvider.createPost(post);
 
       if (success) {
+        if (kDebugMode) {
+          print('投稿作成成功');
+        }
+
+        // 投稿作成後にユーザーの投稿一覧を更新
+        await postProvider.getUserPosts(userProvider.currentUser!.id);
+
         if (mounted) {
-          context.go('/home');
+          if (widget.communityId != null) {
+            Navigator.of(context).pop(); // コミュニティ画面に戻る
+          } else {
+            context.go('/home');
+          }
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('投稿を作成しました')));

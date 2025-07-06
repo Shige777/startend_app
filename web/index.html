@@ -31,6 +31,38 @@
 
   <title>startend_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <meta name="google-signin-client_id" content="201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+  
+  <!-- Firebase Configuration -->
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBzqsXuEw6RlO8Eg0PXX30PaUAOoqsL6X8",
+      authDomain: "startend-sns-app.firebaseapp.com",
+      projectId: "startend-sns-app",
+      storageBucket: "startend-sns-app.firebasestorage.app",
+      messagingSenderId: "201575475230",
+      appId: "1:201575475230:web:a14716424cb840b51fa60f"
+    };
+    
+    // Initialize Firebase
+    try {
+      firebase.initializeApp(firebaseConfig);
+      console.log('Firebase initialized successfully');
+    } catch (error) {
+      console.error('Firebase initialization error:', error);
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
