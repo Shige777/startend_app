@@ -220,141 +220,55 @@ class PostCardWidget extends StatelessWidget {
               ),
             ],
 
-            // 終了予定時刻（END投稿されていない場合）
-            if (!post.isCompleted && post.scheduledEndTime != null) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.defaultPadding,
-                  vertical: AppConstants.smallPadding,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.schedule,
-                      size: 16,
-                      color: post.isOverdue
-                          ? AppColors.error
-                          : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '終了予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: post.isOverdue
-                                ? AppColors.error
-                                : AppColors.textSecondary,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
             // アクションボタン
             if (showActions) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  // いいねボタン
-                  Consumer<UserProvider>(
-                    builder: (context, userProvider, child) {
-                      final currentUser = userProvider.currentUser;
-                      final isLiked =
-                          currentUser != null && post.isLikedBy(currentUser.id);
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.defaultPadding),
+                child: Row(
+                  children: [
+                    // いいねボタン
+                    Consumer<UserProvider>(
+                      builder: (context, userProvider, child) {
+                        final currentUser = userProvider.currentUser;
+                        final isLiked = currentUser != null &&
+                            post.isLikedBy(currentUser.id);
 
-                      return InkWell(
-                        onTap: () => _toggleLike(context, currentUser),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.local_fire_department,
-                                size: 20,
-                                color: isLiked
-                                    ? AppColors.flame
-                                    : AppColors.textSecondary,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                post.likeCount.toString(),
-                                style: TextStyle(
+                        return InkWell(
+                          onTap: () => _toggleLike(context, currentUser),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department,
+                                  size: 20,
                                   color: isLiked
                                       ? AppColors.flame
                                       : AppColors.textSecondary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.likeCount.toString(),
+                                  style: TextStyle(
+                                    color: isLiked
+                                        ? AppColors.flame
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const Spacer(),
-
-                  // END投稿ボタン（START投稿で未完了の場合のみ）
-                  if (post.type == PostType.start && !post.isCompleted) ...[
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, child) {
-                        final currentUser = userProvider.currentUser;
-                        final isOwnPost = currentUser != null &&
-                            post.userId == currentUser.id;
-
-                        if (isOwnPost) {
-                          return ElevatedButton.icon(
-                            onPressed: () {
-                              context.push('/create-end-post', extra: {
-                                'startPostId': post.id,
-                                'startPost': post,
-                              });
-                            },
-                            icon: const Icon(Icons.flag, size: 16),
-                            label: const Text('END投稿'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.completed,
-                              foregroundColor: AppColors.textOnPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              textStyle: const TextStyle(fontSize: 12),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
+                        );
                       },
                     ),
                   ],
-
-                  // 削除ボタン（投稿者本人の場合のみ）
-                  if (onDelete != null) ...[
-                    const SizedBox(width: 8),
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, child) {
-                        final currentUser = userProvider.currentUser;
-                        final isOwnPost = currentUser != null &&
-                            post.userId == currentUser.id;
-
-                        if (isOwnPost) {
-                          return IconButton(
-                            onPressed: onDelete,
-                            icon: const Icon(Icons.delete, size: 16),
-                            color: AppColors.error,
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ],
-                ],
+                ),
               ),
             ],
           ],
@@ -365,13 +279,13 @@ class PostCardWidget extends StatelessWidget {
 
   Widget _buildImageSection(BuildContext context) {
     return Container(
-      height: 280, // 高さを調整（タイトルとラベル分を追加）
+      height: 320, // 高さを大きくして余白を埋める
       child: Column(
         children: [
           // タイトル
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: AppColors.surface,
             child: Text(
               post.title,
@@ -395,14 +309,15 @@ class PostCardWidget extends StatelessWidget {
                       // START画像の下にラベル
                       Container(
                         width: double.infinity,
-                        height: 28, // 固定高さ
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        height: 24, // 高さを小さくして画像を大きく
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 2, horizontal: 4),
                         color: AppColors.surface,
                         child: Row(
                           children: [
                             const Icon(Icons.play_arrow,
-                                size: 16, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
+                                size: 14, color: AppColors.textSecondary),
+                            const SizedBox(width: 2),
                             Expanded(
                               child: Text(
                                 '開始: ${DateTimeUtils.formatDateTime(post.createdAt)}',
@@ -411,6 +326,7 @@ class PostCardWidget extends StatelessWidget {
                                     .bodySmall
                                     ?.copyWith(
                                       color: AppColors.textSecondary,
+                                      fontSize: 10,
                                     ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -473,8 +389,9 @@ class PostCardWidget extends StatelessWidget {
                       // END画像の下にラベル
                       Container(
                         width: double.infinity,
-                        height: 28, // 固定高さ
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        height: 24, // 高さを小さくして画像を大きく
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 2, horizontal: 4),
                         color: AppColors.surface,
                         child: post.scheduledEndTime != null
                             ? Row(
@@ -483,19 +400,19 @@ class PostCardWidget extends StatelessWidget {
                                     post.isCompleted
                                         ? Icons.flag
                                         : Icons.schedule,
-                                    size: 16,
+                                    size: 14,
                                     color: post.isOverdue
                                         ? AppColors.error
                                         : post.isCompleted
                                             ? AppColors.completed
                                             : AppColors.textSecondary,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 2),
                                   Expanded(
                                     child: Text(
                                       post.isCompleted
                                           ? '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime ?? post.scheduledEndTime!)}'
-                                          : '予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
+                                          : '',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -505,13 +422,14 @@ class PostCardWidget extends StatelessWidget {
                                                 : post.isCompleted
                                                     ? AppColors.completed
                                                     : AppColors.textSecondary,
+                                            fontSize: 10,
                                           ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
                               )
-                            : const SizedBox(height: 20), // 空のスペース
+                            : const SizedBox(height: 16), // 空のスペース
                       ),
                     ],
                   ),

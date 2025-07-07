@@ -866,41 +866,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fit: StackFit.expand,
                   children: [
                     _buildPostGridItem(post),
-                    // リアクション数を右下に表示
-                    if (post.likeCount > 0)
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.local_fire_department,
-                                size: 12,
-                                color: AppColors.flame,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                post.likeCount.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     // 投稿ステータスを左上に表示
                     Positioned(
                       top: 4,
