@@ -837,14 +837,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   // グリッド表示用のWidget（START/END画像を2つ並べて表示）
   Widget _buildPostGrid(List<PostModel> posts) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 4,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
           childAspectRatio: 1.0,
         ),
         itemCount: posts.length,
@@ -854,14 +854,71 @@ class _ProfileScreenState extends State<ProfileScreen>
             onTap: () => context.go('/post/${post.id}', extra: {
               'post': post,
             }),
+            onDoubleTap: () => _toggleLike(post),
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(4),
                 color: AppColors.surface,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: _buildPostGridItem(post),
+                borderRadius: BorderRadius.circular(4),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildPostGridItem(post),
+                    // リアクション数を右下に表示
+                    if (post.likeCount > 0)
+                      Positioned(
+                        bottom: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                size: 12,
+                                color: AppColors.flame,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                post.likeCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // 投稿ステータスを左上に表示
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(post.status).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: _getStatusIcon(post.status),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -981,7 +1038,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             onTap: () => context.go('/post/${post.id}', extra: {
               'post': post,
             }),
-            showActions: false, // アクションボタンは非表示
+            showActions: true, // アクションボタンを表示してリアクション可能に
           ),
         );
       }).toList(),
@@ -1060,6 +1117,124 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         );
       }
+    }
+  }
+
+  // 投稿ステータスの色を取得
+  Color _getStatusColor(PostStatus status) {
+    switch (status) {
+      case PostStatus.concentration:
+        return AppColors.primary;
+      case PostStatus.inProgress:
+        return AppColors.inProgress;
+      case PostStatus.completed:
+        return AppColors.completed;
+      case PostStatus.overdue:
+        return AppColors.error;
+    }
+  }
+
+  // 投稿ステータスのアイコンを取得
+  Widget _getStatusIcon(PostStatus status) {
+    switch (status) {
+      case PostStatus.concentration:
+        return const Icon(
+          Icons.flash_on,
+          size: 12,
+          color: Colors.white,
+        );
+      case PostStatus.inProgress:
+        return const Icon(
+          Icons.play_arrow,
+          size: 12,
+          color: Colors.white,
+        );
+      case PostStatus.completed:
+        return const Icon(
+          Icons.check,
+          size: 12,
+          color: Colors.white,
+        );
+      case PostStatus.overdue:
+        return const Icon(
+          Icons.warning,
+          size: 12,
+          color: Colors.white,
+        );
+    }
+  }
+
+  void _toggleLike(PostModel post) async {
+    final userProvider = context.read<UserProvider>();
+    final postProvider = context.read<PostProvider>();
+    final currentUser = userProvider.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    final isLiked = post.isLikedBy(currentUser.id);
+
+    try {
+      bool success;
+      if (isLiked) {
+        success = await postProvider.unlikePost(post.id, currentUser.id);
+      } else {
+        success = await postProvider.likePost(post.id, currentUser.id);
+      }
+
+      if (success) {
+        // 成功時にローカルの投稿データを安全に更新
+        final newLikeCount = isLiked
+            ? (post.likeCount > 0 ? post.likeCount - 1 : 0)
+            : post.likeCount + 1;
+
+        final newLikedByUserIds = isLiked
+            ? post.likedByUserIds.where((id) => id != currentUser.id).toList()
+            : [...post.likedByUserIds, currentUser.id];
+
+        final updatedPost = post.copyWith(
+          likeCount: newLikeCount,
+          likedByUserIds: newLikedByUserIds,
+        );
+
+        // PostProviderの各リストを更新
+        postProvider.updatePostInLists(updatedPost);
+
+        // UI更新のためのsetState
+        if (mounted) {
+          setState(() {});
+        }
+
+        // フィードバックアニメーション
+        if (!isLiked) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.local_fire_department,
+                      color: AppColors.flame),
+                  const SizedBox(width: 8),
+                  Text('${post.title}にリアクションしました'),
+                ],
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'エラーが発生しました')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
     }
   }
 }

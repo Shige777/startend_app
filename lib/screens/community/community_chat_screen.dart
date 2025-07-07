@@ -376,7 +376,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             });
           },
           onDelete: isOwnPost ? () => _showDeleteConfirmation(post) : null,
-          showActions: false, // アクションボタンを非表示
+          showActions: true, // アクションボタンを表示してリアクション可能に
         ),
       ),
     );
