@@ -15,15 +15,17 @@ import '../models/user_model.dart';
 class PostCardWidget extends StatelessWidget {
   final PostModel post;
   final VoidCallback? onTap;
-  final VoidCallback? onDelete;
   final bool showActions; // アクションボタンの表示制御
+  final VoidCallback? onDelete;
+  final String? fromPage; // 遷移元のページ識別子
 
   const PostCardWidget({
     super.key,
     required this.post,
     this.onTap,
-    this.onDelete,
     this.showActions = true, // デフォルトは表示
+    this.onDelete,
+    this.fromPage,
   });
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
@@ -107,13 +109,14 @@ class PostCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(
-        vertical: AppConstants.smallPadding / 2,
+        vertical: 2, // 上下の余白を削減
       ),
       color: AppColors.surface,
       child: InkWell(
         onTap: onTap ??
-            () => context.go('/post/${post.id}', extra: {
+            () => context.push('/post/${post.id}', extra: {
                   'post': post,
+                  'fromPage': fromPage, // 軌跡画面から来たことを識別
                 }),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +282,7 @@ class PostCardWidget extends StatelessWidget {
 
   Widget _buildImageSection(BuildContext context) {
     return Container(
-      height: 320, // 高さを大きくして余白を埋める
+      height: 280, // 高さを調整
       child: Column(
         children: [
           // タイトル
@@ -304,19 +307,23 @@ class PostCardWidget extends StatelessWidget {
                   child: Column(
                     children: [
                       Expanded(
-                        child: _buildImageWidget(post.imageUrl),
+                        child: Container(
+                          width: double.infinity,
+                          child: _buildImageWidget(post.imageUrl,
+                              fit: BoxFit.cover),
+                        ),
                       ),
                       // START画像の下にラベル
                       Container(
                         width: double.infinity,
-                        height: 24, // 高さを小さくして画像を大きく
+                        height: 20, // 高さを小さくして画像を大きく
                         padding: const EdgeInsets.symmetric(
                             vertical: 2, horizontal: 4),
                         color: AppColors.surface,
                         child: Row(
                           children: [
                             const Icon(Icons.play_arrow,
-                                size: 14, color: AppColors.textSecondary),
+                                size: 12, color: AppColors.textSecondary),
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
@@ -326,7 +333,7 @@ class PostCardWidget extends StatelessWidget {
                                     .bodySmall
                                     ?.copyWith(
                                       color: AppColors.textSecondary,
-                                      fontSize: 10,
+                                      fontSize: 9,
                                     ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -338,7 +345,7 @@ class PostCardWidget extends StatelessWidget {
                   ),
                 ),
                 // 区切り線
-                Container(width: 2, color: AppColors.divider),
+                Container(width: 1, color: AppColors.divider),
                 // END画像（右側）
                 Expanded(
                   child: Column(
@@ -350,7 +357,7 @@ class PostCardWidget extends StatelessWidget {
                                 ? null
                                 : () {
                                     // END投稿作成画面への遷移
-                                    context.go('/create-end-post', extra: {
+                                    context.push('/create-end-post', extra: {
                                       'startPostId': post.id,
                                       'startPost': post,
                                     });
@@ -360,7 +367,8 @@ class PostCardWidget extends StatelessWidget {
                               color: AppColors.surfaceVariant,
                               child: post.isCompleted
                                   ? (post.endImageUrl != null
-                                      ? _buildImageWidget(post.endImageUrl)
+                                      ? _buildImageWidget(post.endImageUrl,
+                                          fit: BoxFit.cover)
                                       : const Center(
                                           child: Icon(Icons.flag,
                                               color: AppColors.completed,
@@ -389,7 +397,7 @@ class PostCardWidget extends StatelessWidget {
                       // END画像の下にラベル
                       Container(
                         width: double.infinity,
-                        height: 24, // 高さを小さくして画像を大きく
+                        height: 20, // 高さを小さくして画像を大きく
                         padding: const EdgeInsets.symmetric(
                             vertical: 2, horizontal: 4),
                         color: AppColors.surface,
@@ -400,7 +408,7 @@ class PostCardWidget extends StatelessWidget {
                                     post.isCompleted
                                         ? Icons.flag
                                         : Icons.schedule,
-                                    size: 14,
+                                    size: 12,
                                     color: post.isOverdue
                                         ? AppColors.error
                                         : post.isCompleted
@@ -422,7 +430,7 @@ class PostCardWidget extends StatelessWidget {
                                                 : post.isCompleted
                                                     ? AppColors.completed
                                                     : AppColors.textSecondary,
-                                            fontSize: 10,
+                                            fontSize: 9,
                                           ),
                                       overflow: TextOverflow.ellipsis,
                                     ),

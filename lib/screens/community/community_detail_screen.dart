@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/community_model.dart';
+import '../../models/user_model.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
@@ -12,8 +13,10 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/post_model.dart';
 import '../../widgets/post_list_widget.dart';
+import '../../widgets/post_card_widget.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/platform_image_picker_mobile.dart';
+import '../../utils/date_time_utils.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -313,13 +316,11 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               )
-                            : PostListWidget(
-                                type: PostListType.community,
-                                posts: _communityPosts,
-                                onPostTap: (post) {
-                                  context.go('/post/${post.id}', extra: {
-                                    'post': post,
-                                  });
+                            : ListView.builder(
+                                itemCount: _communityPosts.length,
+                                itemBuilder: (context, index) {
+                                  final post = _communityPosts[index];
+                                  return _buildCompactPostCard(post);
                                 },
                               ),
                       ),
@@ -451,6 +452,32 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                   maxLines: 3,
                   maxLength: 200,
                 ),
+                const SizedBox(height: 16),
+                // メンバー上限数の表示（編集不可）
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.group, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'メンバー上限数: ',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        '8人（固定）',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -500,37 +527,89 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('メンバー管理'),
+        title: Row(
+          children: [
+            const Text('メンバー管理'),
+            const Spacer(),
+            Text(
+              '${_community!.memberIds.length}/8',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
-          child: FutureBuilder<List<String>>(
-            future: Future.value(_community!.memberIds),
+          child: FutureBuilder<List<UserModel>>(
+            future: _loadMemberDetails(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final memberIds = snapshot.data!;
-              return ListView.builder(
-                itemCount: memberIds.length,
-                itemBuilder: (context, index) {
-                  final memberId = memberIds[index];
-                  final isLeader = memberId == _community!.leaderId;
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Text('メンバー情報を取得できませんでした'),
+                );
+              }
 
-                  return ListTile(
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.person),
+              final members = snapshot.data!;
+              return ListView.builder(
+                itemCount: members.length,
+                itemBuilder: (context, index) {
+                  final member = members[index];
+                  final isLeader = member.id == _community!.leaderId;
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: member.profileImageUrl != null
+                            ? NetworkImage(member.profileImageUrl!)
+                            : null,
+                        child: member.profileImageUrl == null
+                            ? const Icon(Icons.person)
+                            : null,
+                      ),
+                      title: Text(
+                        member.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(member.email),
+                          if (isLeader)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'リーダー',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: !isLeader && _isLeader()
+                          ? IconButton(
+                              icon: const Icon(Icons.remove_circle,
+                                  color: Colors.red),
+                              onPressed: () => _removeMember(member.id),
+                            )
+                          : null,
                     ),
-                    title: Text(isLeader ? 'リーダー' : 'メンバー'),
-                    subtitle: Text(memberId),
-                    trailing: !isLeader
-                        ? IconButton(
-                            icon: const Icon(Icons.remove_circle,
-                                color: Colors.red),
-                            onPressed: () => _removeMember(memberId),
-                          )
-                        : null,
                   );
                 },
               );
@@ -543,6 +622,188 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
             child: const Text('閉じる'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<List<UserModel>> _loadMemberDetails() async {
+    final userProvider = context.read<UserProvider>();
+    final List<UserModel> members = [];
+
+    for (final memberId in _community!.memberIds) {
+      try {
+        final user = await userProvider.getUserById(memberId);
+        if (user != null) {
+          members.add(user);
+        }
+      } catch (e) {
+        // エラーの場合は基本的なユーザー情報を作成
+        members.add(UserModel(
+          id: memberId,
+          displayName: 'Unknown User',
+          email: '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          followingIds: [],
+          followerIds: [],
+          communityIds: [],
+          isPrivate: false,
+          requiresApproval: false,
+        ));
+      }
+    }
+
+    return members;
+  }
+
+  Widget _buildImageWidget(String? imageUrl) {
+    if (imageUrl == null) {
+      return Container(
+        color: AppColors.surfaceVariant,
+        child: const Center(
+          child: Icon(Icons.image, color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: AppColors.surfaceVariant,
+          child: const Center(
+            child: Icon(Icons.error, color: AppColors.error),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompactPostCard(PostModel post) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => context.push('/post/${post.id}', extra: {
+          'post': post,
+        }),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // タイトル
+              Text(
+                post.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              // 画像セクション（小さく）
+              Container(
+                height: 120, // 高さを小さく
+                child: Row(
+                  children: [
+                    // START画像
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: _buildImageWidget(post.imageUrl),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // END画像
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: post.isCompleted && post.endImageUrl != null
+                              ? _buildImageWidget(post.endImageUrl)
+                              : Container(
+                                  color: AppColors.surfaceVariant,
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.add_photo_alternate,
+                                            color: AppColors.textSecondary,
+                                            size: 24),
+                                        SizedBox(height: 4),
+                                        Text('END',
+                                            style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 10)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // メタ情報
+              Row(
+                children: [
+                  Icon(
+                    post.isCompleted ? Icons.check_circle : Icons.play_arrow,
+                    size: 16,
+                    color: post.isCompleted
+                        ? AppColors.completed
+                        : AppColors.inProgress,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    post.isCompleted ? '完了' : '進行中',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: post.isCompleted
+                          ? AppColors.completed
+                          : AppColors.inProgress,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateTimeUtils.getRelativeTime(post.createdAt),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -110,6 +110,10 @@ class PostProvider extends ChangeNotifier {
           .collection('posts')
           .doc(post.id)
           .update(post.toFirestore());
+
+      // ローカルの投稿リストも更新
+      updatePostInLists(post);
+
       return true;
     } catch (e) {
       _setError('投稿更新に失敗しました');

@@ -14,12 +14,14 @@ class PostDetailScreen extends StatefulWidget {
   final String postId;
   final PostModel? post;
   final String? fromCommunity; // コミュニティから遷移してきた場合のコミュニティID
+  final String? fromPage; // 遷移元のページ識別子
 
   const PostDetailScreen({
     super.key,
     required this.postId,
     this.post,
     this.fromCommunity,
+    this.fromPage,
   });
 
   @override
@@ -151,11 +153,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/home');
-              }
+              Navigator.of(context).pop();
             },
             child: const Text('キャンセル'),
           ),
@@ -200,13 +198,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             const SnackBar(content: Text('投稿を削除しました')),
           );
           // 前の画面に戻る
-          if (widget.fromCommunity != null) {
-            context.go('/community/${widget.fromCommunity}');
-          } else if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go('/home');
-          }
+          Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('投稿の削除に失敗しました')),
@@ -246,30 +238,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            // コミュニティから遷移してきた場合は、コミュニティ画面に戻る
-            if (widget.fromCommunity != null) {
-              context.go('/community/${widget.fromCommunity}');
-            } else if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
+            // 前の画面に戻る
+            Navigator.of(context).pop();
           },
         ),
         title: const Text('投稿詳細'),
         actions: [
-          // 投稿者本人の場合のみ削除ボタンを表示
-          if (_isPostOwner())
+          // 投稿者本人の場合のみ編集・削除ボタンを表示
+          if (_isPostOwner()) ...[
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () {
+                context.push('/edit-post', extra: _post);
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed: _showDeleteConfirmation,
             ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              // TODO: シェア機能の実装
-            },
-          ),
+          ],
         ],
       ),
       body: SingleChildScrollView(
@@ -281,6 +268,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               post: _post!,
               showActions: false,
               onDelete: _isPostOwner() ? _showDeleteConfirmation : null,
+              fromPage: 'detail', // 詳細画面内での使用
             ),
 
             // 実際にかかった時間の表示（完了した投稿の場合のみ）
@@ -383,31 +371,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
-
-            // END投稿作成ボタン（進行中の投稿で投稿者本人の場合のみ）
-            if (_post!.status == PostStatus.inProgress && _isPostOwner())
-              Padding(
-                padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      context.push('/create-end-post', extra: {
-                        'startPostId': _post!.id,
-                        'startPost': _post!,
-                        'fromCommunity': widget.fromCommunity,
-                      });
-                    },
-                    icon: const Icon(Icons.flag),
-                    label: const Text('END投稿を作成'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.completed,
-                      foregroundColor: AppColors.textOnPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

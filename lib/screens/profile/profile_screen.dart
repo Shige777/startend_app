@@ -19,8 +19,16 @@ import '../../widgets/wave_loading_widget.dart';
 class ProfileScreen extends StatefulWidget {
   final String? userId; // 他のユーザーのプロフィールを表示する場合に使用
   final bool isOwnProfile; // 自分のプロフィールかどうかを明示的に指定
+  final String? fromPage; // 遷移元のページ識別子
+  final String? searchQuery; // 検索クエリ（検索画面から来た場合）
 
-  const ProfileScreen({super.key, this.userId, this.isOwnProfile = false});
+  const ProfileScreen({
+    super.key,
+    this.userId,
+    this.isOwnProfile = false,
+    this.fromPage,
+    this.searchQuery,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -223,9 +231,11 @@ class _ProfileScreenState extends State<ProfileScreen>
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
+                  // 前の画面に戻る
                   if (context.canPop()) {
                     context.pop();
                   } else {
+                    // 戻る先がない場合は投稿画面に戻る
                     context.go('/home');
                   }
                 },
@@ -352,6 +362,198 @@ class _ProfileScreenState extends State<ProfileScreen>
             );
           }
 
+          // 他のユーザーのプロフィール表示（タブ付き）
+          if (!widget.isOwnProfile) {
+            return Column(
+              children: [
+                // プロフィール情報
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                  color: AppColors.surface,
+                  child: Column(
+                    children: [
+                      // プロフィール画像と基本情報
+                      Row(
+                        children: [
+                          _buildProfileImage(user.profileImageUrl),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user.displayName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                if (user.bio != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    user.bio!,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 統計情報（1行に配置）
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStatItem(context, '投稿',
+                              user.postCount.toString()), // 実際の投稿数を表示
+                          _buildStatItem(
+                            context,
+                            'フォロワー',
+                            user.followersCount.toString(),
+                            onTap: () {
+                              context.go('/follow-list/${user.id}/followers');
+                            },
+                          ),
+                          _buildStatItem(
+                            context,
+                            'フォロー中',
+                            user.followingCount.toString(),
+                            onTap: () {
+                              context.go('/follow-list/${user.id}/following');
+                            },
+                          ),
+                          _buildStatItem(
+                            context,
+                            'コミュニティ',
+                            user.communitiesCount.toString(),
+                            onTap: () {
+                              context.go('/community-list/${user.id}');
+                            },
+                          ),
+                        ],
+                      ),
+
+                      // フォローボタン（他のユーザーのプロフィールの場合）
+                      const SizedBox(height: 16),
+                      Consumer<UserProvider>(
+                        builder: (context, userProvider, child) {
+                          final currentUser = userProvider.currentUser;
+
+                          // 自分自身のプロフィールの場合はフォローボタンを表示しない
+                          if (currentUser == null ||
+                              currentUser.id == user.id) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final isFollowing =
+                              currentUser.followingIds.contains(user.id);
+
+                          return SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                try {
+                                  if (isFollowing) {
+                                    // アンフォロー
+                                    final success = await userProvider
+                                        .unfollowUser(user.id);
+                                    if (success && mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('フォローを解除しました')),
+                                      );
+                                      // プロフィールユーザー情報を更新
+                                      final updatedUser =
+                                          await userProvider.getUser(user.id);
+                                      if (updatedUser != null) {
+                                        setState(() {
+                                          _profileUser = updatedUser;
+                                        });
+                                      }
+                                    }
+                                  } else {
+                                    // フォロー
+                                    final success =
+                                        await userProvider.followUser(user.id);
+                                    if (success && mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('フォローしました')),
+                                      );
+                                      // プロフィールユーザー情報を更新
+                                      final updatedUser =
+                                          await userProvider.getUser(user.id);
+                                      if (updatedUser != null) {
+                                        setState(() {
+                                          _profileUser = updatedUser;
+                                        });
+                                      }
+                                    }
+                                  }
+
+                                  // 現在のユーザー情報を再読み込み
+                                  await userProvider.refreshCurrentUser();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('エラーが発生しました: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFollowing
+                                    ? AppColors.surfaceVariant
+                                    : AppColors.primary,
+                                foregroundColor: isFollowing
+                                    ? AppColors.textPrimary
+                                    : AppColors.textOnPrimary,
+                              ),
+                              child: Text(isFollowing ? 'フォロー中' : 'フォロー'),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // タブバー（集中・進行中、過去の2つ）
+                Container(
+                  color: AppColors.surface,
+                  child: TabBar(
+                    controller: _tabController,
+                    tabs: const [
+                      Tab(text: '集中・進行中'),
+                      Tab(text: '過去'),
+                    ],
+                  ),
+                ),
+
+                // タブビュー
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildPostSection(context, 'active'), // 集中+進行中
+                      _buildPostSection(context, 'completed'), // 過去
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
+          // 自分のプロフィール表示（軌跡画面）
           return Column(
             children: [
               // プロフィール情報
@@ -836,70 +1038,47 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // グリッド表示用のWidget（START/END画像を2つ並べて表示）
   Widget _buildPostGrid(List<PostModel> posts) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 2,
-          mainAxisSpacing: 2,
-          childAspectRatio: 1.0,
-        ),
-        itemCount: posts.length,
-        itemBuilder: (context, index) {
-          final post = posts[index];
-          return GestureDetector(
-            onTap: () => context.go('/post/${post.id}', extra: {
-              'post': post,
-            }),
-            onDoubleTap: () => _toggleLike(post),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
-                color: AppColors.surface,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _buildPostGridItem(post),
-                    // 投稿ステータスを左上に表示
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(post.status).withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: _getStatusIcon(post.status),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+        childAspectRatio: 1.0,
       ),
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        return GestureDetector(
+          onTap: () => context.push('/post/${post.id}', extra: {
+            'post': post,
+          }),
+          onDoubleTap: () => _toggleLike(post),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.surface,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _buildPostGridItem(post),
+            ),
+          ),
+        );
+      },
     );
   }
 
   // 投稿のグリッドアイテム（START/END画像を表示）
   Widget _buildPostGridItem(PostModel post) {
-    // 完了した投稿の場合、START/END画像を並べて表示
-    if (post.status == PostStatus.completed && post.endImageUrl != null) {
-      return Row(
-        children: [
-          // START画像
-          Expanded(
+    return Row(
+      children: [
+        // 左側：START投稿画像
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
             child: post.imageUrl != null
                 ? Image.network(
                     post.imageUrl!,
@@ -924,71 +1103,56 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
           ),
-          // 区切り線
-          Container(
-            width: 1,
-            color: AppColors.divider,
-          ),
-          // END画像
-          Expanded(
-            child: Image.network(
-              post.endImageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: AppColors.surface,
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: AppColors.textSecondary,
-                    size: 16,
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      );
-    } else {
-      // 進行中や集中の投稿の場合、START画像のみ表示
-      return post.imageUrl != null
-          ? Image.network(
-              post.imageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: AppColors.surface,
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: AppColors.textSecondary,
-                  ),
-                );
-              },
-            )
-          : Container(
-              color: AppColors.surface,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.image,
-                    color: AppColors.textSecondary,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    post.title,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+        ),
+        // 右側：END投稿画像 or プレースホルダー
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: post.isCompleted
+                ? (post.endImageUrl != null
+                    ? Image.network(
+                        post.endImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: AppColors.surface,
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              color: AppColors.textSecondary,
+                              size: 16,
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: AppColors.surface,
+                        child: const Center(
+                          child: Icon(Icons.flag,
+                              color: AppColors.completed, size: 32),
+                        ),
+                      ))
+                : Container(
+                    color: AppColors.surface.withOpacity(0.8),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate,
+                              color: AppColors.textSecondary, size: 24),
+                          SizedBox(height: 4),
+                          Text('END',
+                              style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10)),
+                        ],
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-            );
-    }
+          ),
+        ),
+      ],
+    );
   }
 
   // リスト表示用のWidget（PostCardWidgetを使用）
@@ -1000,10 +1164,12 @@ class _ProfileScreenState extends State<ProfileScreen>
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: PostCardWidget(
             post: post,
-            onTap: () => context.go('/post/${post.id}', extra: {
+            onTap: () => context.push('/post/${post.id}', extra: {
               'post': post,
+              'fromPage': 'profile', // 軌跡画面から来たことを識別
             }),
             showActions: true, // アクションボタンを表示してリアクション可能に
+            fromPage: 'profile', // 軌跡画面から来たことを識別
           ),
         );
       }).toList(),
@@ -1082,50 +1248,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         );
       }
-    }
-  }
-
-  // 投稿ステータスの色を取得
-  Color _getStatusColor(PostStatus status) {
-    switch (status) {
-      case PostStatus.concentration:
-        return AppColors.primary;
-      case PostStatus.inProgress:
-        return AppColors.inProgress;
-      case PostStatus.completed:
-        return AppColors.completed;
-      case PostStatus.overdue:
-        return AppColors.error;
-    }
-  }
-
-  // 投稿ステータスのアイコンを取得
-  Widget _getStatusIcon(PostStatus status) {
-    switch (status) {
-      case PostStatus.concentration:
-        return const Icon(
-          Icons.flash_on,
-          size: 12,
-          color: Colors.white,
-        );
-      case PostStatus.inProgress:
-        return const Icon(
-          Icons.play_arrow,
-          size: 12,
-          color: Colors.white,
-        );
-      case PostStatus.completed:
-        return const Icon(
-          Icons.check,
-          size: 12,
-          color: Colors.white,
-        );
-      case PostStatus.overdue:
-        return const Icon(
-          Icons.warning,
-          size: 12,
-          color: Colors.white,
-        );
     }
   }
 

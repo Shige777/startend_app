@@ -101,8 +101,8 @@ class PostGridWidget extends StatelessWidget {
             padding: EdgeInsets.zero,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              crossAxisSpacing: 1,
-              mainAxisSpacing: 1,
+              crossAxisSpacing: 0,
+              mainAxisSpacing: 0,
               childAspectRatio: 1,
             ),
             itemCount: posts.length,
@@ -118,8 +118,9 @@ class PostGridWidget extends StatelessWidget {
   Widget _buildGridItem(BuildContext context, PostModel post) {
     return GestureDetector(
       onTap: () {
-        context.go('/post/${post.id}', extra: {
+        context.push('/post/${post.id}', extra: {
           'post': post,
+          'fromPage': 'profile', // 軌跡画面から来たことを識別
         });
       },
       onLongPress: () {
@@ -141,125 +142,44 @@ class PostGridWidget extends StatelessWidget {
                   child: _buildImageWidget(post.imageUrl),
                 ),
               ),
-              Container(width: 2, color: Colors.white),
               // 右側：END投稿画像 or プレースホルダー
               Expanded(
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  color: AppColors.surfaceVariant.withOpacity(0.5),
                   child: post.isCompleted
                       ? (post.endImageUrl != null
                           ? _buildImageWidget(post.endImageUrl)
-                          : const Center(
-                              child: Icon(Icons.flag,
-                                  color: AppColors.completed, size: 32),
+                          : Container(
+                              color: AppColors.surfaceVariant,
+                              child: const Center(
+                                child: Icon(Icons.flag,
+                                    color: AppColors.completed, size: 32),
+                              ),
                             ))
-                      : const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate,
-                                  color: AppColors.textSecondary, size: 24),
-                              SizedBox(height: 4),
-                              Text('END',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 10)),
-                            ],
+                      : Container(
+                          color: AppColors.surfaceVariant.withOpacity(0.8),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate,
+                                    color: AppColors.textSecondary, size: 24),
+                                SizedBox(height: 4),
+                                Text('END',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 10)),
+                              ],
+                            ),
                           ),
                         ),
                 ),
               ),
             ],
           ),
-
-          // オーバーレイ
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-              ),
-            ),
-          ),
-
-          // ステータスチップ
-          Positioned(top: 4, right: 4, child: _buildStatusChip(post)),
-
-          // タイトル
-          Positioned(
-            bottom: 4,
-            left: 4,
-            right: 4,
-            child: Text(
-              post.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatusChip(PostModel post) {
-    Color chipColor;
-    Widget chipContent;
-
-    switch (post.status) {
-      case PostStatus.concentration:
-        chipColor = AppColors.textPrimary;
-        chipContent = const Icon(Icons.flash_on, color: Colors.white, size: 12);
-        break;
-      case PostStatus.inProgress:
-        chipColor = AppColors.inProgress;
-        chipContent = const Text(
-          '進行中',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        );
-        break;
-      case PostStatus.completed:
-        chipColor = AppColors.completed;
-        chipContent = const Text(
-          '完了',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        );
-        break;
-      case PostStatus.overdue:
-        chipColor = AppColors.error;
-        chipContent = const Text(
-          '期限切れ',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        );
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: chipColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: chipContent,
     );
   }
 

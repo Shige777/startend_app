@@ -18,6 +18,7 @@ import 'screens/profile/profile_settings_screen.dart';
 import 'screens/post/create_post_screen.dart';
 import 'screens/post/create_end_post_screen.dart';
 import 'screens/post/post_detail_screen.dart';
+import 'screens/post/edit_post_screen.dart';
 import 'screens/community/community_chat_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
@@ -178,7 +179,22 @@ final GoRouter _router = GoRouter(
       path: '/profile/:userId',
       builder: (context, state) {
         final userId = state.pathParameters['userId']!;
-        return ProfileScreen(userId: userId);
+
+        // extraパラメータの処理
+        String? fromPage;
+        String? searchQuery;
+
+        if (state.extra != null && state.extra is Map<String, dynamic>) {
+          final extra = state.extra as Map<String, dynamic>;
+          fromPage = extra['fromPage'] as String?;
+          searchQuery = extra['searchQuery'] as String?;
+        }
+
+        return ProfileScreen(
+          userId: userId,
+          fromPage: fromPage,
+          searchQuery: searchQuery,
+        );
       },
     ),
     GoRoute(
@@ -231,6 +247,20 @@ final GoRouter _router = GoRouter(
       },
     ),
     GoRoute(
+      path: '/edit-post',
+      builder: (context, state) {
+        final post = state.extra as PostModel?;
+
+        if (post == null) {
+          return const Scaffold(
+            body: Center(child: Text('エラー: 投稿情報が見つかりません')),
+          );
+        }
+
+        return EditPostScreen(post: post);
+      },
+    ),
+    GoRoute(
       path: '/post/:id',
       builder: (context, state) {
         final postId = state.pathParameters['id']!;
@@ -238,6 +268,7 @@ final GoRouter _router = GoRouter(
         // extraパラメータの安全な処理
         PostModel? post;
         String? fromCommunity;
+        String? fromPage;
 
         if (state.extra != null) {
           if (state.extra is Map<String, dynamic>) {
@@ -245,6 +276,7 @@ final GoRouter _router = GoRouter(
             final extra = state.extra as Map<String, dynamic>;
             post = extra['post'] as PostModel?;
             fromCommunity = extra['fromCommunity'] as String?;
+            fromPage = extra['fromPage'] as String?;
           } else if (state.extra is PostModel) {
             // PostModel直接の場合（従来の互換性のため）
             post = state.extra as PostModel;
@@ -255,6 +287,7 @@ final GoRouter _router = GoRouter(
           postId: postId,
           post: post,
           fromCommunity: fromCommunity,
+          fromPage: fromPage,
         );
       },
     ),

@@ -234,29 +234,6 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-
-              // 投稿ボタン
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : _createEndPost,
-                icon: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textOnPrimary,
-                          ),
-                        ),
-                      )
-                    : const Icon(Icons.flag),
-                label: const Text('END投稿を作成'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.completed,
-                  foregroundColor: AppColors.textOnPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
             ],
           ),
         ),

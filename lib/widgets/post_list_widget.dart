@@ -163,7 +163,7 @@ class _PostListWidgetState extends State<PostListWidget> {
               // 投稿を表示
               final postIndex = index - searchUsers.length;
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 1),
                 child: PostCardWidget(
                   post: posts[postIndex],
                   onTap: widget.onPostTap != null
@@ -172,6 +172,7 @@ class _PostListWidgetState extends State<PostListWidget> {
                   onDelete: _canDeletePost(posts[postIndex])
                       ? () => _showDeleteConfirmation(posts[postIndex])
                       : null,
+                  fromPage: 'posts', // 投稿画面から来たことを識別
                 ),
               );
             },

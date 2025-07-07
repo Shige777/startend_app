@@ -83,6 +83,18 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
             ),
           ),
         ],
+        // 所属コミュニティのセクションヘッダー
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            '所属コミュニティ',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+          ),
+        ),
         // コミュニティ一覧
         Expanded(
           child: Consumer<CommunityProvider>(
@@ -121,11 +133,17 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
                 );
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              return GridView.builder(
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, // 2列表示
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1, // 正方形
+                ),
                 itemCount: communities.length,
                 itemBuilder: (context, index) {
-                  return _buildCommunityCard(communities[index]);
+                  return _buildCommunityTile(communities[index]);
                 },
               );
             },
@@ -148,104 +166,151 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
     }).toList();
   }
 
-  Widget _buildCommunityCard(CommunityModel community) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: _buildCommunityImage(community.imageUrl),
-        title: Text(
-          community.name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (community.description != null &&
-                community.description!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                community.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.people,
-                  size: 16,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${community.memberIds.length}人',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Icon(
-                  Icons.article,
-                  size: 16,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'ジャンル: ${community.genre}',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+  Widget _buildCommunityTile(CommunityModel community) {
+    return GestureDetector(
+      onTap: () {
+        if (widget.onCommunityTap != null) {
+          widget.onCommunityTap!(community);
+        } else {
+          context.go('/community/${community.id}');
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          if (widget.onCommunityTap != null) {
-            widget.onCommunityTap!(community);
-          } else {
-            context.go('/community/${community.id}');
-          }
-        },
+        child: Column(
+          children: [
+            // コミュニティ画像
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  child: _buildCommunityTileImage(community.imageUrl),
+                ),
+              ),
+            ),
+            // コミュニティ情報
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      community.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    if (community.description != null &&
+                        community.description!.isNotEmpty) ...[
+                      Text(
+                        community.description!,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ] else ...[
+                      const Spacer(),
+                    ],
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.people,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${community.memberIds.length}人',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // コミュニティ画像を表示するWidgetを構築
-  Widget _buildCommunityImage(String? imageUrl) {
+  // コミュニティタイル用画像を表示するWidgetを構築
+  Widget _buildCommunityTileImage(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) {
-      return CircleAvatar(
-        radius: 30, // サイズを大きく
-        backgroundColor: AppColors.primary,
-        child: Icon(
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: AppColors.primary,
+        child: const Icon(
           Icons.group,
-          size: 30, // アイコンサイズも大きく
+          size: 40,
           color: AppColors.textOnPrimary,
         ),
       );
     }
 
     try {
-      return CircleAvatar(
-        radius: 30, // サイズを大きく
-        backgroundImage: NetworkImage(imageUrl),
-        backgroundColor: AppColors.primary,
-        onBackgroundImageError: (exception, stackTrace) {
-          // エラー時はアイコンを表示
-        },
-        child: null,
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: AppColors.primary,
+              child: const Icon(
+                Icons.group,
+                size: 40,
+                color: AppColors.textOnPrimary,
+              ),
+            );
+          },
+        ),
       );
     } catch (e) {
-      return CircleAvatar(
-        radius: 30, // サイズを大きく
-        backgroundColor: AppColors.primary,
-        child: Icon(
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: AppColors.primary,
+        child: const Icon(
           Icons.group,
-          size: 30, // アイコンサイズも大きく
+          size: 40,
           color: AppColors.textOnPrimary,
         ),
       );

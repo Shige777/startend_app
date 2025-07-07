@@ -28,6 +28,11 @@ class _SearchScreenState extends State<SearchScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
+  // 検索状態を保持するstatic変数
+  static String _lastSearchQuery = '';
+  static List<PostModel> _lastSearchResults = [];
+  static List<UserModel> _lastUserSearchResults = [];
+
   List<PostModel> _searchResults = [];
   List<UserModel> _userSearchResults = [];
   List<UserModel> _followingUsers = [];
@@ -40,6 +45,15 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // 前回の検索状態を復元
+    if (_lastSearchQuery.isNotEmpty) {
+      _searchController.text = _lastSearchQuery;
+      _searchQuery = _lastSearchQuery;
+      _searchResults = _lastSearchResults;
+      _userSearchResults = _lastUserSearchResults;
+    }
+
     _loadFollowingUsers();
   }
 
@@ -71,6 +85,11 @@ class _SearchScreenState extends State<SearchScreen>
         _isSearching = false;
         _searchQuery = '';
       });
+
+      // static変数もクリア
+      _lastSearchQuery = '';
+      _lastSearchResults = [];
+      _lastUserSearchResults = [];
       return;
     }
 
@@ -93,6 +112,11 @@ class _SearchScreenState extends State<SearchScreen>
         _userSearchResults = users;
         _isSearching = false;
       });
+
+      // 検索結果をstatic変数に保存
+      _lastSearchQuery = query;
+      _lastSearchResults = posts;
+      _lastUserSearchResults = users;
     } catch (e) {
       setState(() {
         _isSearching = false;
@@ -326,6 +350,14 @@ class _SearchScreenState extends State<SearchScreen>
                                   itemBuilder: (context, index) {
                                     return UserListItem(
                                       user: _userSearchResults[index],
+                                      onTap: () {
+                                        context.go(
+                                            '/profile/${_userSearchResults[index].id}',
+                                            extra: {
+                                              'fromPage': 'search',
+                                              'searchQuery': _searchQuery,
+                                            });
+                                      },
                                     );
                                   },
                                 ),

@@ -237,6 +237,19 @@ class CommunityProvider extends ChangeNotifier {
       // userIdが指定されていない場合は現在のユーザーIDを使用
       final targetUserId = userId ?? 'test_user_001'; // TODO: 実際のユーザーIDを取得
 
+      // コミュニティ情報を取得してメンバー数をチェック
+      final community = await getCommunity(communityId);
+      if (community == null) {
+        _setError('コミュニティが見つかりません');
+        return false;
+      }
+
+      // メンバー数が上限（8人）に達している場合は参加を拒否
+      if (community.memberIds.length >= 8) {
+        _setError('コミュニティのメンバー数が上限に達しています（8人）');
+        return false;
+      }
+
       final batch = _firestore.batch();
 
       // コミュニティのメンバーリストに追加
