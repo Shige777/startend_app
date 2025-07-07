@@ -1,9 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/post_model.dart';
+import '../services/notification_service.dart';
 
 class PostProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notificationService = NotificationService();
 
   List<PostModel> _posts = [];
   List<PostModel> _followingPosts = [];
@@ -12,6 +16,7 @@ class PostProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentUserId; // 現在読み込み中のユーザーID
+  final Map<String, bool> _loadingStates = {};
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;
@@ -31,28 +36,26 @@ class PostProvider extends ChangeNotifier {
   }
 
   // 投稿作成
-  Future<bool> createPost(PostModel post) async {
+  Future<String?> createPost(PostModel post) async {
     try {
       _setLoading(true);
       _setError(null);
 
-      // ドキュメントIDを生成してから投稿を保存
-      final docRef = _firestore.collection('posts').doc();
-      final postWithId = post.copyWith(id: docRef.id);
+      final docRef =
+          await _firestore.collection('posts').add(post.toFirestore());
 
-      await docRef.set(postWithId.toFirestore());
+      // 作成された投稿に通知をスケジュール
+      final createdPost = post.copyWith(id: docRef.id);
+      await _notificationService.schedulePostNotifications(createdPost);
 
       // ローカルの投稿リストに追加
-      _userPosts.insert(0, postWithId);
+      _userPosts.insert(0, createdPost);
       notifyListeners();
 
-      return true;
+      return docRef.id;
     } catch (e) {
-      _setError('投稿作成に失敗しました: ${e.toString()}');
-      if (kDebugMode) {
-        print('投稿作成エラー: $e');
-      }
-      return false;
+      _setError('投稿の作成に失敗しました');
+      return null;
     } finally {
       _setLoading(false);
     }
@@ -154,20 +157,57 @@ class PostProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
-      final querySnapshot = await _firestore
-          .collection('posts')
-          .where('communityIds', arrayContains: communityId)
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .get();
+      if (kDebugMode) {
+        print('コミュニティ投稿取得開始: $communityId');
+      }
+
+      // インデックスが作成されるまでの一時的な回避策：orderByを削除
+      QuerySnapshot querySnapshot;
+      try {
+        // まずorderByありで試行（チャット形式のため昇順）
+        querySnapshot = await _firestore
+            .collection('posts')
+            .where('communityIds', arrayContains: communityId)
+            .orderBy('createdAt', descending: false)
+            .limit(50)
+            .get();
+      } catch (indexError) {
+        if (kDebugMode) {
+          print('インデックス不足のため、orderByなしで再試行');
+        }
+        // インデックスエラーの場合、orderByなしで取得してクライアント側でソート
+        querySnapshot = await _firestore
+            .collection('posts')
+            .where('communityIds', arrayContains: communityId)
+            .limit(50)
+            .get();
+      }
 
       final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
+      // クライアント側でソート（チャット形式のため昇順）
+      posts.sort((a, b) {
+        // END投稿がある場合は、actualEndTimeを使用
+        final aTime = a.actualEndTime ?? a.createdAt;
+        final bTime = b.actualEndTime ?? b.createdAt;
+        return aTime.compareTo(bTime);
+      });
+
+      if (kDebugMode) {
+        print('コミュニティ投稿取得完了: ${posts.length}件');
+        for (final post in posts) {
+          print('- ${post.title} (communityIds: ${post.communityIds})');
+        }
+      }
+
       return posts;
     } catch (e) {
       _setError('コミュニティ投稿取得に失敗しました');
+      if (kDebugMode) {
+        print('コミュニティ投稿取得エラー: $e');
+      }
       return [];
     } finally {
       _setLoading(false);
@@ -282,7 +322,7 @@ class PostProvider extends ChangeNotifier {
   // いいね
   Future<bool> likePost(String postId, String userId) async {
     try {
-      _setLoading(true);
+      // いいね機能ではローディング状態を設定しない（他の機能に影響しないため）
       _setError(null);
 
       await _firestore.collection('posts').doc(postId).update({
@@ -295,29 +335,38 @@ class PostProvider extends ChangeNotifier {
     } catch (e) {
       _setError('いいねに失敗しました');
       return false;
-    } finally {
-      _setLoading(false);
     }
   }
 
   // いいね取り消し
   Future<bool> unlikePost(String postId, String userId) async {
     try {
-      _setLoading(true);
+      // いいね機能ではローディング状態を設定しない（他の機能に影響しないため）
       _setError(null);
 
-      await _firestore.collection('posts').doc(postId).update({
-        'likedByUserIds': FieldValue.arrayRemove([userId]),
-        'likeCount': FieldValue.increment(-1),
-        'updatedAt': FieldValue.serverTimestamp(),
+      // トランザクションを使用してlikeCountがマイナスにならないように制御
+      await _firestore.runTransaction((transaction) async {
+        final postRef = _firestore.collection('posts').doc(postId);
+        final postSnapshot = await transaction.get(postRef);
+
+        if (!postSnapshot.exists) {
+          throw Exception('投稿が見つかりません');
+        }
+
+        final currentLikeCount = postSnapshot.data()?['likeCount'] ?? 0;
+        final newLikeCount = currentLikeCount > 0 ? currentLikeCount - 1 : 0;
+
+        transaction.update(postRef, {
+          'likedByUserIds': FieldValue.arrayRemove([userId]),
+          'likeCount': newLikeCount,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
 
       return true;
     } catch (e) {
       _setError('いいね取り消しに失敗しました');
       return false;
-    } finally {
-      _setLoading(false);
     }
   }
 
@@ -327,22 +376,20 @@ class PostProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      // 投稿に関連する通知をキャンセル
+      await _notificationService.cancelPostNotifications(postId);
+
       await _firestore.collection('posts').doc(postId).delete();
 
       // ローカルの投稿リストからも削除
       _userPosts.removeWhere((post) => post.id == postId);
-      _posts.removeWhere((post) => post.id == postId);
       _followingPosts.removeWhere((post) => post.id == postId);
       _communityPosts.removeWhere((post) => post.id == postId);
-
       notifyListeners();
 
       return true;
     } catch (e) {
-      _setError('投稿削除に失敗しました: ${e.toString()}');
-      if (kDebugMode) {
-        print('投稿削除エラー: $e');
-      }
+      _setError('投稿削除に失敗しました');
       return false;
     } finally {
       _setLoading(false);
@@ -353,9 +400,9 @@ class PostProvider extends ChangeNotifier {
   bool _shouldShowInFollowing(PostModel post) {
     final now = DateTime.now();
 
-    // 完了している場合、24時間以内なら表示
-    if (post.isCompleted) {
-      return now.difference(post.updatedAt).inHours <= 24;
+    // 完了している場合、END投稿（actualEndTime）から24時間以内なら表示
+    if (post.isCompleted && post.actualEndTime != null) {
+      return now.difference(post.actualEndTime!).inHours <= 24;
     }
 
     // 完了予定時刻から24時間経過したら非表示
@@ -367,32 +414,37 @@ class PostProvider extends ChangeNotifier {
   }
 
   // 投稿の分類取得
-  Map<String, List<PostModel>> categorizeUserPosts(List<PostModel> posts) {
+  PostStatus getPostCategory(PostModel post) {
     final now = DateTime.now();
-    final Map<String, List<PostModel>> categorized = {
-      'concentration': [],
-      'inProgress': [],
-      'completed': [],
-    };
 
-    for (final post in posts) {
-      switch (post.status) {
-        case PostStatus.concentration:
-          categorized['concentration']!.add(post);
-          break;
-        case PostStatus.inProgress:
-          categorized['inProgress']!.add(post);
-          break;
-        case PostStatus.completed:
-          categorized['completed']!.add(post);
-          break;
-        case PostStatus.overdue:
-          // 期限切れは進行中に含める
-          categorized['inProgress']!.add(post);
-          break;
-      }
+    if (post.isCompleted) {
+      return PostStatus.completed;
+    } else if (post.scheduledEndTime != null &&
+        now.isAfter(post.scheduledEndTime!)) {
+      return PostStatus.overdue;
+    } else if (post.type == PostType.start) {
+      return PostStatus.inProgress;
+    } else {
+      return PostStatus.concentration;
     }
+  }
 
-    return categorized;
+  // ローカルの投稿リストを更新
+  void updatePostInLists(PostModel updatedPost) {
+    // 各リストで該当する投稿を更新
+    _updatePostInList(_posts, updatedPost);
+    _updatePostInList(_userPosts, updatedPost);
+    _updatePostInList(_followingPosts, updatedPost);
+    _updatePostInList(_communityPosts, updatedPost);
+
+    notifyListeners();
+  }
+
+  // リスト内の投稿を更新するヘルパーメソッド
+  void _updatePostInList(List<PostModel> list, PostModel updatedPost) {
+    final index = list.indexWhere((post) => post.id == updatedPost.id);
+    if (index != -1) {
+      list[index] = updatedPost;
+    }
   }
 }

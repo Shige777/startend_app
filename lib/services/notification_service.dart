@@ -2,6 +2,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import '../models/post_model.dart';
 
 class NotificationService {
   static final FirebaseMessaging _firebaseMessaging =
@@ -10,13 +14,44 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// 通知サービスの初期化
-  static Future<void> initialize() async {
-    // 通知権限の要求
-    await _requestPermission();
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
 
-    // ローカル通知の初期化
-    await _initializeLocalNotifications();
+  bool _isInitialized = false;
+
+  /// 通知サービスの初期化
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    // タイムゾーンの初期化
+    tz.initializeTimeZones();
+
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+    );
+
+    // 通知権限の要求
+    await _requestPermissions();
+
+    _isInitialized = true;
 
     // FCMトークンの取得と保存
     await _getFCMToken();
@@ -32,44 +67,27 @@ class NotificationService {
   }
 
   /// 通知権限の要求
-  static Future<void> _requestPermission() async {
-    final settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+  Future<void> _requestPermissions() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('通知権限が許可されました');
-    } else {
-      print('通知権限が拒否されました');
+      await androidImplementation?.requestNotificationsPermission();
     }
   }
 
-  /// ローカル通知の初期化
-  static Future<void> _initializeLocalNotifications() async {
-    const androidInitializationSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInitializationSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const initializationSettings = InitializationSettings(
-      android: androidInitializationSettings,
-      iOS: iosInitializationSettings,
-    );
-
-    await _localNotifications.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-  }
-
   /// FCMトークンの取得と保存
-  static Future<void> _getFCMToken() async {
+  Future<void> _getFCMToken() async {
     try {
       final token = await _firebaseMessaging.getToken();
       if (token != null) {
@@ -83,7 +101,7 @@ class NotificationService {
   }
 
   /// FCMトークンをFirestoreに保存
-  static Future<void> _saveFCMToken(String token) async {
+  Future<void> _saveFCMToken(String token) async {
     try {
       // TODO: 現在のユーザーIDを取得してトークンを保存
       // await _firestore.collection('users').doc(userId).update({
@@ -96,7 +114,7 @@ class NotificationService {
   }
 
   /// フォアグラウンド通知の処理
-  static Future<void> _handleForegroundMessage(RemoteMessage message) async {
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('フォアグラウンド通知を受信: ${message.notification?.title}');
 
     // ローカル通知として表示
@@ -104,7 +122,7 @@ class NotificationService {
   }
 
   /// バックグラウンド通知の処理
-  static Future<void> _handleBackgroundMessage(RemoteMessage message) async {
+  Future<void> _handleBackgroundMessage(RemoteMessage message) async {
     print('バックグラウンド通知を受信: ${message.notification?.title}');
 
     // 通知タップ時の処理
@@ -112,7 +130,7 @@ class NotificationService {
   }
 
   /// ローカル通知の表示
-  static Future<void> _showLocalNotification(RemoteMessage message) async {
+  Future<void> _showLocalNotification(RemoteMessage message) async {
     const androidNotificationDetails = AndroidNotificationDetails(
       'startend_channel',
       'StartEnd通知',
@@ -143,7 +161,7 @@ class NotificationService {
   }
 
   /// 通知タップ時の処理
-  static void _onNotificationTapped(NotificationResponse response) {
+  void _onDidReceiveNotificationResponse(NotificationResponse response) {
     if (response.payload != null) {
       // TODO: 通知データに基づいて適切な画面に遷移
       print('通知がタップされました: ${response.payload}');
@@ -151,7 +169,7 @@ class NotificationService {
   }
 
   /// 画面遷移の処理
-  static void _navigateToScreen(Map<String, dynamic> data) {
+  void _navigateToScreen(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     final id = data['id'] as String?;
 
@@ -172,7 +190,7 @@ class NotificationService {
   }
 
   /// 特定のユーザーに通知を送信
-  static Future<void> sendNotificationToUser({
+  Future<void> sendNotificationToUser({
     required String userId,
     required String title,
     required String body,
@@ -195,7 +213,7 @@ class NotificationService {
   }
 
   /// フォロー通知の送信
-  static Future<void> sendFollowNotification({
+  Future<void> sendFollowNotification({
     required String targetUserId,
     required String followerName,
     required String followerId,
@@ -212,7 +230,7 @@ class NotificationService {
   }
 
   /// いいね通知の送信
-  static Future<void> sendLikeNotification({
+  Future<void> sendLikeNotification({
     required String postOwnerId,
     required String likerName,
     required String postId,
@@ -230,7 +248,7 @@ class NotificationService {
   }
 
   /// コメント通知の送信
-  static Future<void> sendCommentNotification({
+  Future<void> sendCommentNotification({
     required String postOwnerId,
     required String commenterName,
     required String postId,
@@ -248,7 +266,7 @@ class NotificationService {
   }
 
   /// 予定時刻リマインダー通知の設定
-  static Future<void> scheduleReminderNotification({
+  Future<void> scheduleReminderNotification({
     required String postId,
     required String title,
     required DateTime scheduledTime,
@@ -271,8 +289,7 @@ class NotificationService {
   }
 
   /// 通知履歴の取得
-  static Stream<List<Map<String, dynamic>>> getNotificationHistory(
-      String userId) {
+  Stream<List<Map<String, dynamic>>> getNotificationHistory(String userId) {
     return _firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
@@ -288,7 +305,7 @@ class NotificationService {
   }
 
   /// 通知を既読にする
-  static Future<void> markAsRead(String notificationId) async {
+  Future<void> markAsRead(String notificationId) async {
     try {
       await _firestore.collection('notifications').doc(notificationId).update({
         'read': true,
@@ -300,13 +317,158 @@ class NotificationService {
   }
 
   /// 未読通知数の取得
-  static Stream<int> getUnreadNotificationCount(String userId) {
+  Stream<int> getUnreadNotificationCount(String userId) {
     return _firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .where('read', isEqualTo: false)
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
+  }
+
+  // 集中投稿の5分前通知をスケジュール
+  Future<void> scheduleConcentrationNotification(PostModel post) async {
+    if (!_isInitialized) await initialize();
+
+    if (post.scheduledEndTime == null) return;
+
+    final notificationTime =
+        post.scheduledEndTime!.subtract(const Duration(minutes: 5));
+
+    // 過去の時刻の場合は通知しない
+    if (notificationTime.isBefore(DateTime.now())) return;
+
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'concentration_channel',
+      '集中通知',
+      channelDescription: '集中投稿の終了5分前通知',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
+    final notificationId = _generateNotificationId(post.id, 'concentration');
+
+    await _localNotifications.zonedSchedule(
+      notificationId,
+      '集中終了まであと5分！',
+      '「${post.title}」の集中時間が終了まであと5分です。',
+      tz.TZDateTime.from(notificationTime, tz.local),
+      platformChannelSpecifics,
+      payload: 'concentration_${post.id}',
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+
+    debugPrint('集中通知をスケジュール: ${post.title} - ${notificationTime}');
+  }
+
+  // 進行中投稿の24時間前通知をスケジュール
+  Future<void> scheduleProgressNotification(PostModel post) async {
+    if (!_isInitialized) await initialize();
+
+    if (post.scheduledEndTime == null) return;
+
+    final notificationTime =
+        post.scheduledEndTime!.subtract(const Duration(hours: 24));
+
+    // 過去の時刻の場合は通知しない
+    if (notificationTime.isBefore(DateTime.now())) return;
+
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'progress_channel',
+      '進行中通知',
+      channelDescription: '進行中投稿の24時間前通知',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
+    final notificationId = _generateNotificationId(post.id, 'progress');
+
+    await _localNotifications.zonedSchedule(
+      notificationId,
+      '終了予定まであと24時間！',
+      '「${post.title}」の終了予定まであと24時間です。進捗はいかがですか？',
+      tz.TZDateTime.from(notificationTime, tz.local),
+      platformChannelSpecifics,
+      payload: 'progress_${post.id}',
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+
+    debugPrint('進行中通知をスケジュール: ${post.title} - ${notificationTime}');
+  }
+
+  // 投稿の通知をキャンセル
+  Future<void> cancelPostNotifications(String postId) async {
+    if (!_isInitialized) await initialize();
+
+    final concentrationId = _generateNotificationId(postId, 'concentration');
+    final progressId = _generateNotificationId(postId, 'progress');
+
+    await _localNotifications.cancel(concentrationId);
+    await _localNotifications.cancel(progressId);
+
+    debugPrint('投稿の通知をキャンセル: $postId');
+  }
+
+  // 投稿作成時の通知スケジュール
+  Future<void> schedulePostNotifications(PostModel post) async {
+    if (post.type == PostType.start && !post.isCompleted) {
+      // 集中投稿の場合は5分前通知
+      if (post.status == PostStatus.concentration) {
+        await scheduleConcentrationNotification(post);
+      } else if (post.status == PostStatus.inProgress) {
+        // 進行中投稿の場合は24時間前通知
+        await scheduleProgressNotification(post);
+      }
+    }
+  }
+
+  // 通知IDの生成（投稿IDとタイプから一意のIDを生成）
+  int _generateNotificationId(String postId, String type) {
+    return '${postId}_$type'.hashCode;
+  }
+
+  // 全ての通知をキャンセル
+  Future<void> cancelAllNotifications() async {
+    if (!_isInitialized) await initialize();
+    await _localNotifications.cancelAll();
+  }
+
+  // 予定された通知の一覧を取得
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    if (!_isInitialized) await initialize();
+    return await _localNotifications.pendingNotificationRequests();
   }
 }
 

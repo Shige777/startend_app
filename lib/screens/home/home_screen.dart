@@ -43,6 +43,12 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _selectedIndex = 1;
         });
+      } else if (tabParam == 'community') {
+        setState(() {
+          _selectedIndex = 0; // 投稿画面
+        });
+        // コミュニティタブを選択
+        _tabController.index = 1;
       }
     });
   }

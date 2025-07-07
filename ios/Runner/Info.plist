@@ -45,6 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- 通知とバックグラウンド処理のための設定 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>background-processing</string>
+		<string>background-fetch</string>
+	</array>
+	
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>googlegmail</string>

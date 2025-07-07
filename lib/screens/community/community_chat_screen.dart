@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/community_model.dart';
 import '../../models/post_model.dart';
+import '../../models/user_model.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
@@ -14,6 +15,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/date_time_utils.dart';
 import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/post_card_widget.dart';
 
 class CommunityChatScreen extends StatefulWidget {
   final String communityId;
@@ -45,13 +47,78 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 画面に戻ってきた時に投稿を再読み込み
+    if (_community != null) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _loadCommunityPosts();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(CommunityChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // ウィジェットが更新された時も投稿を再読み込み
+    if (oldWidget.communityId != widget.communityId) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _loadCommunityData();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _createPost() {
-    context.go('/create-post', extra: {'communityId': widget.communityId});
+  void _createPost() async {
+    final result = await context
+        .push('/create-post', extra: {'communityId': widget.communityId});
+    // 投稿作成から戻ってきた時に投稿を再読み込み（常に実行）
+    await _loadCommunityPosts();
+  }
+
+  void _createEndPost(PostModel startPost) async {
+    final result = await context.push('/create-end-post', extra: {
+      'startPostId': startPost.id,
+      'startPost': startPost,
+    });
+    // END投稿作成から戻ってきた時に投稿を再読み込み（常に実行）
+    await _loadCommunityPosts();
+  }
+
+  Future<void> _loadCommunityPosts() async {
+    if (kDebugMode) {
+      print('CommunityChatScreen: 投稿読み込み開始 - ${widget.communityId}');
+    }
+
+    final postProvider = context.read<PostProvider>();
+    final posts = await postProvider.getCommunityPosts(widget.communityId);
+
+    if (kDebugMode) {
+      print('CommunityChatScreen: 投稿読み込み完了 - ${posts.length}件');
+    }
+
+    if (mounted) {
+      setState(() {
+        _communityPosts = posts;
+      });
+
+      // 投稿読み込み後に最下部にスクロール
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   Future<void> _loadCommunityData() async {
@@ -71,9 +138,8 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       });
 
       // コミュニティの投稿を取得
-      final posts = await postProvider.getCommunityPosts(widget.communityId);
+      await _loadCommunityPosts();
       setState(() {
-        _communityPosts = posts;
         _isLoading = false;
       });
     } else {
@@ -130,7 +196,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              // コミュニティ画面から戻る時はコミュニティタブを選択
+              context.go('/home?tab=community');
+            }
+          },
         ),
         title: Text(_community!.name),
         actions: [
@@ -207,56 +280,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(8),
                   itemCount: _communityPosts.length,
                   itemBuilder: (context, index) {
                     final post = _communityPosts[index];
-                    return _buildMessageBubble(post);
+                    return _buildCommunityPostCard(post);
                   },
                 ),
-        ),
-
-        // メッセージ入力欄
-        Container(
-          padding: const EdgeInsets.all(AppConstants.defaultPadding),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              top: BorderSide(color: AppColors.divider),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  decoration: InputDecoration(
-                    hintText: 'メッセージを入力...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                  ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendMessage(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _sendMessage,
-                icon: const Icon(Icons.send),
-                color: AppColors.primary,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.textOnPrimary,
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -269,7 +300,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildCommunityImage(_community!.imageUrl, radius: 50),
+            _buildCommunityImage(_community!.imageUrl, radius: 80),
             const SizedBox(height: 24),
             Text(
               _community!.name,
@@ -310,95 +341,43 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(PostModel post) {
-    final currentUser = context.read<UserProvider>().currentUser;
-    final isMyMessage = post.userId == currentUser?.id;
+  Widget _buildCommunityPostCard(PostModel post) {
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isOwnPost = currentUser != null && post.userId == currentUser.id;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment:
-            isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isMyMessage) ...[
-            const CircleAvatar(
-              radius: 16,
-              child: Icon(Icons.person, size: 16),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMyMessage ? AppColors.primary : AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!isMyMessage)
-                    Text(
-                      'ユーザー名', // TODO: 実際のユーザー名を取得
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  if (post.title.isNotEmpty)
-                    Text(
-                      post.title,
-                      style: TextStyle(
-                        color: isMyMessage
-                            ? AppColors.textOnPrimary
-                            : AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  if (post.comment != null && post.comment!.isNotEmpty)
-                    Text(
-                      post.comment!,
-                      style: TextStyle(
-                        color: isMyMessage
-                            ? AppColors.textOnPrimary
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                  if (post.imageUrl != null) ...[
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        post.imageUrl!,
-                        width: 200,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    DateTimeUtils.formatTime(post.createdAt),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isMyMessage
-                          ? AppColors.textOnPrimary.withOpacity(0.7)
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+      decoration: BoxDecoration(
+        color:
+            isOwnPost ? AppColors.primary.withOpacity(0.15) : AppColors.surface,
+        // 自分の投稿には左側に濃い青い線を追加
+        border: isOwnPost
+            ? const Border(left: BorderSide(color: AppColors.primary, width: 6))
+            : Border.all(color: AppColors.divider.withOpacity(0.3), width: 1),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
-          if (isMyMessage) ...[
-            const SizedBox(width: 8),
-            const CircleAvatar(
-              radius: 16,
-              child: Icon(Icons.person, size: 16),
-            ),
-          ],
         ],
+      ),
+      child: Transform.scale(
+        scale: 0.95, // 全体的に5%小さく
+        child: PostCardWidget(
+          post: post,
+          onTap: () {
+            // コミュニティ投稿の詳細画面に遷移する際に、戻り先をコミュニティ画面に指定
+            context.push('/post/${post.id}', extra: {
+              'post': post,
+              'fromCommunity': widget.communityId,
+            });
+          },
+          onDelete: isOwnPost ? () => _showDeleteConfirmation(post) : null,
+          showActions: false, // アクションボタンを非表示
+        ),
       ),
     );
   }
@@ -466,7 +445,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     );
 
     final success = await postProvider.createPost(post);
-    if (success) {
+    if (success != null) {
       _messageController.clear();
       _loadCommunityData(); // メッセージ一覧を更新
     }
@@ -577,41 +556,127 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   // コミュニティ画像を表示するWidgetを構築
-  Widget _buildCommunityImage(String? imageUrl, {double radius = 50}) {
+  Widget _buildCommunityImage(String? imageUrl, {double radius = 40}) {
     if (imageUrl == null) {
       return CircleAvatar(
         radius: radius,
+        backgroundColor: AppColors.surfaceVariant,
         child: Icon(Icons.group, size: radius),
       );
     }
 
     if (_isNetworkUrl(imageUrl)) {
-      // ネットワーク画像
       return CircleAvatar(
         radius: radius,
         backgroundImage: NetworkImage(imageUrl),
+        onBackgroundImageError: (exception, stackTrace) {
+          // エラーハンドリング
+        },
       );
     } else {
-      // ローカルファイル
-      if (kIsWeb) {
-        // Webの場合はエラー表示
-        return CircleAvatar(
-          radius: radius,
-          child: Icon(Icons.error, size: radius),
-        );
-      } else {
-        // モバイルの場合はFileImageを使用
-        try {
-          return CircleAvatar(
-            radius: radius,
-            backgroundImage: FileImage(File(imageUrl)),
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: AppColors.surfaceVariant,
+        child: Icon(Icons.group, size: radius),
+      );
+    }
+  }
+
+  Widget _buildPostImage(String imageUrl) {
+    return Container(
+      width: double.infinity,
+      height: 200, // 画像の高さを大きく
+      child: _isNetworkUrl(imageUrl)
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 200,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: double.infinity,
+                  height: 200,
+                  color: AppColors.surface,
+                  child: const Icon(Icons.image_not_supported),
+                );
+              },
+            )
+          : Container(
+              width: double.infinity,
+              height: 200,
+              color: AppColors.surface,
+              child: const Icon(Icons.image_not_supported),
+            ),
+    );
+  }
+
+  // 削除確認ダイアログを表示
+  void _showDeleteConfirmation(PostModel post) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('投稿削除'),
+        content: const Text('この投稿を削除しますか？\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deletePost(post);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+            ),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 投稿削除処理
+  Future<void> _deletePost(PostModel post) async {
+    final postProvider = context.read<PostProvider>();
+
+    // ローディング表示
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final success = await postProvider.deletePost(post.id);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // ローディング終了
+
+        if (success) {
+          // ローカルリストからも削除
+          setState(() {
+            _communityPosts.removeWhere((p) => p.id == post.id);
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('投稿を削除しました')),
           );
-        } catch (e) {
-          return CircleAvatar(
-            radius: radius,
-            child: Icon(Icons.error, size: radius),
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('投稿の削除に失敗しました')),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // ローディング終了
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラーが発生しました: $e')),
+        );
       }
     }
   }

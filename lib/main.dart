@@ -10,6 +10,7 @@ import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/post_provider.dart';
 import 'providers/community_provider.dart';
+import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -17,7 +18,6 @@ import 'screens/profile/profile_settings_screen.dart';
 import 'screens/post/create_post_screen.dart';
 import 'screens/post/create_end_post_screen.dart';
 import 'screens/post/post_detail_screen.dart';
-import 'screens/community/community_screen.dart';
 import 'screens/community/community_chat_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
@@ -29,6 +29,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 通知サービスの初期化
+  await NotificationService().initialize();
+
   runApp(const MyApp());
 }
 
@@ -165,7 +169,10 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) => const ProfileScreen(),
+      redirect: (context, state) {
+        // 自分のプロフィールへの遷移は軌跡画面にリダイレクト
+        return '/home?tab=1';
+      },
     ),
     GoRoute(
       path: '/profile/:userId',
@@ -177,10 +184,6 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/profile/settings',
       builder: (context, state) => const ProfileSettingsScreen(),
-    ),
-    GoRoute(
-      path: '/community',
-      builder: (context, state) => const CommunityScreen(),
     ),
     GoRoute(
       path: '/community/:id',
@@ -197,6 +200,14 @@ final GoRouter _router = GoRouter(
       path: '/post/create',
       builder: (context, state) {
         final communityId = state.uri.queryParameters['communityId'];
+        return CreatePostScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/create-post',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final communityId = extra?['communityId'] as String?;
         return CreatePostScreen(communityId: communityId);
       },
     ),
@@ -223,10 +234,27 @@ final GoRouter _router = GoRouter(
       path: '/post/:id',
       builder: (context, state) {
         final postId = state.pathParameters['id']!;
-        final post = state.extra as PostModel?;
+
+        // extraパラメータの安全な処理
+        PostModel? post;
+        String? fromCommunity;
+
+        if (state.extra != null) {
+          if (state.extra is Map<String, dynamic>) {
+            // Map形式の場合
+            final extra = state.extra as Map<String, dynamic>;
+            post = extra['post'] as PostModel?;
+            fromCommunity = extra['fromCommunity'] as String?;
+          } else if (state.extra is PostModel) {
+            // PostModel直接の場合（従来の互換性のため）
+            post = state.extra as PostModel;
+          }
+        }
+
         return PostDetailScreen(
           postId: postId,
           post: post,
+          fromCommunity: fromCommunity,
         );
       },
     ),

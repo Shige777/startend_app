@@ -219,9 +219,11 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
   Widget _buildCommunityImage(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) {
       return CircleAvatar(
+        radius: 30, // サイズを大きく
         backgroundColor: AppColors.primary,
         child: Icon(
           Icons.group,
+          size: 30, // アイコンサイズも大きく
           color: AppColors.textOnPrimary,
         ),
       );
@@ -229,6 +231,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
 
     try {
       return CircleAvatar(
+        radius: 30, // サイズを大きく
         backgroundImage: NetworkImage(imageUrl),
         backgroundColor: AppColors.primary,
         onBackgroundImageError: (exception, stackTrace) {
@@ -238,9 +241,11 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
       );
     } catch (e) {
       return CircleAvatar(
+        radius: 30, // サイズを大きく
         backgroundColor: AppColors.primary,
         child: Icon(
           Icons.group,
+          size: 30, // アイコンサイズも大きく
           color: AppColors.textOnPrimary,
         ),
       );

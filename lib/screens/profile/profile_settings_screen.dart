@@ -122,7 +122,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             if (Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
             } else {
-              context.go('/profile');
+              // 自分のプロフィール設定から戻る場合は軌跡画面に遷移
+              context.go('/home?tab=1');
             }
           },
         ),
@@ -459,7 +460,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           } else {
-            context.go('/profile');
+            // 自分のプロフィール設定から戻る場合は軌跡画面に遷移
+            context.go('/home?tab=1');
           }
         }
       } else {

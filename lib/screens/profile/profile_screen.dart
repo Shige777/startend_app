@@ -13,6 +13,7 @@ import '../../models/post_model.dart';
 import '../../models/user_model.dart';
 import '../../widgets/post_grid_widget.dart';
 import '../../widgets/post_list_widget.dart';
+import '../../widgets/post_card_widget.dart';
 import '../../widgets/wave_loading_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -25,12 +26,15 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+enum TimePeriod { day, week, month, year, all }
+
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isGridView = true;
   bool _hasLoadedPosts = false;
   UserModel? _profileUser; // 表示するユーザー情報
+  TimePeriod _selectedPeriod = TimePeriod.all;
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
@@ -131,6 +135,77 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  // 期間フィルタ機能
+  Map<String, List<PostModel>> _groupPostsByPeriod(List<PostModel> posts) {
+    if (_selectedPeriod == TimePeriod.all) {
+      return {'すべて': posts};
+    }
+
+    final Map<String, List<PostModel>> groupedPosts = {};
+
+    for (final post in posts) {
+      final postDate = post.createdAt;
+      String groupKey;
+
+      switch (_selectedPeriod) {
+        case TimePeriod.day:
+          groupKey = '${postDate.month}月${postDate.day}日';
+          break;
+        case TimePeriod.week:
+          // 年の第何週かを計算
+          final weekOfYear = _getWeekOfYear(postDate);
+          groupKey = '${postDate.year}年第${weekOfYear}週';
+          break;
+        case TimePeriod.month:
+          groupKey = '${postDate.year}年${postDate.month}月';
+          break;
+        case TimePeriod.year:
+          groupKey = '${postDate.year}年';
+          break;
+        case TimePeriod.all:
+          groupKey = 'すべて';
+          break;
+      }
+
+      if (!groupedPosts.containsKey(groupKey)) {
+        groupedPosts[groupKey] = [];
+      }
+      groupedPosts[groupKey]!.add(post);
+    }
+
+    // 期間順にソート
+    final sortedKeys = groupedPosts.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+    final sortedGroupedPosts = <String, List<PostModel>>{};
+    for (final key in sortedKeys) {
+      sortedGroupedPosts[key] = groupedPosts[key]!;
+    }
+
+    return sortedGroupedPosts;
+  }
+
+  // 年の第何週かを計算するヘルパーメソッド
+  int _getWeekOfYear(DateTime date) {
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final dayOfYear = date.difference(firstDayOfYear).inDays + 1;
+    return ((dayOfYear - 1) ~/ 7) + 1;
+  }
+
+  String _getPeriodText(TimePeriod period) {
+    switch (period) {
+      case TimePeriod.day:
+        return '日';
+      case TimePeriod.week:
+        return '週';
+      case TimePeriod.month:
+        return '月';
+      case TimePeriod.year:
+        return '年';
+      case TimePeriod.all:
+        return 'すべて';
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -142,23 +217,56 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        // 軌跡画面（自分のプロフィール）では戻るボタンを表示しない
+        automaticallyImplyLeading: !widget.isOwnProfile,
+        leading: !widget.isOwnProfile
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              )
+            : null,
         title: Text(widget.isOwnProfile
             ? '軌跡'
             : (_profileUser?.displayName ?? 'プロフィール')),
         actions: widget.isOwnProfile
             ? [
+                PopupMenuButton<TimePeriod>(
+                  icon: const Icon(Icons.date_range),
+                  onSelected: (period) {
+                    setState(() {
+                      _selectedPeriod = period;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) => TimePeriod.values
+                      .map((period) => PopupMenuItem<TimePeriod>(
+                            value: period,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedPeriod == period
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(_getPeriodText(period)),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                ),
                 IconButton(
                   icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
                   onPressed: () {
                     setState(() {
                       _isGridView = !_isGridView;
                     });
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    context.go('/profile/settings');
                   },
                 ),
                 PopupMenuButton<String>(
@@ -183,6 +291,31 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ]
             : [
+                PopupMenuButton<TimePeriod>(
+                  icon: const Icon(Icons.date_range),
+                  onSelected: (period) {
+                    setState(() {
+                      _selectedPeriod = period;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) => TimePeriod.values
+                      .map((period) => PopupMenuItem<TimePeriod>(
+                            value: period,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedPeriod == period
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(_getPeriodText(period)),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                ),
                 IconButton(
                   icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
                   onPressed: () {
@@ -264,94 +397,69 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                     // フォローボタン（他のユーザーのプロフィールの場合）
                     if (!widget.isOwnProfile) ...[
+                      const SizedBox(height: 16),
                       Consumer<UserProvider>(
                         builder: (context, userProvider, child) {
                           final currentUser = userProvider.currentUser;
+
+                          // 自分自身のプロフィールの場合はフォローボタンを表示しない
+                          if (currentUser == null ||
+                              currentUser.id == user.id) {
+                            return const SizedBox.shrink();
+                          }
+
                           final isFollowing =
-                              currentUser?.followingIds.contains(user.id) ??
-                                  false;
+                              currentUser.followingIds.contains(user.id);
 
                           return SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: () async {
-                                if (currentUser != null) {
-                                  try {
-                                    if (isFollowing) {
-                                      // アンフォロー
-                                      final updatedFollowingIds =
-                                          List<String>.from(
-                                              currentUser.followingIds)
-                                            ..remove(user.id);
-                                      final updatedCurrentUser =
-                                          currentUser.copyWith(
-                                        followingIds: updatedFollowingIds,
-                                        updatedAt: DateTime.now(),
-                                      );
-                                      await userProvider
-                                          .updateUser(updatedCurrentUser);
-
-                                      // フォローされるユーザーのフォロワー数も更新
-                                      final updatedFollowerIds =
-                                          List<String>.from(user.followerIds)
-                                            ..remove(currentUser.id);
-                                      final updatedUser = user.copyWith(
-                                        followerIds: updatedFollowerIds,
-                                        updatedAt: DateTime.now(),
-                                      );
-                                      await userProvider
-                                          .updateUser(updatedUser);
-
-                                      // プロフィールユーザー情報を更新
-                                      setState(() {
-                                        _profileUser = updatedUser;
-                                      });
-
+                                try {
+                                  if (isFollowing) {
+                                    // アンフォロー
+                                    final success = await userProvider
+                                        .unfollowUser(user.id);
+                                    if (success && mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         const SnackBar(
                                             content: Text('フォローを解除しました')),
                                       );
-                                    } else {
-                                      // フォロー
-                                      final updatedFollowingIds =
-                                          List<String>.from(
-                                              currentUser.followingIds)
-                                            ..add(user.id);
-                                      final updatedCurrentUser =
-                                          currentUser.copyWith(
-                                        followingIds: updatedFollowingIds,
-                                        updatedAt: DateTime.now(),
-                                      );
-                                      await userProvider
-                                          .updateUser(updatedCurrentUser);
-
-                                      // フォローされるユーザーのフォロワー数も更新
-                                      final updatedFollowerIds =
-                                          List<String>.from(user.followerIds)
-                                            ..add(currentUser.id);
-                                      final updatedUser = user.copyWith(
-                                        followerIds: updatedFollowerIds,
-                                        updatedAt: DateTime.now(),
-                                      );
-                                      await userProvider
-                                          .updateUser(updatedUser);
-
                                       // プロフィールユーザー情報を更新
-                                      setState(() {
-                                        _profileUser = updatedUser;
-                                      });
-
+                                      final updatedUser =
+                                          await userProvider.getUser(user.id);
+                                      if (updatedUser != null) {
+                                        setState(() {
+                                          _profileUser = updatedUser;
+                                        });
+                                      }
+                                    }
+                                  } else {
+                                    // フォロー
+                                    final success =
+                                        await userProvider.followUser(user.id);
+                                    if (success && mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         const SnackBar(
                                             content: Text('フォローしました')),
                                       );
+                                      // プロフィールユーザー情報を更新
+                                      final updatedUser =
+                                          await userProvider.getUser(user.id);
+                                      if (updatedUser != null) {
+                                        setState(() {
+                                          _profileUser = updatedUser;
+                                        });
+                                      }
                                     }
+                                  }
 
-                                    // 現在のユーザー情報を再読み込み
-                                    await userProvider.refreshCurrentUser();
-                                  } catch (e) {
+                                  // 現在のユーザー情報を再読み込み
+                                  await userProvider.refreshCurrentUser();
+                                } catch (e) {
+                                  if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text('エラーが発生しました: $e')),
                                     );
@@ -371,7 +479,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                           );
                         },
                       ),
-                      const SizedBox(height: 16),
                     ],
 
                     // 統計情報
@@ -406,6 +513,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ],
                     ),
+
+                    // プロフィール編集ボタン（自分のプロフィールの場合）
+                    if (widget.isOwnProfile) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            context.go('/profile/settings');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary),
+                            foregroundColor: AppColors.primary,
+                          ),
+                          child: const Text('プロフィールを編集'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -439,7 +564,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       // 他のユーザーのプロフィールの場合はナビゲーションバーを追加
       bottomNavigationBar: !widget.isOwnProfile
           ? BottomNavigationBar(
-              currentIndex: 1, // 軌跡タブを選択状態にする
+              currentIndex: 0, // 投稿タブを選択状態にする
               onTap: (index) {
                 if (index == 0) {
                   context.go('/home');
@@ -523,8 +648,24 @@ class _ProfileScreenState extends State<ProfileScreen>
             }
 
             final status = post.status;
-            return status == PostStatus.concentration ||
-                status == PostStatus.inProgress;
+            final now = DateTime.now();
+
+            // 集中投稿は常に表示
+            if (status == PostStatus.concentration) {
+              return true;
+            }
+
+            // 進行中投稿は、終了予定時刻から24時間以内なら表示
+            if (status == PostStatus.inProgress) {
+              if (post.scheduledEndTime != null) {
+                final hoursSinceScheduledEnd =
+                    now.difference(post.scheduledEndTime!).inHours;
+                return hoursSinceScheduledEnd <= 24;
+              }
+              return true; // 終了予定時刻が設定されていない場合は表示
+            }
+
+            return false;
           }).toList();
 
           // 集中を上に、進行中を下に並べる
@@ -582,16 +723,336 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         }
 
-        return _isGridView
-            ? PostGridWidget(posts: posts)
-            : PostListWidget(
-                type: PostListType.user,
-                posts: posts,
-                userId: _profileUser?.id,
-                onPostTap: (post) {
-                  context.go('/post/${post.id}', extra: post);
-                },
-              );
+        // 期間でグループ化
+        final groupedPosts = _groupPostsByPeriod(posts);
+
+        if (category == 'active') {
+          // 集中と進行中を分けて表示（すべての期間をまとめて）
+          final allPosts =
+              groupedPosts.values.expand((posts) => posts).toList();
+          final concentrationPosts = allPosts
+              .where((post) => post.status == PostStatus.concentration)
+              .toList();
+          final inProgressPosts = allPosts
+              .where((post) => post.status == PostStatus.inProgress)
+              .toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 集中セクション（集中投稿がある場合のみ表示）
+                if (concentrationPosts.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Text(
+                      '集中',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                  ),
+                  // 集中の投稿をグリッド表示
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: concentrationPosts.length,
+                      itemBuilder: (context, index) {
+                        final post = concentrationPosts[index];
+                        return GestureDetector(
+                          onTap: () => context.go('/post/${post.id}', extra: {
+                            'post': post,
+                          }),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: AppColors.surface,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: post.imageUrl != null
+                                  ? Image.network(
+                                      post.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          color: AppColors.surface,
+                                          child: const Icon(
+                                            Icons.image_not_supported,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      color: AppColors.surface,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.image,
+                                            color: AppColors.textSecondary,
+                                            size: 32,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            post.title,
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // 進行中セクション
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(
+                    '進行中',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                  ),
+                ),
+                // 進行中の投稿をグリッド表示
+                if (inProgressPosts.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: inProgressPosts.length,
+                      itemBuilder: (context, index) {
+                        final post = inProgressPosts[index];
+                        return GestureDetector(
+                          onTap: () => context.go('/post/${post.id}', extra: {
+                            'post': post,
+                          }),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: AppColors.surface,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: post.imageUrl != null
+                                  ? Image.network(
+                                      post.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          color: AppColors.surface,
+                                          child: const Icon(
+                                            Icons.image_not_supported,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      color: AppColors.surface,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.image,
+                                            color: AppColors.textSecondary,
+                                            size: 32,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            post.title,
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ] else ...[
+                  // 進行中投稿がない場合の表示
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 20),
+                    child: Center(
+                      child: Text(
+                        '進行中の投稿はありません',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        } else {
+          // 過去の投稿を期間別に表示
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final entry in groupedPosts.entries) ...[
+                  // 期間ラベル
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Text(
+                      entry.key,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                  ),
+                  // 投稿表示
+                  _isGridView
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 4,
+                              mainAxisSpacing: 4,
+                              childAspectRatio: 1.0,
+                            ),
+                            itemCount: entry.value.length,
+                            itemBuilder: (context, index) {
+                              final post = entry.value[index];
+                              return GestureDetector(
+                                onTap: () =>
+                                    context.go('/post/${post.id}', extra: {
+                                  'post': post,
+                                }),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: AppColors.surface,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: post.imageUrl != null
+                                        ? Image.network(
+                                            post.imageUrl!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                color: AppColors.surface,
+                                                child: const Icon(
+                                                  Icons.image_not_supported,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            color: AppColors.surface,
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const Icon(
+                                                  Icons.image,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  size: 32,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  post.title,
+                                                  style: const TextStyle(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                      : PostListWidget(
+                          type: PostListType.user,
+                          posts: entry.value,
+                          userId: _profileUser?.id,
+                          onPostTap: (post) {
+                            context.go('/post/${post.id}', extra: {
+                              'post': post,
+                            });
+                          },
+                        ),
+                  const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          );
+        }
       },
     );
   }

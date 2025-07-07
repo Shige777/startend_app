@@ -13,11 +13,13 @@ import '../../widgets/post_card_widget.dart';
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final PostModel? post;
+  final String? fromCommunity; // コミュニティから遷移してきた場合のコミュニティID
 
   const PostDetailScreen({
     super.key,
     required this.postId,
     this.post,
+    this.fromCommunity,
   });
 
   @override
@@ -148,7 +150,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         content: const Text('この投稿を削除しますか？\nこの操作は取り消せません。'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
+            },
             child: const Text('キャンセル'),
           ),
           TextButton(
@@ -192,8 +200,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             const SnackBar(content: Text('投稿を削除しました')),
           );
           // 前の画面に戻る
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          if (widget.fromCommunity != null) {
+            context.go('/community/${widget.fromCommunity}');
+          } else if (context.canPop()) {
+            context.pop();
           } else {
             context.go('/home');
           }
@@ -235,7 +245,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // コミュニティから遷移してきた場合は、コミュニティ画面に戻る
+            if (widget.fromCommunity != null) {
+              context.go('/community/${widget.fromCommunity}');
+            } else if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: const Text('投稿詳細'),
         actions: [
@@ -263,6 +282,66 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               showActions: false,
               onDelete: _isPostOwner() ? _showDeleteConfirmation : null,
             ),
+
+            // 実際にかかった時間の表示（完了した投稿の場合のみ）
+            if (_post!.status == PostStatus.completed &&
+                _post!.actualEndTime != null)
+              Padding(
+                padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                child: Card(
+                  color: AppColors.completed.withOpacity(0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.timer, color: AppColors.completed),
+                            const SizedBox(width: 8),
+                            Text(
+                              '実際にかかった時間',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.completed,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _getElapsedTime(),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.completed,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '開始: ${DateTimeUtils.formatDateTime(_post!.createdAt)}',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                        ),
+                        Text(
+                          '完了: ${DateTimeUtils.formatDateTime(_post!.actualEndTime!)}',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
             // カスタムアクションボタン
             Padding(
@@ -304,9 +383,52 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
+
+            // END投稿作成ボタン（進行中の投稿で投稿者本人の場合のみ）
+            if (_post!.status == PostStatus.inProgress && _isPostOwner())
+              Padding(
+                padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      context.push('/create-end-post', extra: {
+                        'startPostId': _post!.id,
+                        'startPost': _post!,
+                        'fromCommunity': widget.fromCommunity,
+                      });
+                    },
+                    icon: const Icon(Icons.flag),
+                    label: const Text('END投稿を作成'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.completed,
+                      foregroundColor: AppColors.textOnPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  // 実際にかかった時間を計算する関数
+  String _getElapsedTime() {
+    if (_post?.actualEndTime == null) return '';
+
+    final elapsed = _post!.actualEndTime!.difference(_post!.createdAt);
+    final days = elapsed.inDays;
+    final hours = elapsed.inHours % 24;
+    final minutes = elapsed.inMinutes % 60;
+
+    if (days > 0) {
+      return '${days}日${hours}時間${minutes}分';
+    } else if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
   }
 }

@@ -163,7 +163,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
             if (Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
             } else {
-              context.go('/home');
+              // コミュニティ画面から戻る時はコミュニティタブを選択
+              context.go('/home?tab=community');
             }
           },
         ),
@@ -316,7 +317,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                 type: PostListType.community,
                                 posts: _communityPosts,
                                 onPostTap: (post) {
-                                  context.go('/post/${post.id}');
+                                  context.go('/post/${post.id}', extra: {
+                                    'post': post,
+                                  });
                                 },
                               ),
                       ),

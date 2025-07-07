@@ -83,9 +83,11 @@ class _UserListItemState extends State<UserListItem> {
         followerId: currentUser.id,
         followingId: widget.user.id,
       );
-      setState(() {
-        _isFollowing = isFollowing;
-      });
+      if (mounted) {
+        setState(() {
+          _isFollowing = isFollowing;
+        });
+      }
     }
   }
 
@@ -107,9 +109,11 @@ class _UserListItemState extends State<UserListItem> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       bool success;
@@ -139,19 +143,23 @@ class _UserListItemState extends State<UserListItem> {
         }
       }
 
-      if (success && !widget.user.requiresApproval) {
+      if (success && !widget.user.requiresApproval && mounted) {
         setState(() {
           _isFollowing = !_isFollowing;
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('エラーが発生しました: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラーが発生しました: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

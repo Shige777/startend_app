@@ -48,7 +48,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: Text(widget.communityId != null ? 'コミュニティ投稿' : 'START投稿'),
         actions: [
@@ -283,11 +289,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         print('投稿作成開始: ${post.title}');
         print('ユーザーID: ${post.userId}');
         print('投稿タイプ: ${post.type}');
+        print('コミュニティID: ${post.communityIds}');
       }
 
       final success = await postProvider.createPost(post);
 
-      if (success) {
+      if (success != null) {
         if (kDebugMode) {
           print('投稿作成成功');
         }
@@ -297,7 +304,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
         if (mounted) {
           if (widget.communityId != null) {
-            Navigator.of(context).pop(); // コミュニティ画面に戻る
+            // コミュニティ投稿の場合は、必ずコミュニティ画面に戻る
+            context.go('/community/${widget.communityId}');
           } else {
             context.go('/home');
           }

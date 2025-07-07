@@ -15,15 +15,15 @@ import '../models/user_model.dart';
 class PostCardWidget extends StatelessWidget {
   final PostModel post;
   final VoidCallback? onTap;
-  final bool showActions;
   final VoidCallback? onDelete;
+  final bool showActions; // アクションボタンの表示制御
 
   const PostCardWidget({
     super.key,
     required this.post,
     this.onTap,
-    this.showActions = true,
     this.onDelete,
+    this.showActions = true, // デフォルトは表示
   });
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
@@ -109,46 +109,83 @@ class PostCardWidget extends StatelessWidget {
       margin: const EdgeInsets.symmetric(
         vertical: AppConstants.smallPadding / 2,
       ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(0), // ボーダーレス
-      ),
+      color: AppColors.surface,
       child: InkWell(
-        onTap: onTap ?? () => context.go('/post/${post.id}', extra: post),
+        onTap: onTap ??
+            () => context.go('/post/${post.id}', extra: {
+                  'post': post,
+                }),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ヘッダー（ユーザー情報）
-            Padding(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              child: Row(
-                children: [
-                  const CircleAvatar(radius: 20, child: Icon(Icons.person)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ユーザー名', // TODO: 実際のユーザー名を取得
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          DateTimeUtils.getRelativeTime(post.createdAt),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary,
+            Consumer<UserProvider>(
+              builder: (context, userProvider, _) {
+                return FutureBuilder<UserModel?>(
+                  future: userProvider.getUserById(post.userId),
+                  builder: (context, snapshot) {
+                    final user = snapshot.data;
+                    return Padding(
+                      padding:
+                          const EdgeInsets.all(AppConstants.defaultPadding),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (user != null) {
+                                context.go('/profile/${user.id}');
+                              }
+                            },
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundImage: user?.profileImageUrl != null
+                                  ? CachedNetworkImageProvider(
+                                      user!.profileImageUrl!)
+                                  : null,
+                              child: user?.profileImageUrl == null
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                if (user != null) {
+                                  context.go('/profile/${user.id}');
+                                }
+                              },
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user?.displayName ?? 'ユーザー名',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // _buildStatusChip(), // 完了文字を削除
-                ],
-              ),
+                                  Text(
+                                    DateTimeUtils.getRelativeTime(
+                                        post.createdAt),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // _buildStatusChip(), // 完了文字を削除
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
 
             // 画像（START投稿は常に2枚表示：左側START、右側END）
@@ -174,28 +211,17 @@ class PostCardWidget extends StatelessWidget {
 
             // END投稿のコメント（完了している場合）- 画像の下に表示
             if (post.isCompleted && post.endComment != null) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.completed.withOpacity(0.1),
-                  border: Border(
-                    top: BorderSide(
-                      color: AppColors.completed.withOpacity(0.3),
-                    ),
-                  ),
-                ),
+              Padding(
+                padding: const EdgeInsets.all(AppConstants.defaultPadding),
                 child: Text(
                   post.endComment!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.completed,
-                      ),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
             ],
 
-            // アクション（いいね、コメント）
-            if (showActions)
+            // 終了予定時刻（END投稿されていない場合）
+            if (!post.isCompleted && post.scheduledEndTime != null) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppConstants.defaultPadding,
@@ -203,68 +229,134 @@ class PostCardWidget extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    // いいねボタン
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, _) {
-                        final currentUser = userProvider.currentUser;
-                        final isLiked = currentUser != null &&
-                            post.isLikedBy(currentUser.id);
-
-                        return InkWell(
-                          onTap: () => _toggleLike(context, currentUser),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.local_fire_department,
-                                  size: 20,
-                                  color: isLiked
-                                      ? AppColors.flame
-                                      : AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  post.likeCount.toString(),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                          color: AppColors.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                    Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: post.isOverdue
+                          ? AppColors.error
+                          : AppColors.textSecondary,
                     ),
-                    const Spacer(),
-
-                    // 投稿者本人の場合のみ削除ボタンを表示
-                    if (onDelete != null)
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 16),
-                        onPressed: onDelete,
-                        color: AppColors.error,
-                      ),
-
-                    // END投稿ボタン（START投稿の場合のみ）
-                    if (post.type == PostType.start && !post.isCompleted)
-                      TextButton.icon(
-                        onPressed: () {
-                          // END投稿作成画面への遷移
-                          context.go('/create-end-post', extra: {
-                            'startPostId': post.id,
-                            'startPost': post,
-                          });
-                        },
-                        icon: const Icon(Icons.flag, size: 16),
-                        label: const Text('END投稿'),
-                      ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '終了予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: post.isOverdue
+                                ? AppColors.error
+                                : AppColors.textSecondary,
+                          ),
+                    ),
                   ],
                 ),
               ),
+            ],
+
+            // アクションボタン
+            if (showActions) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  // いいねボタン
+                  Consumer<UserProvider>(
+                    builder: (context, userProvider, child) {
+                      final currentUser = userProvider.currentUser;
+                      final isLiked =
+                          currentUser != null && post.isLikedBy(currentUser.id);
+
+                      return InkWell(
+                        onTap: () => _toggleLike(context, currentUser),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.local_fire_department,
+                                size: 20,
+                                color: isLiked
+                                    ? AppColors.flame
+                                    : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                post.likeCount.toString(),
+                                style: TextStyle(
+                                  color: isLiked
+                                      ? AppColors.flame
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const Spacer(),
+
+                  // END投稿ボタン（START投稿で未完了の場合のみ）
+                  if (post.type == PostType.start && !post.isCompleted) ...[
+                    Consumer<UserProvider>(
+                      builder: (context, userProvider, child) {
+                        final currentUser = userProvider.currentUser;
+                        final isOwnPost = currentUser != null &&
+                            post.userId == currentUser.id;
+
+                        if (isOwnPost) {
+                          return ElevatedButton.icon(
+                            onPressed: () {
+                              context.push('/create-end-post', extra: {
+                                'startPostId': post.id,
+                                'startPost': post,
+                              });
+                            },
+                            icon: const Icon(Icons.flag, size: 16),
+                            label: const Text('END投稿'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.completed,
+                              foregroundColor: AppColors.textOnPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
+
+                  // 削除ボタン（投稿者本人の場合のみ）
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 8),
+                    Consumer<UserProvider>(
+                      builder: (context, userProvider, child) {
+                        final currentUser = userProvider.currentUser;
+                        final isOwnPost = currentUser != null &&
+                            post.userId == currentUser.id;
+
+                        if (isOwnPost) {
+                          return IconButton(
+                            onPressed: onDelete,
+                            icon: const Icon(Icons.delete, size: 16),
+                            color: AppColors.error,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -559,7 +651,24 @@ class PostCardWidget extends StatelessWidget {
         success = await postProvider.likePost(post.id, currentUser.id);
       }
 
-      if (!success) {
+      if (success) {
+        // 成功時にローカルの投稿データを安全に更新
+        final newLikeCount = isLiked
+            ? (post.likeCount > 0 ? post.likeCount - 1 : 0) // マイナスにならないように制御
+            : post.likeCount + 1;
+
+        final newLikedByUserIds = isLiked
+            ? post.likedByUserIds.where((id) => id != currentUser.id).toList()
+            : [...post.likedByUserIds, currentUser.id];
+
+        final updatedPost = post.copyWith(
+          likeCount: newLikeCount,
+          likedByUserIds: newLikedByUserIds,
+        );
+
+        // PostProviderの各リストを更新
+        postProvider.updatePostInLists(updatedPost);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(postProvider.errorMessage ?? 'エラーが発生しました')),
         );

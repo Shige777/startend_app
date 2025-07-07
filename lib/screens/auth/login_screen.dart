@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success && mounted) {
       // 通知サービスを初期化
-      await NotificationService.initialize();
+      await NotificationService().initialize();
       context.go('/home');
     }
   }
@@ -246,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithGoogle();
     if (success && mounted) {
       // 通知サービスを初期化
-      await NotificationService.initialize();
+      await NotificationService().initialize();
       context.go('/home');
     }
   }
@@ -258,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithApple();
     if (success && mounted) {
       // 通知サービスを初期化
-      await NotificationService.initialize();
+      await NotificationService().initialize();
       context.go('/home');
     }
   }

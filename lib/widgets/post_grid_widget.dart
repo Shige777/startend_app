@@ -11,8 +11,9 @@ import '../providers/user_provider.dart';
 
 class PostGridWidget extends StatelessWidget {
   final List<PostModel> posts;
+  final String? periodLabel;
 
-  const PostGridWidget({super.key, required this.posts});
+  const PostGridWidget({super.key, required this.posts, this.periodLabel});
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
@@ -77,25 +78,49 @@ class PostGridWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 1,
-        mainAxisSpacing: 1,
-        childAspectRatio: 1,
-      ),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        return _buildGridItem(context, posts[index]);
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 期間ラベル表示
+        if (periodLabel != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              periodLabel!,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+            ),
+          ),
+        ],
+        // グリッド表示
+        Expanded(
+          child: GridView.builder(
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 1,
+              mainAxisSpacing: 1,
+              childAspectRatio: 1,
+            ),
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              return _buildGridItem(context, posts[index]);
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildGridItem(BuildContext context, PostModel post) {
     return GestureDetector(
       onTap: () {
-        context.go('/post/${post.id}', extra: post);
+        context.go('/post/${post.id}', extra: {
+          'post': post,
+        });
       },
       onLongPress: () {
         if (_canDeletePost(context, post)) {

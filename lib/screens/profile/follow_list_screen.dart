@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
+import '../../services/follow_service.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/user_list_item.dart';
@@ -32,7 +34,9 @@ class _FollowListScreenState extends State<FollowListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _loadUsers();
+    });
   }
 
   Future<void> _loadUsers() async {
@@ -41,29 +45,20 @@ class _FollowListScreenState extends State<FollowListScreen> {
         _isLoading = true;
       });
 
-      final userProvider = context.read<UserProvider>();
-      final targetUser = await userProvider.getUser(widget.userId);
-
-      if (targetUser != null) {
-        List<String> userIds;
-        if (widget.type == FollowListType.followers) {
-          userIds = targetUser.followerIds;
-        } else {
-          userIds = targetUser.followingIds;
-        }
-
-        final users = <UserModel>[];
-        for (final userId in userIds) {
-          final user = await userProvider.getUser(userId);
-          if (user != null) {
-            users.add(user);
-          }
-        }
-
-        setState(() {
-          _users = users;
-        });
+      // FollowServiceを使用してフォロー関係を取得
+      Stream<List<UserModel>> userStream;
+      if (widget.type == FollowListType.followers) {
+        userStream = FollowService.getFollowers(widget.userId);
+      } else {
+        userStream = FollowService.getFollowing(widget.userId);
       }
+
+      // Streamの最初の値を取得
+      final users = await userStream.first;
+
+      setState(() {
+        _users = users;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,6 +80,14 @@ class _FollowListScreenState extends State<FollowListScreen> {
         title: Text(widget.title),
         backgroundColor: AppColors.surface,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
       ),
       body: _isLoading
           ? const Center(
@@ -140,7 +143,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                       user: user,
                       onTap: () {
                         // TODO: ユーザー詳細画面に遷移
-                        context.go('/user/${user.id}');
+                        context.go('/profile/${user.id}');
                       },
                     );
                   },

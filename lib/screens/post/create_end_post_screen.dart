@@ -49,10 +49,10 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
+            if (context.canPop()) {
+              context.pop();
             } else {
-              context.go('/profile');
+              context.go('/home');
             }
           },
         ),
@@ -319,13 +319,18 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
         imageUrl,
       );
 
-      if (success) {
+      if (success != null) {
         if (mounted) {
-          // より安全なナビゲーション処理
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          // START投稿がコミュニティ投稿の場合は、コミュニティ画面に戻る
+          if (widget.startPost.communityIds.isNotEmpty) {
+            context.go('/community/${widget.startPost.communityIds.first}');
           } else {
-            context.go('/profile');
+            // より安全なナビゲーション処理
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
           }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('END投稿を作成しました！')),

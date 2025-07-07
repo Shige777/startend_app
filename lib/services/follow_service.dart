@@ -42,10 +42,10 @@ class FollowService {
       await batch.commit();
 
       // フォロー通知を送信
-      await NotificationService.sendFollowNotification(
+      await NotificationService().sendFollowNotification(
         targetUserId: followingId,
-        followerName: followerName,
         followerId: followerId,
+        followerName: followerName,
       );
 
       return true;
@@ -134,6 +134,12 @@ class FollowService {
 
       for (final doc in snapshot.docs) {
         final followerId = doc.data()['followerId'] as String;
+
+        // 自分自身を除外
+        if (followerId == userId) {
+          continue;
+        }
+
         final userDoc =
             await _firestore.collection('users').doc(followerId).get();
 
@@ -158,6 +164,12 @@ class FollowService {
 
       for (final doc in snapshot.docs) {
         final followingId = doc.data()['followingId'] as String;
+
+        // 自分自身を除外
+        if (followingId == userId) {
+          continue;
+        }
+
         final userDoc =
             await _firestore.collection('users').doc(followingId).get();
 
@@ -253,7 +265,7 @@ class FollowService {
       });
 
       // フォロー申請通知を送信
-      await NotificationService.sendNotificationToUser(
+      await NotificationService().sendNotificationToUser(
         userId: targetUserId,
         title: 'フォロー申請',
         body: '${requesterName}さんからフォロー申請が届きました',
@@ -311,7 +323,7 @@ class FollowService {
       await batch.commit();
 
       // 承認通知を送信
-      await NotificationService.sendNotificationToUser(
+      await NotificationService().sendNotificationToUser(
         userId: requesterId,
         title: 'フォロー申請が承認されました',
         body: 'フォロー申請が承認されました',

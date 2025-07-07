@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -143,7 +144,35 @@ class UserProvider extends ChangeNotifier {
       _setError('ユーザー取得に失敗しました');
       return null;
     } finally {
-      _setLoading(false);
+      // ビルド中にsetStateが呼ばれないようにSchedulerBindingを使用
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _setLoading(false);
+      });
+    }
+  }
+
+  // ユーザーをIDで取得（キャッシュ機能付き）
+  Map<String, UserModel> _userCache = {};
+
+  Future<UserModel?> getUserById(String userId) async {
+    // キャッシュにある場合はそれを返す
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId];
+    }
+
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        final user = UserModel.fromFirestore(doc);
+        _userCache[userId] = user; // キャッシュに保存
+        return user;
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting user by ID: $e');
+      }
+      return null;
     }
   }
 
@@ -212,8 +241,13 @@ class UserProvider extends ChangeNotifier {
   Future<bool> followUser(String userId) async {
     if (_currentUser == null) return false;
 
+    // 自分自身をフォローしようとした場合はエラー
+    if (_currentUser!.id == userId) {
+      _setError('自分自身をフォローすることはできません');
+      return false;
+    }
+
     try {
-      _setLoading(true);
       _setError(null);
 
       final batch = _firestore.batch();
@@ -238,12 +272,13 @@ class UserProvider extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
+      // キャッシュからフォローしたユーザーを削除（最新データを取得するため）
+      _userCache.remove(userId);
+
       return true;
     } catch (e) {
       _setError('フォローに失敗しました');
       return false;
-    } finally {
-      _setLoading(false);
     }
   }
 
@@ -251,8 +286,13 @@ class UserProvider extends ChangeNotifier {
   Future<bool> unfollowUser(String userId) async {
     if (_currentUser == null) return false;
 
+    // 自分自身をアンフォローしようとした場合はエラー
+    if (_currentUser!.id == userId) {
+      _setError('自分自身をアンフォローすることはできません');
+      return false;
+    }
+
     try {
-      _setLoading(true);
       _setError(null);
 
       final batch = _firestore.batch();
@@ -279,12 +319,13 @@ class UserProvider extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
+      // キャッシュからアンフォローしたユーザーを削除（最新データを取得するため）
+      _userCache.remove(userId);
+
       return true;
     } catch (e) {
       _setError('アンフォローに失敗しました');
       return false;
-    } finally {
-      _setLoading(false);
     }
   }
 
