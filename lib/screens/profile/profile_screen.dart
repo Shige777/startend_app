@@ -755,79 +755,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                     ),
                   ),
-                  // 集中の投稿をグリッド表示
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 4,
-                        mainAxisSpacing: 4,
-                        childAspectRatio: 1.0,
-                      ),
-                      itemCount: concentrationPosts.length,
-                      itemBuilder: (context, index) {
-                        final post = concentrationPosts[index];
-                        return GestureDetector(
-                          onTap: () => context.go('/post/${post.id}', extra: {
-                            'post': post,
-                          }),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: AppColors.surface,
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: post.imageUrl != null
-                                  ? Image.network(
-                                      post.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: AppColors.surface,
-                                          child: const Icon(
-                                            Icons.image_not_supported,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: AppColors.surface,
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.image,
-                                            color: AppColors.textSecondary,
-                                            size: 32,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            post.title,
-                                            style: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  // 集中の投稿を表示
+                  _isGridView
+                      ? _buildPostGrid(concentrationPosts)
+                      : _buildPostList(concentrationPosts),
                   const SizedBox(height: 24),
                 ],
 
@@ -844,80 +775,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                   ),
                 ),
-                // 進行中の投稿をグリッド表示
+                // 進行中の投稿を表示
                 if (inProgressPosts.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 4,
-                        mainAxisSpacing: 4,
-                        childAspectRatio: 1.0,
-                      ),
-                      itemCount: inProgressPosts.length,
-                      itemBuilder: (context, index) {
-                        final post = inProgressPosts[index];
-                        return GestureDetector(
-                          onTap: () => context.go('/post/${post.id}', extra: {
-                            'post': post,
-                          }),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: AppColors.surface,
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: post.imageUrl != null
-                                  ? Image.network(
-                                      post.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: AppColors.surface,
-                                          child: const Icon(
-                                            Icons.image_not_supported,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: AppColors.surface,
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.image,
-                                            color: AppColors.textSecondary,
-                                            size: 32,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            post.title,
-                                            style: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  _isGridView
+                      ? _buildPostGrid(inProgressPosts)
+                      : _buildPostList(inProgressPosts),
                 ] else ...[
                   // 進行中投稿がない場合の表示
                   Padding(
@@ -960,93 +822,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   // 投稿表示
                   _isGridView
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              crossAxisSpacing: 4,
-                              mainAxisSpacing: 4,
-                              childAspectRatio: 1.0,
-                            ),
-                            itemCount: entry.value.length,
-                            itemBuilder: (context, index) {
-                              final post = entry.value[index];
-                              return GestureDetector(
-                                onTap: () =>
-                                    context.go('/post/${post.id}', extra: {
-                                  'post': post,
-                                }),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: AppColors.surface,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: post.imageUrl != null
-                                        ? Image.network(
-                                            post.imageUrl!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return Container(
-                                                color: AppColors.surface,
-                                                child: const Icon(
-                                                  Icons.image_not_supported,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                              );
-                                            },
-                                          )
-                                        : Container(
-                                            color: AppColors.surface,
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                const Icon(
-                                                  Icons.image,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                  size: 32,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  post.title,
-                                                  style: const TextStyle(
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                    fontSize: 12,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      : PostListWidget(
-                          type: PostListType.user,
-                          posts: entry.value,
-                          userId: _profileUser?.id,
-                          onPostTap: (post) {
-                            context.go('/post/${post.id}', extra: {
-                              'post': post,
-                            });
-                          },
-                        ),
+                      ? _buildPostGrid(entry.value)
+                      : _buildPostList(entry.value),
                   const SizedBox(height: 16),
                 ],
               ],
@@ -1054,6 +831,160 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         }
       },
+    );
+  }
+
+  // グリッド表示用のWidget（START/END画像を2つ並べて表示）
+  Widget _buildPostGrid(List<PostModel> posts) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: posts.length,
+        itemBuilder: (context, index) {
+          final post = posts[index];
+          return GestureDetector(
+            onTap: () => context.go('/post/${post.id}', extra: {
+              'post': post,
+            }),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.surface,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _buildPostGridItem(post),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 投稿のグリッドアイテム（START/END画像を表示）
+  Widget _buildPostGridItem(PostModel post) {
+    // 完了した投稿の場合、START/END画像を並べて表示
+    if (post.status == PostStatus.completed && post.endImageUrl != null) {
+      return Row(
+        children: [
+          // START画像
+          Expanded(
+            child: post.imageUrl != null
+                ? Image.network(
+                    post.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: AppColors.surface,
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: AppColors.textSecondary,
+                          size: 16,
+                        ),
+                      );
+                    },
+                  )
+                : Container(
+                    color: AppColors.surface,
+                    child: const Icon(
+                      Icons.image,
+                      color: AppColors.textSecondary,
+                      size: 16,
+                    ),
+                  ),
+          ),
+          // 区切り線
+          Container(
+            width: 1,
+            color: AppColors.divider,
+          ),
+          // END画像
+          Expanded(
+            child: Image.network(
+              post.endImageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: AppColors.surface,
+                  child: const Icon(
+                    Icons.image_not_supported,
+                    color: AppColors.textSecondary,
+                    size: 16,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    } else {
+      // 進行中や集中の投稿の場合、START画像のみ表示
+      return post.imageUrl != null
+          ? Image.network(
+              post.imageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: AppColors.surface,
+                  child: const Icon(
+                    Icons.image_not_supported,
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              },
+            )
+          : Container(
+              color: AppColors.surface,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.image,
+                    color: AppColors.textSecondary,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    post.title,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+    }
+  }
+
+  // リスト表示用のWidget（PostCardWidgetを使用）
+  Widget _buildPostList(List<PostModel> posts) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: posts.map((post) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: PostCardWidget(
+            post: post,
+            onTap: () => context.go('/post/${post.id}', extra: {
+              'post': post,
+            }),
+            showActions: false, // アクションボタンは非表示
+          ),
+        );
+      }).toList(),
     );
   }
 
