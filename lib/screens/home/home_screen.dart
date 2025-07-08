@@ -181,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen>
         if (_tabController.index == 0) {
           // フォロー中タブ：投稿作成
           return FloatingActionButton(
+            heroTag: "home_post_fab",
             onPressed: () {
               context.push('/post/create');
             },
@@ -193,6 +194,7 @@ class _HomeScreenState extends State<HomeScreen>
         } else {
           // コミュニティタブ：コミュニティ作成
           return FloatingActionButton(
+            heroTag: "home_community_fab",
             onPressed: () {
               _showCreateCommunityDialog(context);
             },
@@ -203,6 +205,19 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           );
         }
+      case 1:
+        // 軌跡タブ：投稿作成
+        return FloatingActionButton(
+          heroTag: "home_track_fab",
+          onPressed: () {
+            context.push('/post/create');
+          },
+          backgroundColor: AppColors.primary,
+          child: const Icon(
+            Icons.add,
+            color: AppColors.textOnPrimary,
+          ),
+        );
       default:
         return null;
     }

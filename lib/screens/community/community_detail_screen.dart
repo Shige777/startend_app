@@ -358,11 +358,11 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       ),
       floatingActionButton: _isJoined
           ? FloatingActionButton(
+              heroTag: "community_detail_fab",
               onPressed: () {
                 context.push('/post/create?communityId=${widget.communityId}');
               },
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.edit),
+              child: const Icon(Icons.add),
             )
           : null,
     );

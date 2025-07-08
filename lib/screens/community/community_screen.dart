@@ -81,12 +81,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ? const Center(child: WaveLoadingWidget())
           : _buildContent(),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateCommunityDialog,
-        backgroundColor: AppColors.primary,
-        child: const Icon(
-          Icons.group_add,
-          color: AppColors.textOnPrimary,
-        ),
+        heroTag: "community_screen_fab",
+        onPressed: () {
+          context.push('/community/create');
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -184,7 +183,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         physics: const ClampingScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 1.05,
+          childAspectRatio: 1.2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
         ),
@@ -236,7 +235,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               children: [
                 // コミュニティ画像
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
@@ -256,43 +255,45 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
                 // コミュニティ情報
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Padding(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           community.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 15,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 6),
                         if (community.description != null &&
                             community.description!.isNotEmpty) ...[
-                          Flexible(
+                          Expanded(
                             child: Text(
                               community.description!,
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 12,
+                                height: 1.3,
                               ),
-                              maxLines: 2,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        ] else ...[
+                          const Expanded(child: SizedBox()),
                         ],
-                        const Spacer(),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             const Icon(
                               Icons.people,
-                              size: 14,
+                              size: 16,
                               color: AppColors.textSecondary,
                             ),
                             const SizedBox(width: 4),
@@ -300,7 +301,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               '${community.memberIds.length}人',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 11,
+                                fontSize: 12,
                               ),
                             ),
                             const Spacer(),
@@ -308,7 +309,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 (widget.searchQuery?.isNotEmpty ?? false))
                               const Icon(
                                 Icons.add_circle_outline,
-                                size: 16,
+                                size: 18,
                                 color: AppColors.primary,
                               ),
                           ],
@@ -333,7 +334,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         color: AppColors.primary.withOpacity(0.1),
         child: const Icon(
           Icons.group,
-          size: 40,
+          size: 60,
           color: AppColors.primary,
         ),
       );
@@ -350,7 +351,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             color: AppColors.primary.withOpacity(0.1),
             child: const Icon(
               Icons.group,
-              size: 40,
+              size: 60,
               color: AppColors.primary,
             ),
           );

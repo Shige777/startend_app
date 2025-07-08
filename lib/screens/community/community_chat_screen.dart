@@ -240,7 +240,10 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       body: _isJoined ? _buildPostsView() : _buildJoinPrompt(),
       floatingActionButton: _isJoined
           ? FloatingActionButton(
-              onPressed: _createPost,
+              heroTag: "community_chat_fab",
+              onPressed: () {
+                context.push('/post/create?communityId=${widget.communityId}');
+              },
               child: const Icon(Icons.add),
             )
           : null,
