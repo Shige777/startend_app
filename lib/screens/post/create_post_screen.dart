@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:typed_data';
+
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:go_router/go_router.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
@@ -28,7 +28,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _commentController = TextEditingController();
 
   DateTime? _selectedDateTime;
-  String? _selectedImagePath;
+
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
   PrivacyLevel _selectedPrivacyLevel = PrivacyLevel.public;
@@ -85,10 +85,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   setState(() {
                     _selectedImageBytes = bytes;
                     _selectedImageFileName = fileName;
-                    // モバイル環境では従来のパスも保持
-                    if (!kIsWeb) {
-                      _selectedImagePath = fileName;
-                    }
                   });
                 },
               ),
@@ -304,10 +300,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
         if (mounted) {
           if (widget.communityId != null) {
-            // コミュニティ投稿の場合は、必ずコミュニティ画面に戻る
-            context.go('/community/${widget.communityId}');
+            // コミュニティ投稿の場合は、コミュニティ画面に戻る
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/community/${widget.communityId}');
+            }
           } else {
-            context.go('/home');
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
           }
           ScaffoldMessenger.of(
             context,

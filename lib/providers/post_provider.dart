@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/post_model.dart';
 import '../services/notification_service.dart';
 
 class PostProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   final NotificationService _notificationService = NotificationService();
 
   List<PostModel> _posts = [];
@@ -16,7 +16,6 @@ class PostProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentUserId; // 現在読み込み中のユーザーID
-  final Map<String, bool> _loadingStates = {};
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;
@@ -50,6 +49,15 @@ class PostProvider extends ChangeNotifier {
 
       // ローカルの投稿リストに追加
       _userPosts.insert(0, createdPost);
+
+      // コミュニティ投稿の場合は、コミュニティ投稿リストにも追加
+      if (createdPost.communityIds.isNotEmpty) {
+        _communityPosts.insert(0, createdPost);
+        if (kDebugMode) {
+          print('コミュニティ投稿リストに追加: ${createdPost.title}');
+        }
+      }
+
       notifyListeners();
 
       return docRef.id;
@@ -134,18 +142,22 @@ class PostProvider extends ChangeNotifier {
         return _followingPosts;
       }
 
+      // インデックスエラーを回避するため、orderByを削除してクライアント側でソート
       final querySnapshot = await _firestore
           .collection('posts')
           .where('userId', whereIn: followingIds)
-          .orderBy('createdAt', descending: true)
           .limit(50)
           .get();
 
-      _followingPosts = querySnapshot.docs
+      final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .where(_shouldShowInFollowing)
           .toList();
 
+      // クライアント側でソート
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      _followingPosts = posts;
       return _followingPosts;
     } catch (e) {
       _setError('フォロー中の投稿取得に失敗しました');
@@ -169,15 +181,22 @@ class PostProvider extends ChangeNotifier {
       QuerySnapshot querySnapshot;
       try {
         // まずorderByありで試行（チャット形式のため昇順）
+        if (kDebugMode) {
+          print('orderByありでクエリ試行中...');
+        }
         querySnapshot = await _firestore
             .collection('posts')
             .where('communityIds', arrayContains: communityId)
             .orderBy('createdAt', descending: false)
             .limit(50)
             .get();
+
+        if (kDebugMode) {
+          print('orderByありでクエリ成功');
+        }
       } catch (indexError) {
         if (kDebugMode) {
-          print('インデックス不足のため、orderByなしで再試行');
+          print('インデックス不足のため、orderByなしで再試行: $indexError');
         }
         // インデックスエラーの場合、orderByなしで取得してクライアント側でソート
         querySnapshot = await _firestore
@@ -185,6 +204,19 @@ class PostProvider extends ChangeNotifier {
             .where('communityIds', arrayContains: communityId)
             .limit(50)
             .get();
+
+        if (kDebugMode) {
+          print('orderByなしでクエリ完了');
+        }
+      }
+
+      if (kDebugMode) {
+        print('Firestore取得完了: ${querySnapshot.docs.length}件のドキュメント');
+        for (final doc in querySnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          print(
+              '- ドキュメント ${doc.id}: ${data['title']} (userId: ${data['userId']}, communityIds: ${data['communityIds']})');
+        }
       }
 
       final posts = querySnapshot.docs
@@ -202,9 +234,13 @@ class PostProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('コミュニティ投稿取得完了: ${posts.length}件');
         for (final post in posts) {
-          print('- ${post.title} (communityIds: ${post.communityIds})');
+          print(
+              '- ${post.title} (communityIds: ${post.communityIds}, userId: ${post.userId})');
         }
       }
+
+      // コミュニティ投稿リストを更新
+      _communityPosts = posts;
 
       return posts;
     } catch (e) {
@@ -230,17 +266,21 @@ class PostProvider extends ChangeNotifier {
         return _communityPosts;
       }
 
+      // インデックスエラーを回避するため、orderByを削除してクライアント側でソート
       final querySnapshot = await _firestore
           .collection('posts')
           .where('communityIds', arrayContainsAny: communityIds)
-          .orderBy('createdAt', descending: true)
           .limit(50)
           .get();
 
-      _communityPosts = querySnapshot.docs
+      final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
+      // クライアント側でソート
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      _communityPosts = posts;
       return _communityPosts;
     } catch (e) {
       _setError('コミュニティ投稿取得に失敗しました');

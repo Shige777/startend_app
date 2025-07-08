@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import '../../providers/auth_provider.dart';
+
 import '../../providers/post_provider.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
@@ -11,7 +12,7 @@ import '../../constants/app_colors.dart';
 import '../../services/storage_service.dart';
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/custom_tab_bar.dart';
-import '../../widgets/community_list_widget.dart';
+import '../community/community_screen.dart';
 import '../../widgets/platform_image_picker.dart';
 import '../profile/profile_screen.dart';
 
@@ -164,9 +165,7 @@ class _HomeScreenState extends State<HomeScreen>
                   type: PostListType.following,
                   searchQuery: _searchQuery,
                 ),
-                CommunityListWidget(
-                  searchQuery: _searchQuery,
-                ),
+                CommunityScreen(searchQuery: _searchQuery),
               ],
             ),
           ),
@@ -183,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen>
           // フォロー中タブ：投稿作成
           return FloatingActionButton(
             onPressed: () {
-              context.go('/post/create');
+              context.push('/post/create');
             },
             backgroundColor: AppColors.primary,
             child: const Icon(
@@ -220,6 +219,13 @@ class _HomeScreenState extends State<HomeScreen>
         context.read<PostProvider>().searchPosts(_searchQuery);
         context.read<UserProvider>().searchUsers(_searchQuery);
       }
+    } else if (_tabController.index == 1) {
+      // コミュニティタブでの検索
+      if (_searchQuery.isNotEmpty) {
+        context
+            .read<CommunityProvider>()
+            .searchCommunities(query: _searchQuery);
+      }
     }
   }
 
@@ -243,39 +249,11 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     // アイコン選択
                     GestureDetector(
-                      onTap: () async {
-                        // 直接画像選択ダイアログを表示
-                        final result = await showDialog<Map<String, dynamic>>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('画像を選択'),
-                            content: SizedBox(
-                              width: 300,
-                              height: 300,
-                              child: PlatformImagePicker(
-                                onImageSelected: (bytes, fileName) {
-                                  Navigator.of(context).pop({
-                                    'bytes': bytes,
-                                    'fileName': fileName,
-                                  });
-                                },
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('キャンセル'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (result != null) {
-                          setState(() {
-                            selectedImageBytes = result['bytes'];
-                            selectedImageName = result['fileName'];
-                          });
-                        }
-                      },
+                      onTap: () => _showImagePickerBottomSheet(
+                          context, setState, (bytes, fileName) {
+                        selectedImageBytes = bytes;
+                        selectedImageName = fileName;
+                      }),
                       child: Container(
                         width: 80,
                         height: 80,
@@ -436,5 +414,204 @@ class _HomeScreenState extends State<HomeScreen>
   void _onTabChanged() {
     // タブが変更されたときの処理
     setState(() {}); // FloatingActionButtonのアイコンを更新
+  }
+
+  void _showImagePickerBottomSheet(
+    BuildContext context,
+    StateSetter setState,
+    Function(Uint8List, String) onImageSelected,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'アイコンを選択',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // カメラで撮影
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    if (kIsWeb) {
+                      // Web版では画像選択のみ
+                      _showWebImagePicker(context, setState, onImageSelected);
+                    } else {
+                      // モバイル版ではカメラ撮影
+                      _pickImageFromCamera(setState, onImageSelected);
+                    }
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.camera_alt,
+                          size: 48,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'カメラで撮影',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // ギャラリーから選択
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    if (kIsWeb) {
+                      // Web版では画像選択
+                      _showWebImagePicker(context, setState, onImageSelected);
+                    } else {
+                      // モバイル版ではギャラリー選択
+                      _pickImageFromGallery(setState, onImageSelected);
+                    }
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.photo_library,
+                          size: 48,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'ギャラリーから選択',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showWebImagePicker(
+    BuildContext context,
+    StateSetter setState,
+    Function(Uint8List, String) onImageSelected,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('画像を選択'),
+        content: SizedBox(
+          width: 300,
+          height: 300,
+          child: PlatformImagePicker(
+            onImageSelected: (bytes, fileName) {
+              Navigator.of(context).pop();
+              setState(() {
+                onImageSelected(bytes, fileName);
+              });
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera(
+    StateSetter setState,
+    Function(Uint8List, String) onImageSelected,
+  ) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          onImageSelected(bytes, pickedFile.name);
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('画像の取得に失敗しました: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickImageFromGallery(
+    StateSetter setState,
+    Function(Uint8List, String) onImageSelected,
+  ) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          onImageSelected(bytes, pickedFile.name);
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('画像の取得に失敗しました: $e')),
+        );
+      }
+    }
   }
 }

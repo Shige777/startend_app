@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/community_model.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
@@ -13,7 +11,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
-import '../../utils/date_time_utils.dart';
+
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/post_card_widget.dart';
 
@@ -76,18 +74,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   void _createPost() async {
-    final result = await context
+    await context
         .push('/create-post', extra: {'communityId': widget.communityId});
     // 投稿作成から戻ってきた時に投稿を再読み込み（常に実行）
-    await _loadCommunityPosts();
-  }
-
-  void _createEndPost(PostModel startPost) async {
-    final result = await context.push('/create-end-post', extra: {
-      'startPostId': startPost.id,
-      'startPost': startPost,
-    });
-    // END投稿作成から戻ってきた時に投稿を再読み込み（常に実行）
     await _loadCommunityPosts();
   }
 
@@ -124,7 +113,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   Future<void> _loadCommunityData() async {
     final communityProvider = context.read<CommunityProvider>();
     final userProvider = context.read<UserProvider>();
-    final postProvider = context.read<PostProvider>();
 
     // コミュニティ情報を取得
     final community = await communityProvider.getCommunity(widget.communityId);
@@ -385,7 +373,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
   bool _canJoin() {
     if (_community == null) return false;
-    return _community!.memberIds.length < _community!.maxMembers;
+    return _community!.memberIds.length < 8; // 上限8人
   }
 
   Future<void> _joinCommunity() async {
@@ -418,37 +406,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         );
         _loadCommunityData();
       }
-    }
-  }
-
-  Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-
-    final userProvider = context.read<UserProvider>();
-    final postProvider = context.read<PostProvider>();
-    final currentUser = userProvider.currentUser;
-
-    if (currentUser == null) return;
-
-    final post = PostModel(
-      id: '',
-      userId: currentUser.id,
-      type: PostType.start,
-      title: '',
-      comment: _messageController.text.trim(),
-      imageUrl: null,
-      privacyLevel: PrivacyLevel.communityOnly,
-      communityIds: [widget.communityId],
-      likedByUserIds: [],
-      likeCount: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    final success = await postProvider.createPost(post);
-    if (success != null) {
-      _messageController.clear();
-      _loadCommunityData(); // メッセージ一覧を更新
     }
   }
 
@@ -533,22 +490,227 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   void _showMembersDialog() {
-    // TODO: メンバー管理ダイアログの実装
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('メンバー管理'),
-          content: const Text('メンバー管理機能は今後実装予定です'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('閉じる'),
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Text('メンバー管理'),
+            const Spacer(),
+            Text(
+              '${_community!.memberIds.length}/8',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
-        );
-      },
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: FutureBuilder<List<UserModel>>(
+            future: _loadMemberDetails(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Text('メンバー情報を取得できませんでした'),
+                );
+              }
+
+              final members = snapshot.data!;
+              return ListView.builder(
+                itemCount: members.length,
+                itemBuilder: (context, index) {
+                  final member = members[index];
+                  final isLeader = member.id == _community!.leaderId;
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: member.profileImageUrl != null
+                            ? NetworkImage(member.profileImageUrl!)
+                            : null,
+                        child: member.profileImageUrl == null
+                            ? const Icon(Icons.person)
+                            : null,
+                      ),
+                      title: Text(
+                        member.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(member.email),
+                          if (isLeader)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'リーダー',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: !isLeader && _isLeader
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.admin_panel_settings,
+                                      color: AppColors.primary),
+                                  onPressed: () =>
+                                      _transferLeadership(member.id),
+                                  tooltip: 'リーダーに任命',
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle,
+                                      color: Colors.red),
+                                  onPressed: () => _removeMember(member.id),
+                                  tooltip: 'メンバーを削除',
+                                ),
+                              ],
+                            )
+                          : null,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<List<UserModel>> _loadMemberDetails() async {
+    final userProvider = context.read<UserProvider>();
+    final List<UserModel> members = [];
+
+    for (final memberId in _community!.memberIds) {
+      try {
+        final user = await userProvider.getUserById(memberId);
+        if (user != null) {
+          members.add(user);
+        }
+      } catch (e) {
+        // エラーの場合は基本的なユーザー情報を作成
+        members.add(UserModel(
+          id: memberId,
+          displayName: 'Unknown User',
+          email: '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          followingIds: [],
+          followerIds: [],
+          communityIds: [],
+          isPrivate: false,
+          requiresApproval: false,
+        ));
+      }
+    }
+
+    return members;
+  }
+
+  Future<void> _removeMember(String memberId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('メンバー削除'),
+        content: const Text('このメンバーをコミュニティから削除しますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await context
+          .read<CommunityProvider>()
+          .removeMember(widget.communityId, memberId);
+
+      if (success && mounted) {
+        setState(() {
+          _community = _community!.copyWith(
+            memberIds:
+                _community!.memberIds.where((id) => id != memberId).toList(),
+          );
+        });
+        Navigator.pop(context); // メンバー管理ダイアログを閉じる
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('メンバーを削除しました')),
+        );
+      }
+    }
+  }
+
+  Future<void> _transferLeadership(String newLeaderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('リーダー移譲'),
+        content: const Text('このメンバーを新しいリーダーに任命しますか？\nあなたは通常のメンバーになります。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('任命'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await context
+          .read<CommunityProvider>()
+          .transferLeadership(widget.communityId, newLeaderId);
+
+      if (success && mounted) {
+        setState(() {
+          _community = _community!.copyWith(leaderId: newLeaderId);
+          _isLeader = false; // 自分はもうリーダーではない
+        });
+        Navigator.pop(context); // メンバー管理ダイアログを閉じる
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('リーダーを移譲しました')),
+        );
+      }
+    }
   }
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
@@ -581,34 +743,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         child: Icon(Icons.group, size: radius),
       );
     }
-  }
-
-  Widget _buildPostImage(String imageUrl) {
-    return Container(
-      width: double.infinity,
-      height: 200, // 画像の高さを大きく
-      child: _isNetworkUrl(imageUrl)
-          ? Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: 200,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: double.infinity,
-                  height: 200,
-                  color: AppColors.surface,
-                  child: const Icon(Icons.image_not_supported),
-                );
-              },
-            )
-          : Container(
-              width: double.infinity,
-              height: 200,
-              color: AppColors.surface,
-              child: const Icon(Icons.image_not_supported),
-            ),
-    );
   }
 
   // 削除確認ダイアログを表示

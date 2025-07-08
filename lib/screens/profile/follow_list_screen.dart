@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
-import '../../providers/user_provider.dart';
 import '../../services/follow_service.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/wave_loading_widget.dart';
@@ -85,6 +83,8 @@ class _FollowListScreenState extends State<FollowListScreen> {
           onPressed: () {
             if (context.canPop()) {
               context.pop();
+            } else {
+              context.go('/home?tab=1'); // 軌跡タブに戻る
             }
           },
         ),
@@ -143,7 +143,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                       user: user,
                       onTap: () {
                         // TODO: ユーザー詳細画面に遷移
-                        context.go('/profile/${user.id}');
+                        context.push('/profile/${user.id}');
                       },
                     );
                   },

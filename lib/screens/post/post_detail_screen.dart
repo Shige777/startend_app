@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
 import 'package:go_router/go_router.dart';
 import '../../models/post_model.dart';
 import '../../providers/post_provider.dart';
@@ -239,7 +239,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             // 前の画面に戻る
-            Navigator.of(context).pop();
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              // 戻る先がない場合はホーム画面に戻る
+              context.go('/home');
+            }
           },
         ),
         title: const Text('投稿詳細'),
@@ -270,66 +275,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               onDelete: _isPostOwner() ? _showDeleteConfirmation : null,
               fromPage: 'detail', // 詳細画面内での使用
             ),
-
-            // 実際にかかった時間の表示（完了した投稿の場合のみ）
-            if (_post!.status == PostStatus.completed &&
-                _post!.actualEndTime != null)
-              Padding(
-                padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                child: Card(
-                  color: AppColors.completed.withOpacity(0.1),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.timer, color: AppColors.completed),
-                            const SizedBox(width: 8),
-                            Text(
-                              '実際にかかった時間',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.completed,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _getElapsedTime(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.completed,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '開始: ${DateTimeUtils.formatDateTime(_post!.createdAt)}',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                        ),
-                        Text(
-                          '完了: ${DateTimeUtils.formatDateTime(_post!.actualEndTime!)}',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
             // カスタムアクションボタン
             Padding(
@@ -392,6 +337,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       return '${hours}時間${minutes}分';
     } else {
       return '${minutes}分';
+    }
+  }
+
+  // 残り時間を計算する関数
+  String _getRemainingTime() {
+    if (_post?.scheduledEndTime == null) return '';
+
+    final now = DateTime.now();
+    final remaining = _post!.scheduledEndTime!.difference(now);
+
+    if (remaining.isNegative) {
+      final overdue = now.difference(_post!.scheduledEndTime!);
+      final days = overdue.inDays;
+      final hours = overdue.inHours % 24;
+      final minutes = overdue.inMinutes % 60;
+
+      if (days > 0) {
+        return '予定時刻を${days}日${hours}時間${minutes}分経過';
+      } else if (hours > 0) {
+        return '予定時刻を${hours}時間${minutes}分経過';
+      } else {
+        return '予定時刻を${minutes}分経過';
+      }
+    } else {
+      final days = remaining.inDays;
+      final hours = remaining.inHours % 24;
+      final minutes = remaining.inMinutes % 60;
+
+      if (days > 0) {
+        return '残り${days}日${hours}時間${minutes}分';
+      } else if (hours > 0) {
+        return '残り${hours}時間${minutes}分';
+      } else {
+        return '残り${minutes}分';
+      }
     }
   }
 }

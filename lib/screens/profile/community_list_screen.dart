@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/community_model.dart';
 import '../../providers/community_provider.dart';
-import '../../providers/user_provider.dart';
+
 import '../../constants/app_colors.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/community_list_widget.dart';
@@ -66,8 +66,8 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
+            if (context.canPop()) {
+              context.pop();
             } else {
               context.go('/home?tab=1'); // 軌跡タブに戻る
             }
@@ -121,7 +121,7 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
               : CommunityListWidget(
                   communities: _communities,
                   onCommunityTap: (community) {
-                    context.go('/community/${community.id}');
+                    context.push('/community/${community.id}');
                   },
                 ),
     );

@@ -420,7 +420,7 @@ class PostCardWidget extends StatelessWidget {
                                     child: Text(
                                       post.isCompleted
                                           ? '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime ?? post.scheduledEndTime!)}'
-                                          : '',
+                                          : '予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall

@@ -18,25 +18,18 @@ class FollowService {
     try {
       final batch = _firestore.batch();
 
-      // フォロー関係を作成
-      final followRef =
-          _firestore.collection('follows').doc('${followerId}_$followingId');
-      batch.set(followRef, {
-        'followerId': followerId,
-        'followingId': followingId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // フォロワー数を更新
+      // フォローする側のfollowingIdsに追加
       final followerUserRef = _firestore.collection('users').doc(followerId);
       batch.update(followerUserRef, {
-        'followingCount': FieldValue.increment(1),
+        'followingIds': FieldValue.arrayUnion([followingId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // フォロー数を更新
+      // フォローされる側のfollowerIdsに追加
       final followingUserRef = _firestore.collection('users').doc(followingId);
       batch.update(followingUserRef, {
-        'followerCount': FieldValue.increment(1),
+        'followerIds': FieldValue.arrayUnion([followerId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       await batch.commit();
@@ -63,21 +56,18 @@ class FollowService {
     try {
       final batch = _firestore.batch();
 
-      // フォロー関係を削除
-      final followRef =
-          _firestore.collection('follows').doc('${followerId}_$followingId');
-      batch.delete(followRef);
-
-      // フォロワー数を更新
+      // フォローする側のfollowingIdsから削除
       final followerUserRef = _firestore.collection('users').doc(followerId);
       batch.update(followerUserRef, {
-        'followingCount': FieldValue.increment(-1),
+        'followingIds': FieldValue.arrayRemove([followingId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // フォロー数を更新
+      // フォローされる側のfollowerIdsから削除
       final followingUserRef = _firestore.collection('users').doc(followingId);
       batch.update(followingUserRef, {
-        'followerCount': FieldValue.increment(-1),
+        'followerIds': FieldValue.arrayRemove([followerId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       await batch.commit();
@@ -94,11 +84,14 @@ class FollowService {
     required String followingId,
   }) async {
     try {
-      final doc = await _firestore
-          .collection('follows')
-          .doc('${followerId}_$followingId')
-          .get();
-      return doc.exists;
+      final doc = await _firestore.collection('users').doc(followerId).get();
+
+      if (!doc.exists) return false;
+
+      final userData = doc.data() as Map<String, dynamic>;
+      final followingIds = List<String>.from(userData['followingIds'] ?? []);
+
+      return followingIds.contains(followingId);
     } catch (e) {
       print('フォロー状態確認エラー: $e');
       return false;
@@ -125,27 +118,38 @@ class FollowService {
   /// フォロワー一覧を取得する
   static Stream<List<UserModel>> getFollowers(String userId) {
     return _firestore
-        .collection('follows')
-        .where('followingId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
+        .collection('users')
+        .doc(userId)
         .snapshots()
         .asyncMap((snapshot) async {
       final List<UserModel> followers = [];
 
-      for (final doc in snapshot.docs) {
-        final followerId = doc.data()['followerId'] as String;
+      if (!snapshot.exists) {
+        return followers;
+      }
 
-        // 自分自身を除外
-        if (followerId == userId) {
-          continue;
-        }
+      final userData = snapshot.data() as Map<String, dynamic>;
+      final followerIds = List<String>.from(userData['followerIds'] ?? []);
 
-        final userDoc =
-            await _firestore.collection('users').doc(followerId).get();
+      // フォロワーIDが空の場合は空のリストを返す
+      if (followerIds.isEmpty) {
+        return followers;
+      }
 
-        if (userDoc.exists) {
-          followers.add(UserModel.fromFirestore(userDoc));
-        }
+      // 10個ずつバッチで処理（Firestoreの制限）
+      for (int i = 0; i < followerIds.length; i += 10) {
+        final batch = followerIds.skip(i).take(10).toList();
+
+        final querySnapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        final batchUsers = querySnapshot.docs
+            .map((doc) => UserModel.fromFirestore(doc))
+            .toList();
+
+        followers.addAll(batchUsers);
       }
 
       return followers;
@@ -155,27 +159,38 @@ class FollowService {
   /// フォロー中のユーザー一覧を取得する
   static Stream<List<UserModel>> getFollowing(String userId) {
     return _firestore
-        .collection('follows')
-        .where('followerId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
+        .collection('users')
+        .doc(userId)
         .snapshots()
         .asyncMap((snapshot) async {
       final List<UserModel> following = [];
 
-      for (final doc in snapshot.docs) {
-        final followingId = doc.data()['followingId'] as String;
+      if (!snapshot.exists) {
+        return following;
+      }
 
-        // 自分自身を除外
-        if (followingId == userId) {
-          continue;
-        }
+      final userData = snapshot.data() as Map<String, dynamic>;
+      final followingIds = List<String>.from(userData['followingIds'] ?? []);
 
-        final userDoc =
-            await _firestore.collection('users').doc(followingId).get();
+      // フォロー中IDが空の場合は空のリストを返す
+      if (followingIds.isEmpty) {
+        return following;
+      }
 
-        if (userDoc.exists) {
-          following.add(UserModel.fromFirestore(userDoc));
-        }
+      // 10個ずつバッチで処理（Firestoreの制限）
+      for (int i = 0; i < followingIds.length; i += 10) {
+        final batch = followingIds.skip(i).take(10).toList();
+
+        final querySnapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        final batchUsers = querySnapshot.docs
+            .map((doc) => UserModel.fromFirestore(doc))
+            .toList();
+
+        following.addAll(batchUsers);
       }
 
       return following;
@@ -231,18 +246,22 @@ class FollowService {
       followingIds.add(currentUserId);
 
       // フォロワー数が多いユーザーを取得（フォローしていないユーザーのみ）
+      // インデックスエラーを回避するため、orderByを削除してクライアント側でソート
       final usersSnapshot = await _firestore
           .collection('users')
           .where('id',
               whereNotIn:
                   followingIds.take(10).toList()) // Firestoreの制限により最大10個
-          .orderBy('followerCount', descending: true)
           .limit(limit)
           .get();
 
-      return usersSnapshot.docs
+      final users = usersSnapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
+
+      // インデックスエラーを回避するため、ソートを削除
+
+      return users;
     } catch (e) {
       print('おすすめユーザー取得エラー: $e');
       return [];
@@ -360,14 +379,25 @@ class FollowService {
         .collection('follow_requests')
         .where('targetUserId', isEqualTo: userId)
         .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList());
+        .map((snapshot) {
+      final requests = snapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                ...doc.data(),
+              })
+          .toList();
+
+      // クライアント側でソート
+      requests.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return requests;
+    });
   }
 
   /// ユーザー検索

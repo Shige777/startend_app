@@ -7,12 +7,14 @@ class CommunityProvider extends ChangeNotifier {
 
   List<CommunityModel> _communities = [];
   List<CommunityModel> _userCommunities = [];
+  List<CommunityModel> _searchResults = [];
   bool _isLoading = false;
   String? _errorMessage;
 
   List<CommunityModel> get communities => _communities;
   List<CommunityModel> get userCommunities => _userCommunities;
   List<CommunityModel> get joinedCommunities => _userCommunities;
+  List<CommunityModel> get searchResults => _searchResults;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -106,27 +108,33 @@ class CommunityProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      // 検索クエリが空の場合は検索結果をクリア
+      if (query == null || query.isEmpty) {
+        _searchResults = [];
+        return _searchResults;
+      }
+
       Query queryRef = _firestore.collection('communities');
 
       if (genre != null && genre.isNotEmpty) {
         queryRef = queryRef.where('genre', isEqualTo: genre);
       }
 
-      if (query != null && query.isNotEmpty) {
-        queryRef = queryRef
-            .where('name', isGreaterThanOrEqualTo: query)
-            .where('name', isLessThan: query + '\uf8ff');
-      }
+      // 名前での検索
+      queryRef = queryRef
+          .where('name', isGreaterThanOrEqualTo: query)
+          .where('name', isLessThan: query + '\uf8ff');
 
       final querySnapshot = await queryRef.limit(20).get();
 
-      _communities = querySnapshot.docs
+      _searchResults = querySnapshot.docs
           .map((doc) => CommunityModel.fromFirestore(doc))
           .toList();
 
-      return _communities;
+      return _searchResults;
     } catch (e) {
       _setError('コミュニティ検索に失敗しました');
+      _searchResults = [];
       return [];
     } finally {
       _setLoading(false);
@@ -162,6 +170,18 @@ class CommunityProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
+
+      // メンバー数制限をチェック
+      final community = await getCommunity(communityId);
+      if (community == null) {
+        _setError('コミュニティが見つかりません');
+        return false;
+      }
+
+      if (community.memberIds.length >= 8) {
+        _setError('コミュニティのメンバー数が上限に達しています');
+        return false;
+      }
 
       await _firestore.collection('communities').doc(communityId).update({
         'pendingMemberIds': FieldValue.arrayUnion([userId]),
@@ -286,23 +306,33 @@ class CommunityProvider extends ChangeNotifier {
         return false;
       }
 
-      final batch = _firestore.batch();
+      // コミュニティ情報を取得
+      final community = await getCommunity(communityId);
+      if (community == null) {
+        _setError('コミュニティが見つかりません');
+        return false;
+      }
 
-      // コミュニティのメンバーリストから削除
-      batch.update(_firestore.collection('communities').doc(communityId), {
-        'memberIds': FieldValue.arrayRemove([userId]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // 脱退後のメンバー数を計算
+      final remainingMembers =
+          community.memberIds.where((id) => id != userId).toList();
 
-      // ユーザーのコミュニティリストから削除
-      batch.update(_firestore.collection('users').doc(userId), {
-        'communityIds': FieldValue.arrayRemove([communityId]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      if (remainingMembers.isEmpty) {
+        // メンバーが0人になる場合、コミュニティを削除
+        await _deleteCommunity(communityId);
+      } else {
+        // リーダーが脱退する場合、新しいリーダーを選出
+        if (community.leaderId == userId) {
+          final newLeaderId = remainingMembers.first;
+          await _transferLeadershipAndRemoveMember(
+              communityId, userId, newLeaderId);
+        } else {
+          // 通常のメンバーの脱退
+          await _removeMemberFromCommunity(communityId, userId);
+        }
+      }
 
-      await batch.commit();
-
-      // ユーザーコミュニティリストを更新
+      // ローカルのユーザーコミュニティリストを更新
       await getUserCommunities(userId);
 
       return true;
@@ -312,6 +342,78 @@ class CommunityProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  // コミュニティを削除
+  Future<void> _deleteCommunity(String communityId) async {
+    final batch = _firestore.batch();
+
+    // コミュニティドキュメントを削除
+    batch.delete(_firestore.collection('communities').doc(communityId));
+
+    // 関連する投稿のcommunityIdsからこのコミュニティIDを削除
+    final postsSnapshot = await _firestore
+        .collection('posts')
+        .where('communityIds', arrayContains: communityId)
+        .get();
+
+    for (final postDoc in postsSnapshot.docs) {
+      batch.update(postDoc.reference, {
+        'communityIds': FieldValue.arrayRemove([communityId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+
+    // ローカルのコミュニティリストからも削除
+    _communities.removeWhere((community) => community.id == communityId);
+    _userCommunities.removeWhere((community) => community.id == communityId);
+    notifyListeners();
+  }
+
+  // リーダー移譲と同時にメンバーを削除
+  Future<void> _transferLeadershipAndRemoveMember(
+    String communityId,
+    String leavingUserId,
+    String newLeaderId,
+  ) async {
+    final batch = _firestore.batch();
+
+    // リーダーを変更し、脱退するメンバーを削除
+    batch.update(_firestore.collection('communities').doc(communityId), {
+      'leaderId': newLeaderId,
+      'memberIds': FieldValue.arrayRemove([leavingUserId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 脱退するユーザーのコミュニティリストから削除
+    batch.update(_firestore.collection('users').doc(leavingUserId), {
+      'communityIds': FieldValue.arrayRemove([communityId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
+  // メンバーをコミュニティから削除
+  Future<void> _removeMemberFromCommunity(
+      String communityId, String userId) async {
+    final batch = _firestore.batch();
+
+    // コミュニティのメンバーリストから削除
+    batch.update(_firestore.collection('communities').doc(communityId), {
+      'memberIds': FieldValue.arrayRemove([userId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // ユーザーのコミュニティリストから削除
+    batch.update(_firestore.collection('users').doc(userId), {
+      'communityIds': FieldValue.arrayRemove([communityId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
   }
 
   // メンバーを脱退させる（リーダー権限）
@@ -396,6 +498,60 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
+  // コミュニティ情報更新（リーダー権限）
+  Future<bool> updateCommunityInfo({
+    required String communityId,
+    String? name,
+    String? description,
+    String? genre,
+    String? imageUrl,
+    bool? isPrivate,
+  }) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final updateData = <String, dynamic>{
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (name != null) updateData['name'] = name;
+      if (description != null) updateData['description'] = description;
+      if (genre != null) updateData['genre'] = genre;
+      if (imageUrl != null) updateData['imageUrl'] = imageUrl;
+      if (isPrivate != null) updateData['isPrivate'] = isPrivate;
+
+      await _firestore
+          .collection('communities')
+          .doc(communityId)
+          .update(updateData);
+
+      // ローカルのコミュニティリストを更新
+      final updatedCommunity = await getCommunity(communityId);
+      if (updatedCommunity != null) {
+        final index = _communities.indexWhere((c) => c.id == communityId);
+        if (index != -1) {
+          _communities[index] = updatedCommunity;
+        }
+
+        final userIndex =
+            _userCommunities.indexWhere((c) => c.id == communityId);
+        if (userIndex != -1) {
+          _userCommunities[userIndex] = updatedCommunity;
+        }
+
+        notifyListeners();
+      }
+
+      return true;
+    } catch (e) {
+      _setError('コミュニティ情報更新に失敗しました');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // コミュニティ取得
   Future<CommunityModel?> getCommunity(String communityId) async {
     try {
@@ -422,16 +578,21 @@ class CommunityProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      // インデックスエラーを回避するため、orderByを削除してクライアント側でソート
       final querySnapshot = await _firestore
           .collection('communities')
           .where('genre', isEqualTo: genre)
-          .orderBy('createdAt', descending: true)
           .limit(20)
           .get();
 
-      return querySnapshot.docs
+      final communities = querySnapshot.docs
           .map((doc) => CommunityModel.fromFirestore(doc))
           .toList();
+
+      // クライアント側でソート
+      communities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return communities;
     } catch (e) {
       _setError('ジャンル別コミュニティ取得に失敗しました');
       return [];

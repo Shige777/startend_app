@@ -11,8 +11,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
-import '../../widgets/post_grid_widget.dart';
-import '../../widgets/post_list_widget.dart';
+
 import '../../widgets/post_card_widget.dart';
 import '../../widgets/wave_loading_widget.dart';
 
@@ -197,6 +196,71 @@ class _ProfileScreenState extends State<ProfileScreen>
     final firstDayOfYear = DateTime(date.year, 1, 1);
     final dayOfYear = date.difference(firstDayOfYear).inDays + 1;
     return ((dayOfYear - 1) ~/ 7) + 1;
+  }
+
+  // 期間別の実際にかかった時間を表示するWidget
+  Widget _buildPeriodTimeDisplay(List<PostModel> posts) {
+    // 完了した投稿のみを対象とする
+    final completedPosts = posts
+        .where((post) =>
+            post.status == PostStatus.completed && post.actualEndTime != null)
+        .toList();
+
+    if (completedPosts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 実際にかかった時間を合計
+    Duration totalDuration = Duration.zero;
+    for (final post in completedPosts) {
+      final duration = post.actualEndTime!.difference(post.createdAt);
+      totalDuration += duration;
+    }
+
+    // 時間を表示形式に変換
+    String formattedTime = _formatDuration(totalDuration);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.completed.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.completed.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.timer,
+            size: 16,
+            color: AppColors.completed,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '実際にかかった時間: $formattedTime',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.completed,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 時間を表示形式に変換するヘルパーメソッド
+  String _formatDuration(Duration duration) {
+    final days = duration.inDays;
+    final hours = duration.inHours % 24;
+    final minutes = duration.inMinutes % 60;
+
+    if (days > 0) {
+      return '${days}日${hours}時間${minutes}分';
+    } else if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
   }
 
   String _getPeriodText(TimePeriod period) {
@@ -418,7 +482,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             'フォロワー',
                             user.followersCount.toString(),
                             onTap: () {
-                              context.go('/follow-list/${user.id}/followers');
+                              context.push('/follow-list/${user.id}/followers');
                             },
                           ),
                           _buildStatItem(
@@ -426,7 +490,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             'フォロー中',
                             user.followingCount.toString(),
                             onTap: () {
-                              context.go('/follow-list/${user.id}/following');
+                              context.push('/follow-list/${user.id}/following');
                             },
                           ),
                           _buildStatItem(
@@ -434,7 +498,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             'コミュニティ',
                             user.communitiesCount.toString(),
                             onTap: () {
-                              context.go('/community-list/${user.id}');
+                              context.push('/community-list/${user.id}');
                             },
                           ),
                         ],
@@ -694,7 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           'フォロワー',
                           user.followersCount.toString(),
                           onTap: () {
-                            context.go('/follow-list/${user.id}/followers');
+                            context.push('/follow-list/${user.id}/followers');
                           },
                         ),
                         _buildStatItem(
@@ -702,7 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           'フォロー中',
                           user.followingCount.toString(),
                           onTap: () {
-                            context.go('/follow-list/${user.id}/following');
+                            context.push('/follow-list/${user.id}/following');
                           },
                         ),
                         _buildStatItem(
@@ -710,7 +774,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           'コミュニティ',
                           user.communitiesCount.toString(),
                           onTap: () {
-                            context.go('/community-list/${user.id}');
+                            context.push('/community-list/${user.id}');
                           },
                         ),
                       ],
@@ -723,7 +787,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
-                            context.go('/profile/settings');
+                            context.push('/profile/settings');
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.primary),
@@ -1009,17 +1073,25 @@ class _ProfileScreenState extends State<ProfileScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final entry in groupedPosts.entries) ...[
-                  // 期間ラベル
+                  // 期間ラベルと実際にかかった時間
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
-                    child: Text(
-                      entry.key,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.key,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPeriodTimeDisplay(entry.value),
+                      ],
                     ),
                   ),
                   // 投稿表示

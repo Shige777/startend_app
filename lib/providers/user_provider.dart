@@ -340,14 +340,26 @@ class UserProvider extends ChangeNotifier {
 
       if (user.followerIds.isEmpty) return [];
 
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where(FieldPath.documentId, whereIn: user.followerIds)
-          .get();
+      // Firestoreのwhereインデックスエラーを回避するため、個別に取得
+      final List<UserModel> followerUsers = [];
 
-      return querySnapshot.docs
-          .map((doc) => UserModel.fromFirestore(doc))
-          .toList();
+      // 10個ずつバッチで処理（Firestoreの制限）
+      for (int i = 0; i < user.followerIds.length; i += 10) {
+        final batch = user.followerIds.skip(i).take(10).toList();
+
+        final querySnapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        final batchUsers = querySnapshot.docs
+            .map((doc) => UserModel.fromFirestore(doc))
+            .toList();
+
+        followerUsers.addAll(batchUsers);
+      }
+
+      return followerUsers;
     } catch (e) {
       _setError('フォロワー取得に失敗しました');
       return [];
@@ -367,14 +379,26 @@ class UserProvider extends ChangeNotifier {
 
       if (user.followingIds.isEmpty) return [];
 
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where(FieldPath.documentId, whereIn: user.followingIds)
-          .get();
+      // Firestoreのwhereインデックスエラーを回避するため、個別に取得
+      final List<UserModel> followingUsers = [];
 
-      return querySnapshot.docs
-          .map((doc) => UserModel.fromFirestore(doc))
-          .toList();
+      // 10個ずつバッチで処理（Firestoreの制限）
+      for (int i = 0; i < user.followingIds.length; i += 10) {
+        final batch = user.followingIds.skip(i).take(10).toList();
+
+        final querySnapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        final batchUsers = querySnapshot.docs
+            .map((doc) => UserModel.fromFirestore(doc))
+            .toList();
+
+        followingUsers.addAll(batchUsers);
+      }
+
+      return followingUsers;
     } catch (e) {
       _setError('フォロー中取得に失敗しました');
       return [];

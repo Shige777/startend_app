@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:go_router/go_router.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
@@ -30,7 +30,6 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
   final _formKey = GlobalKey<FormState>();
   final _commentController = TextEditingController();
 
-  String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
   bool _isLoading = false;

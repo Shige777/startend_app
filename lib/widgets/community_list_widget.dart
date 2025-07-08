@@ -172,8 +172,11 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         if (widget.onCommunityTap != null) {
           widget.onCommunityTap!(community);
         } else {
-          context.go('/community/${community.id}');
+          context.push('/community/${community.id}');
         }
+      },
+      onLongPress: () {
+        _showCommunityOptionsDialog(community);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -267,6 +270,134 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         ),
       ),
     );
+  }
+
+  void _showCommunityOptionsDialog(CommunityModel community) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(community.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('詳細を見る'),
+              onTap: () {
+                Navigator.of(context).pop();
+                context.push('/community/${community.id}');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app, color: Colors.red),
+              title: const Text('脱退', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showLeaveCommunityDialog(community);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLeaveCommunityDialog(CommunityModel community) {
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isLeader = community.leaderId == currentUser?.id;
+    final memberCount = community.memberIds.length;
+
+    String message = '「${community.name}」から脱退しますか？';
+    String warning = '';
+
+    if (isLeader) {
+      if (memberCount == 1) {
+        warning = '⚠️ あなたがリーダーで最後のメンバーです。\n脱退するとコミュニティは自動的に削除されます。';
+      } else {
+        warning = '⚠️ あなたはリーダーです。\n脱退すると他のメンバーが新しいリーダーになります。';
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('コミュニティ脱退'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            if (warning.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Text(
+                  warning,
+                  style: const TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _leaveCommunity(community);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('脱退'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _leaveCommunity(CommunityModel community) async {
+    final userProvider = context.read<UserProvider>();
+    final communityProvider = context.read<CommunityProvider>();
+    final currentUser = userProvider.currentUser;
+
+    if (currentUser == null) return;
+
+    final success = await communityProvider.leaveCommunity(
+      community.id,
+      userId: currentUser.id,
+    );
+
+    if (success && mounted) {
+      // UserProviderの現在のユーザー情報を更新
+      await userProvider.refreshCurrentUser();
+
+      // コミュニティ一覧を再読み込み
+      await communityProvider.getUserCommunities(currentUser.id);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「${community.name}」から脱退しました')),
+      );
+    }
   }
 
   // コミュニティタイル用画像を表示するWidgetを構築

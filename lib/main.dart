@@ -19,6 +19,7 @@ import 'screens/post/create_post_screen.dart';
 import 'screens/post/create_end_post_screen.dart';
 import 'screens/post/post_detail_screen.dart';
 import 'screens/post/edit_post_screen.dart';
+import 'screens/community/community_screen.dart';
 import 'screens/community/community_chat_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
@@ -170,9 +171,20 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/profile',
-      redirect: (context, state) {
+      builder: (context, state) {
         // 自分のプロフィールへの遷移は軌跡画面にリダイレクト
-        return '/home?tab=1';
+        return Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final currentUser = userProvider.currentUser;
+            if (currentUser == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return ProfileScreen(
+              userId: currentUser.id,
+              isOwnProfile: true,
+            );
+          },
+        );
       },
     ),
     GoRoute(

@@ -9,12 +9,10 @@ import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
-import '../../models/community_model.dart';
-import '../../providers/community_provider.dart';
+
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/user_list_item.dart';
 import '../../widgets/wave_loading_widget.dart';
-import '../../widgets/community_list_widget.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -38,8 +36,6 @@ class _SearchScreenState extends State<SearchScreen>
   List<UserModel> _followingUsers = [];
   bool _isSearching = false;
   String _searchQuery = '';
-  List<CommunityModel> _communityResults = [];
-  bool _isLoading = false;
 
   @override
   void initState() {

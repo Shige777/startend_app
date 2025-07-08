@@ -25,7 +25,6 @@ class _EditPostScreenState extends State<EditPostScreen> {
   late TextEditingController _titleController;
   late TextEditingController _commentController;
 
-  String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
   late PrivacyLevel _selectedPrivacyLevel;
@@ -137,7 +136,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pop();
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
           },
         ),
         title: const Text('投稿編集'),

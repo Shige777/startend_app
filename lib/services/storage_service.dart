@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
+
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path/path.dart' as path;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
@@ -407,23 +407,6 @@ class StorageService {
   static Future<void> deleteImages(List<String> imageUrls) async {
     final futures = imageUrls.map((url) => deleteImage(url));
     await Future.wait(futures);
-  }
-
-  /// ファイル拡張子からContent-Typeを取得
-  static String _getContentType(String extension) {
-    switch (extension.toLowerCase()) {
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      case '.gif':
-        return 'image/gif';
-      case '.webp':
-        return 'image/webp';
-      default:
-        return 'image/jpeg';
-    }
   }
 
   /// 画像を圧縮してアップロード（オプション）
