@@ -108,10 +108,8 @@ class PostCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(
-        vertical: 2, // 上下の余白を削減
-      ),
-      color: AppColors.surface,
+      margin: EdgeInsets.zero, // 余白を完全に削除
+      color: AppColors.background, // 背景色を背景と同一化
       child: InkWell(
         onTap: onTap ??
             () => context.push('/post/${post.id}', extra: {
@@ -225,7 +223,7 @@ class PostCardWidget extends StatelessWidget {
 
             // アクションボタン
             if (showActions) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.defaultPadding),
@@ -274,6 +272,12 @@ class PostCardWidget extends StatelessWidget {
                 ),
               ),
             ],
+
+            // 投稿間の軽い区切り
+            Container(
+              height: 8,
+              color: AppColors.background,
+            ),
           ],
         ),
       ),
@@ -289,7 +293,7 @@ class PostCardWidget extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: AppColors.surface,
+            color: AppColors.background, // 背景色を統一
             child: Text(
               post.title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -319,7 +323,7 @@ class PostCardWidget extends StatelessWidget {
                         height: 20, // 高さを小さくして画像を大きく
                         padding: const EdgeInsets.symmetric(
                             vertical: 2, horizontal: 4),
-                        color: AppColors.surface,
+                        color: AppColors.background, // 背景色を統一
                         child: Row(
                           children: [
                             const Icon(Icons.play_arrow,
@@ -344,8 +348,9 @@ class PostCardWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                // 区切り線
-                Container(width: 1, color: AppColors.divider),
+                // 区切り線（薄く）
+                Container(
+                    width: 0.5, color: AppColors.divider.withOpacity(0.3)),
                 // END画像（右側）
                 Expanded(
                   child: Column(
@@ -400,7 +405,7 @@ class PostCardWidget extends StatelessWidget {
                         height: 20, // 高さを小さくして画像を大きく
                         padding: const EdgeInsets.symmetric(
                             vertical: 2, horizontal: 4),
-                        color: AppColors.surface,
+                        color: AppColors.background, // 背景色を統一
                         child: post.scheduledEndTime != null
                             ? Row(
                                 children: [

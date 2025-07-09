@@ -147,33 +147,34 @@ class _PostListWidgetState extends State<PostListWidget> {
         return RefreshIndicator(
           onRefresh: _onRefresh,
           child: ListView.builder(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.zero, // パディングを削除
             itemCount: searchUsers.length + posts.length,
             itemBuilder: (context, index) {
               // ユーザー結果を先に表示
               if (index < searchUsers.length) {
-                return UserListItem(
-                  user: searchUsers[index],
-                  onTap: () {
-                    context.go('/profile/${searchUsers[index].id}');
-                  },
+                return Container(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: UserListItem(
+                    user: searchUsers[index],
+                    onTap: () {
+                      context.go('/profile/${searchUsers[index].id}');
+                    },
+                  ),
                 );
               }
 
               // 投稿を表示
               final postIndex = index - searchUsers.length;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 1),
-                child: PostCardWidget(
-                  post: posts[postIndex],
-                  onTap: widget.onPostTap != null
-                      ? () => widget.onPostTap!(posts[postIndex])
-                      : null,
-                  onDelete: _canDeletePost(posts[postIndex])
-                      ? () => _showDeleteConfirmation(posts[postIndex])
-                      : null,
-                  fromPage: 'posts', // 投稿画面から来たことを識別
-                ),
+              return PostCardWidget(
+                post: posts[postIndex],
+                onTap: widget.onPostTap != null
+                    ? () => widget.onPostTap!(posts[postIndex])
+                    : null,
+                onDelete: _canDeletePost(posts[postIndex])
+                    ? () => _showDeleteConfirmation(posts[postIndex])
+                    : null,
+                fromPage: 'posts', // 投稿画面から来たことを識別
               );
             },
           ),
