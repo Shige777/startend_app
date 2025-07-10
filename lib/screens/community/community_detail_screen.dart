@@ -15,6 +15,10 @@ import '../../models/post_model.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/platform_image_picker_mobile.dart';
 import '../../utils/date_time_utils.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/mvp_widget.dart';
+import '../../services/progress_service.dart';
+import '../../models/progress_model.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -33,6 +37,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   bool _isLoading = true;
   CommunityModel? _community;
   List<PostModel> _communityPosts = [];
+  final ProgressService _progressService = ProgressService();
 
   @override
   void initState() {
@@ -181,6 +186,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -201,41 +209,75 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                 context.push('/post/create?communityId=${widget.communityId}');
               },
             ),
-            if (_isLeader())
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      _showEditCommunityDialog();
-                      break;
-                    case 'members':
-                      _showMembersDialog();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'chat':
+                    context.push('/community/${widget.communityId}/chat');
+                    break;
+                  case 'progress':
+                    context.push('/community/${widget.communityId}/progress');
+                    break;
+                  case 'members':
+                    context.push('/community/${widget.communityId}/members');
+                    break;
+                  case 'settings':
+                    context.push('/community/${widget.communityId}/settings');
+                    break;
+                  case 'edit':
+                    _showEditCommunityDialog();
+                    break;
+                  case 'members_old':
+                    _showMembersDialog();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'chat',
+                  child: Row(
+                    children: [
+                      Icon(Icons.chat),
+                      SizedBox(width: 8),
+                      Text('チャット'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'progress',
+                  child: Row(
+                    children: [
+                      Icon(Icons.trending_up),
+                      SizedBox(width: 8),
+                      Text('進捗'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'members',
+                  child: Row(
+                    children: [
+                      Icon(Icons.group),
+                      SizedBox(width: 8),
+                      Text('メンバー管理'),
+                    ],
+                  ),
+                ),
+                if (_isLeader()) ...[
+                  const PopupMenuDivider(),
                   const PopupMenuItem(
-                    value: 'edit',
+                    value: 'settings',
                     child: Row(
                       children: [
                         Icon(Icons.settings),
                         SizedBox(width: 8),
-                        Text('コミュニティ設定'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'members',
-                    child: Row(
-                      children: [
-                        Icon(Icons.people),
-                        SizedBox(width: 8),
-                        Text('メンバー管理'),
+                        Text('設定'),
                       ],
                     ),
                   ),
                 ],
-              ),
+              ],
+            ),
           ],
         ],
       ),
@@ -244,7 +286,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           // コミュニティ情報
           Container(
             padding: const EdgeInsets.all(AppConstants.defaultPadding),
-            color: AppColors.surface,
+            color: AppColors.background, // 背景色を統一
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -311,7 +353,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                       Container(
                         padding:
                             const EdgeInsets.all(AppConstants.defaultPadding),
-                        color: AppColors.surface,
+                        color: AppColors.background, // 背景色を統一
                         child: Row(
                           children: [
                             const Icon(Icons.post_add,

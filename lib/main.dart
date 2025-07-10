@@ -25,6 +25,13 @@ import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
 import 'screens/profile/community_list_screen.dart';
 import 'models/post_model.dart';
+import 'models/community_model.dart';
+import 'services/community_service.dart';
+import 'screens/community/community_detail_screen.dart';
+import 'screens/community/community_progress_screen.dart';
+import 'screens/community/community_member_management_screen.dart';
+import 'screens/community/community_settings_screen.dart';
+import 'screens/community/create_goal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -301,6 +308,66 @@ final GoRouter _router = GoRouter(
           fromCommunity: fromCommunity,
           fromPage: fromPage,
         );
+      },
+    ),
+    GoRoute(
+      path: '/community/:communityId/detail',
+      builder: (context, state) {
+        final communityId = state.pathParameters['communityId']!;
+        return CommunityDetailScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/community/:communityId/chat',
+      builder: (context, state) {
+        final communityId = state.pathParameters['communityId']!;
+        return CommunityChatScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/community/:communityId/progress',
+      builder: (context, state) {
+        final communityId = state.pathParameters['communityId']!;
+        return FutureBuilder<CommunityModel?>(
+          future: CommunityService().getCommunity(communityId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError || snapshot.data == null) {
+              return const Scaffold(
+                body: Center(child: Text('コミュニティが見つかりません')),
+              );
+            }
+            return CommunityProgressScreen(
+              communityId: communityId,
+              community: snapshot.data!,
+            );
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/community/:communityId/members',
+      builder: (context, state) {
+        final communityId = state.pathParameters['communityId']!;
+        return CommunityMemberManagementScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/community/:communityId/settings',
+      builder: (context, state) {
+        final communityId = state.pathParameters['communityId']!;
+        return CommunitySettingsScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/goal/create',
+      builder: (context, state) {
+        final communityId = state.uri.queryParameters['communityId'];
+        return CreateGoalScreen(communityId: communityId);
       },
     ),
     GoRoute(

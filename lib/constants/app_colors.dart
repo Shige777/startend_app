@@ -11,6 +11,9 @@ class AppColors {
   static const Color accentDark = Color(0xFFE65100);
   static const Color accentLight = Color(0xFFFFE0B2);
 
+  // セカンダリーカラー
+  static const Color secondary = Color(0xFF03DAC6);
+
   // 炎のアニメーション用
   static const Color flame = Color(0xFF2196F3);
   static const Color flameGlow = Color(0xFF64B5F6);
