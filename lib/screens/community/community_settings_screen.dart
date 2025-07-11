@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/community_model.dart';
-import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/community_service.dart';
 import '../../constants/app_colors.dart';
@@ -101,47 +100,34 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
     });
 
     try {
-      // 基本情報の更新
-      final communityProvider = context.read<CommunityProvider>();
-      final success = await communityProvider.updateCommunity(
-        widget.communityId,
-        _nameController.text,
-        _descriptionController.text,
-        _genreController.text,
-        null, // 画像は別途更新
+      // 基本情報と設定の更新
+      final updatedCommunity = _community!.copyWith(
+        name: _nameController.text,
+        description: _descriptionController.text,
+        genre: _genreController.text,
+        isPrivate: !_isPublic,
       );
 
-      if (success) {
-        // 設定の更新
-        final newSettings = CommunitySettings(
-          isPublic: _isPublic,
-          category: _category,
-          allowNewPostNotifications: _allowNewPostNotifications,
-          allowWeeklySummary: _allowWeeklySummary,
-          allowMonthlySummary: _allowMonthlySummary,
-          requireApproval: _requireApproval,
-        );
+      final newSettings = CommunitySettings(
+        isPublic: _isPublic,
+        category: _category,
+        allowNewPostNotifications: _allowNewPostNotifications,
+        allowWeeklySummary: _allowWeeklySummary,
+        allowMonthlySummary: _allowMonthlySummary,
+        requireApproval: _requireApproval,
+      );
 
-        final settingsSuccess = await _communityService.updateCommunitySettings(
-          widget.communityId,
-          newSettings,
-        );
+      // Firestoreのコミュニティドキュメントを直接更新
+      await _communityService.updateCommunityInfo(
+        widget.communityId,
+        updatedCommunity,
+        newSettings,
+      );
 
-        if (settingsSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('設定を保存しました')),
-          );
-          context.pop();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('設定の保存に失敗しました')),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('基本情報の保存に失敗しました')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('設定を保存しました')),
+      );
+      context.pop();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('エラーが発生しました: $e')),
@@ -175,9 +161,8 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
     if (confirmed == true) {
       try {
-        final communityProvider = context.read<CommunityProvider>();
         final success =
-            await communityProvider.deleteCommunity(widget.communityId);
+            await _communityService.deleteCommunity(widget.communityId);
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(

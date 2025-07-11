@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/post_model.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
-import '../../utils/date_time_utils.dart';
 import '../../widgets/post_card_widget.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -268,12 +267,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 投稿内容（アクションボタン非表示）
+            // 投稿内容（アクションボタン非表示、画像拡大機能有効）
             PostCardWidget(
               post: _post!,
               showActions: false,
               onDelete: _isPostOwner() ? _showDeleteConfirmation : null,
               fromPage: 'detail', // 詳細画面内での使用
+              enableImageZoom: true, // 画像拡大機能を有効化
             ),
 
             // カスタムアクションボタン

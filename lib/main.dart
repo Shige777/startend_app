@@ -19,7 +19,7 @@ import 'screens/post/create_post_screen.dart';
 import 'screens/post/create_end_post_screen.dart';
 import 'screens/post/post_detail_screen.dart';
 import 'screens/post/edit_post_screen.dart';
-import 'screens/community/community_screen.dart';
+
 import 'screens/community/community_chat_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
@@ -31,7 +31,6 @@ import 'screens/community/community_detail_screen.dart';
 import 'screens/community/community_progress_screen.dart';
 import 'screens/community/community_member_management_screen.dart';
 import 'screens/community/community_settings_screen.dart';
-import 'screens/community/create_goal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -361,13 +360,6 @@ final GoRouter _router = GoRouter(
       builder: (context, state) {
         final communityId = state.pathParameters['communityId']!;
         return CommunitySettingsScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/goal/create',
-      builder: (context, state) {
-        final communityId = state.uri.queryParameters['communityId'];
-        return CreateGoalScreen(communityId: communityId);
       },
     ),
     GoRoute(

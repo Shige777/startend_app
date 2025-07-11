@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import '../firebase_options.dart'; // Added for DefaultFirebaseOptions
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -17,76 +20,50 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   String? get currentUserId => _user?.uid;
 
+  // コンストラクタ
   AuthProvider() {
-    // GoogleSignInを明示的に設定
-    if (kIsWeb) {
-      _googleSignIn = GoogleSignIn(
-        clientId:
-            '201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com',
-      );
-    } else {
-      // iOS/Android環境では明示的にクライアントIDを設定
-      _googleSignIn = GoogleSignIn(
-        clientId:
-            '201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l.apps.googleusercontent.com',
-      );
-    }
-
-    // デバッグ情報を出力
-    if (kDebugMode) {
-      print('AuthProvider initialized');
-      print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
-      print('GoogleSignIn clientId: ${_googleSignIn.clientId}');
-    }
-
-    // Firebase Auth の永続化設定（Web環境のみ）
-    if (kIsWeb) {
-      try {
-        _auth.setPersistence(Persistence.LOCAL);
-      } catch (e) {
-        if (kDebugMode) {
-          print('setPersistence failed: $e');
-        }
-      }
-    }
+    // Google Sign-Inの設定を初期化
+    _initializeGoogleSignIn();
 
     _auth.authStateChanges().listen((User? user) {
       if (kDebugMode) {
-        print('Auth state changed: ${user?.uid ?? 'null'}');
+        print('Auth state changed: ${user?.uid}');
       }
       _user = user;
       notifyListeners();
     });
 
-    // 現在のユーザーを取得（自動ログイン）
+    // 現在のユーザーを取得
     _user = _auth.currentUser;
+
     if (kDebugMode) {
       print('Current user on init: ${_user?.uid ?? 'null'}');
     }
+  }
 
-    // テスト用: Web環境での開発時はダミーユーザーを設定
-    if (kDebugMode && _user == null) {
-      _setDummyUser();
+  // Google Sign-Inの初期化
+  void _initializeGoogleSignIn() {
+    if (kIsWeb) {
+      // Web環境用の設定 - Firebase ConsoleのWeb Client IDを使用
+      _googleSignIn = GoogleSignIn(
+        clientId:
+            '201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com',
+      );
+    } else {
+      // モバイル環境用の設定
+      // iOS用に明示的にClient IDを設定
+      _googleSignIn = GoogleSignIn(
+        clientId:
+            '201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+    }
+
+    if (kDebugMode) {
+      print('Google Sign-In initialized for ${kIsWeb ? 'Web' : 'Mobile'}');
+      print('Client ID: ${_googleSignIn.clientId}');
     }
   }
-
-  // テスト用のダミーユーザーを設定（Web環境での開発用）
-  void _setDummyUser() {
-    // ダミーユーザー情報を設定
-    Future.delayed(const Duration(milliseconds: 500), () {
-      // デバッグモードでのテスト用認証を有効化
-      if (kDebugMode) {
-        print('Debug Mode: Setting up test user authentication');
-      }
-      notifyListeners();
-    });
-  }
-
-  // テスト用: ダミーユーザーIDを取得
-  String? get testUserId => kDebugMode ? 'test_user_001' : null;
-
-  // 実際のユーザーIDまたはテスト用ユーザーIDを取得
-  String? get effectiveUserId => _user?.uid ?? testUserId;
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -153,122 +130,157 @@ class AuthProvider extends ChangeNotifier {
       _setError(null);
 
       if (kDebugMode) {
-        print('Google Sign In: Starting sign in process...');
-      }
-
-      // 既存のサインインをクリア
-      await _googleSignIn.signOut();
-
-      // GoogleSignInの設定を確認
-      if (kDebugMode) {
-        print('Google Sign In: Configuration check...');
-        print('Client ID: ${_googleSignIn.clientId}');
+        print('=== Google Sign-In Debug Info ===');
         print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
-        print('GoogleSignIn isSignedIn: ${await _googleSignIn.isSignedIn()}');
+        print('Current User: ${_googleSignIn.currentUser?.email ?? 'None'}');
+        print('Starting Google Sign-In...');
       }
 
-      // iOS環境での追加チェック
-      if (!kIsWeb) {
+      // 既存のサインイン状態をクリア
+      try {
+        await _googleSignIn.signOut();
         if (kDebugMode) {
-          print('Google Sign In: Checking iOS configuration...');
+          print('Cleared existing sign-in state');
         }
-
-        // iOS環境でのサインイン試行
-        try {
-          final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-          if (googleUser == null) {
-            if (kDebugMode) {
-              print(
-                  'Google Sign In: User cancelled sign in or signIn returned null');
-            }
-            return false;
-          }
-
-          return await _processGoogleSignIn(googleUser);
-        } catch (e) {
-          if (kDebugMode) {
-            print('Google Sign In iOS Error: $e');
-            print('Error details: ${e.toString()}');
-          }
-
-          // iOS Simulatorの場合は特別なエラーメッセージ
-          if (e.toString().contains('network_error') ||
-              e.toString().contains('sign_in_canceled') ||
-              e.toString().contains('sign_in_failed')) {
-            _setError('iOS Simulatorでは制限があります。実機でお試しください。');
-            return false;
-          }
-
-          throw e;
+      } catch (e) {
+        if (kDebugMode) {
+          print('No existing sign-in to clear: $e');
         }
       }
 
+      // Google Sign-Inを実行
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         if (kDebugMode) {
-          print('Google Sign In: User cancelled sign in');
+          print('Google Sign-In: User cancelled or failed');
+          print('Checking Google Sign-In configuration...');
+
+          // 設定の詳細チェック
+          final isSignedIn = await _googleSignIn.isSignedIn();
+          print('Is signed in: $isSignedIn');
+          print('Client ID configured: ${_googleSignIn.clientId ?? 'Default'}');
         }
-        return false; // ユーザーがキャンセルした場合
+
+        _setError('Google Sign-Inがキャンセルされました');
+        return false;
       }
 
-      return await _processGoogleSignIn(googleUser);
-    } catch (e) {
-      final errorMessage = 'Googleサインインに失敗しました: ${e.toString()}';
-      _setError(errorMessage);
       if (kDebugMode) {
-        print('Google Sign In Error: $e');
+        print('Google Sign-In: Success!');
+        print('  User ID: ${googleUser.id}');
+        print('  Email: ${googleUser.email}');
+        print('  Display Name: ${googleUser.displayName}');
+      }
+
+      // Google認証情報を取得
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      if (kDebugMode) {
+        print('Google Auth: Getting credentials...');
+        print(
+            '  Access Token: ${googleAuth.accessToken != null ? 'Available' : 'Null'}');
+        print(
+            '  ID Token: ${googleAuth.idToken != null ? 'Available' : 'Null'}');
+      }
+
+      // Firebase認証情報を作成
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      if (kDebugMode) {
+        print('Firebase: Signing in with credential...');
+      }
+
+      // Firebaseでサインイン
+      final UserCredential result =
+          await _auth.signInWithCredential(credential);
+
+      if (kDebugMode) {
+        print('Firebase Sign-In: Success!');
+        print('  User ID: ${result.user?.uid}');
+        print('  Email: ${result.user?.email}');
+        print('  Display Name: ${result.user?.displayName}');
+      }
+
+      return true;
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('Google Sign-In Error: $e');
         print('Error Type: ${e.runtimeType}');
-        if (e is FirebaseAuthException) {
-          print('Firebase Auth Error Code: ${e.code}');
-          print('Firebase Auth Error Message: ${e.message}');
+        print('Stack Trace: $stackTrace');
+
+        // 特定のエラーを詳しく調査
+        if (e.toString().contains('PlatformException')) {
+          print('');
+          print('🔍 PlatformException Details:');
+          print('This usually indicates a configuration issue.');
+          print('Common causes:');
+          print('1. Bundle ID mismatch');
+          print('2. GoogleService-Info.plist not properly configured');
+          print('3. OAuth Client ID not properly set up');
+          print('4. App not properly signed');
+          print('');
+        }
+
+        if (e.toString().contains('sign_in_canceled')) {
+          print('');
+          print('ℹ️  User cancelled the sign-in process');
+          print('');
+        }
+
+        if (e.toString().contains('network_error')) {
+          print('');
+          print('🌐 Network error occurred');
+          print('Check internet connection');
+          print('');
         }
       }
+
+      // ユーザーフレンドリーなエラーメッセージ
+      if (e.toString().contains('sign_in_canceled')) {
+        _setError('Google Sign-Inがキャンセルされました');
+      } else if (e.toString().contains('network_error')) {
+        _setError('ネットワークエラーが発生しました。インターネット接続を確認してください。');
+      } else if (e.toString().contains('PlatformException')) {
+        _setError('Google Sign-Inの設定に問題があります。アプリの設定を確認してください。');
+      } else {
+        _setError('Google Sign-Inに失敗しました: ${e.toString()}');
+      }
+
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Google Sign-Inの共通処理
-  Future<bool> _processGoogleSignIn(GoogleSignInAccount googleUser) async {
+  // Google Sign-Inの状態をチェック
+  Future<void> checkGoogleSignInStatus() async {
     if (kDebugMode) {
-      print('Google Sign In: User signed in: ${googleUser.email}');
-    }
-
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-
-    if (kDebugMode) {
-      print('Google Sign In: Got authentication tokens');
+      print('=== Google Sign-In Status Check ===');
+      print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
       print(
-          'Access Token: ${googleAuth.accessToken != null ? 'Present' : 'Missing'}');
-      print('ID Token: ${googleAuth.idToken != null ? 'Present' : 'Missing'}');
+          'Google Sign-In Instance: ${_googleSignIn != null ? 'Created' : 'Not Created'}');
+
+      try {
+        final isSignedIn = await _googleSignIn.isSignedIn();
+        print('Is Signed In: $isSignedIn');
+
+        final currentUser = _googleSignIn.currentUser;
+        if (currentUser != null) {
+          print('Current Google User: ${currentUser.email}');
+        } else {
+          print('Current Google User: None');
+        }
+      } catch (e) {
+        print('Error checking status: $e');
+      }
+
+      print('=== End Status Check ===');
     }
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    if (kDebugMode) {
-      print('Google Sign In: Created Firebase credential');
-    }
-
-    final UserCredential result = await _auth.signInWithCredential(
-      credential,
-    );
-
-    _user = result.user;
-
-    if (kDebugMode) {
-      print('Google Sign In: Successfully signed in to Firebase');
-      print('User ID: ${_user?.uid}');
-      print('User Email: ${_user?.email}');
-    }
-
-    return true;
   }
 
   // Apple ID サインイン
@@ -376,6 +388,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     try {
       _setLoading(true);
+      _setError(null);
       await _auth.signOut();
       await _googleSignIn.signOut();
       _user = null;

@@ -14,6 +14,7 @@ import '../../models/user_model.dart';
 
 import '../../widgets/post_card_widget.dart';
 import '../../widgets/wave_loading_widget.dart';
+import 'profile_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // 他のユーザーのプロフィールを表示する場合に使用
@@ -113,7 +114,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           if (kDebugMode) {
             print('軌跡画面: 自分の投稿を読み込み開始 - ${_profileUser!.id}');
           }
-          await postProvider.getUserPosts(_profileUser!.id);
+          await postProvider.getUserPosts(_profileUser!.id,
+              currentUserId: userProvider.currentUser?.id);
         }
       } else {
         // 他のユーザーのプロフィールの場合
@@ -123,7 +125,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             if (kDebugMode) {
               print('他のユーザーのプロフィール: 投稿を読み込み開始 - ${_profileUser!.id}');
             }
-            await postProvider.getUserPosts(_profileUser!.id);
+            await postProvider.getUserPosts(_profileUser!.id,
+                currentUserId: userProvider.currentUser?.id);
           }
         }
       }
@@ -308,6 +311,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         title: Text(widget.isOwnProfile
             ? '軌跡'
             : (_profileUser?.displayName ?? 'プロフィール')),
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         actions: widget.isOwnProfile
             ? [
                 PopupMenuButton<TimePeriod>(
@@ -433,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 // プロフィール情報
                 Container(
                   padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  color: AppColors.surface,
+                  color: AppColors.background, // 背景色を統一
                   child: Column(
                     children: [
                       // プロフィール画像と基本情報
@@ -593,13 +599,16 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 // タブバー（集中・進行中、過去の2つ）
                 Container(
-                  color: AppColors.surface,
+                  color: AppColors.background, // 背景色を統一
                   child: TabBar(
                     controller: _tabController,
                     tabs: const [
                       Tab(text: '集中・進行中'),
                       Tab(text: '過去'),
                     ],
+                    indicatorColor: AppColors.primary,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textSecondary,
                   ),
                 ),
 
@@ -623,7 +632,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               // プロフィール情報
               Container(
                 padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                color: AppColors.surface,
+                color: AppColors.background, // 背景色を統一
                 child: Column(
                   children: [
                     // プロフィール画像と基本情報
@@ -787,7 +796,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
-                            context.push('/profile/settings');
+                            print('プロフィール編集ボタンがタップされました');
+                            try {
+                              // GoRouterの代わりにNavigator.pushを使用
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ProfileSettingsScreen(),
+                                ),
+                              );
+                              print('プロフィール設定画面への遷移を実行しました');
+                            } catch (e) {
+                              print('プロフィール設定画面への遷移でエラー: $e');
+                            }
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.primary),
@@ -803,13 +824,16 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               // タブバー（集中・進行中をまとめて「集中・進行中」、「過去」の2つに変更）
               Container(
-                color: AppColors.surface,
+                color: AppColors.background, // 背景色を統一
                 child: TabBar(
                   controller: _tabController,
                   tabs: const [
                     Tab(text: '集中・進行中'),
                     Tab(text: '過去'),
                   ],
+                  indicatorColor: AppColors.primary,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
                 ),
               ),
 
@@ -830,6 +854,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       // 他のユーザーのプロフィールの場合はナビゲーションバーを追加
       bottomNavigationBar: !widget.isOwnProfile
           ? BottomNavigationBar(
+              backgroundColor: AppColors.background, // 背景色を統一
+              elevation: 0, // 影を削除
               currentIndex: 0, // 投稿タブを選択状態にする
               onTap: (index) {
                 if (index == 0) {
@@ -967,6 +993,46 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
 
         if (posts.isEmpty) {
+          // プライベートアカウントの場合の表示
+          if (!widget.isOwnProfile &&
+              _profileUser != null &&
+              _profileUser!.isPrivate) {
+            final currentUser = userProvider.currentUser;
+            final isFollowing = currentUser != null &&
+                _profileUser!.followerIds.contains(currentUser.id);
+
+            if (!isFollowing) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 64,
+                      color: AppColors.textHint,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'プライベートアカウント',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'このアカウントの投稿を見るには\nフォローする必要があります',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

@@ -27,29 +27,10 @@ class UserProvider extends ChangeNotifier {
 
   // 現在のユーザーを初期化
   Future<void> _initializeCurrentUser() async {
-    final userId = _authProvider?.effectiveUserId;
+    final userId = _authProvider?.currentUserId;
     if (userId != null) {
-      // テスト用ユーザーの場合はダミーユーザーを作成
-      if (kDebugMode && userId == 'test_user_001') {
-        _currentUser = UserModel(
-          id: userId,
-          displayName: 'テストユーザー',
-          email: 'test@example.com',
-          profileImageUrl: 'https://picsum.photos/150/150?random=user',
-          bio: 'テスト用のユーザーです',
-          isPrivate: false,
-          requiresApproval: false,
-          followerIds: [],
-          followingIds: [],
-          communityIds: [],
-          createdAt: DateTime.now().subtract(const Duration(days: 30)),
-          updatedAt: DateTime.now(),
-        );
-        notifyListeners();
-      } else {
-        // 実際のFirestoreからユーザーを取得または作成
-        await _getOrCreateUser(userId);
-      }
+      // 実際のFirestoreからユーザーを取得または作成
+      await _getOrCreateUser(userId);
     }
   }
 
@@ -216,18 +197,25 @@ class UserProvider extends ChangeNotifier {
         return _searchResults;
       }
 
+      // 部分一致検索のため、全ユーザーを取得してフィルタリング
       final querySnapshot = await _firestore
           .collection('users')
-          .where('displayName', isGreaterThanOrEqualTo: query)
-          .where('displayName', isLessThan: query + '\uf8ff')
-          .limit(20)
+          .orderBy('createdAt', descending: true)
+          .limit(100) // パフォーマンスのため上限を設定
           .get();
 
-      _searchResults = querySnapshot.docs
+      final users = querySnapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
 
-      return _searchResults;
+      // 部分一致でフィルタリング
+      final searchQuery = query.toLowerCase();
+      _searchResults = users.where((user) {
+        return user.displayName.toLowerCase().contains(searchQuery) ||
+            (user.email.toLowerCase().contains(searchQuery));
+      }).toList();
+
+      return _searchResults.take(20).toList(); // 結果を20件に制限
     } catch (e) {
       _setError('ユーザー検索に失敗しました');
       _searchResults = [];

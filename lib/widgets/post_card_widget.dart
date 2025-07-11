@@ -18,6 +18,7 @@ class PostCardWidget extends StatelessWidget {
   final bool showActions; // アクションボタンの表示制御
   final VoidCallback? onDelete;
   final String? fromPage; // 遷移元のページ識別子
+  final bool enableImageZoom; // 画像拡大機能の有効化
 
   const PostCardWidget({
     super.key,
@@ -26,6 +27,7 @@ class PostCardWidget extends StatelessWidget {
     this.showActions = true, // デフォルトは表示
     this.onDelete,
     this.fromPage,
+    this.enableImageZoom = false, // デフォルトは無効
   });
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
@@ -34,7 +36,8 @@ class PostCardWidget extends StatelessWidget {
   }
 
   // 画像を表示するWidgetを構築
-  Widget _buildImageWidget(String? imageUrl, {BoxFit fit = BoxFit.cover}) {
+  Widget _buildImageWidget(String? imageUrl,
+      {BoxFit fit = BoxFit.cover, bool enableZoom = false}) {
     if (imageUrl == null) {
       return Container(
         width: double.infinity,
@@ -46,9 +49,11 @@ class PostCardWidget extends StatelessWidget {
       );
     }
 
+    Widget imageWidget;
+
     if (_isNetworkUrl(imageUrl)) {
       // ネットワーク画像
-      return Container(
+      imageWidget = Container(
         width: double.infinity,
         height: double.infinity,
         child: CachedNetworkImage(
@@ -70,7 +75,7 @@ class PostCardWidget extends StatelessWidget {
       // ローカルファイル
       if (kIsWeb) {
         // Webの場合はエラー画像を表示
-        return Container(
+        imageWidget = Container(
           width: double.infinity,
           height: double.infinity,
           color: AppColors.surfaceVariant,
@@ -79,7 +84,7 @@ class PostCardWidget extends StatelessWidget {
       } else {
         // モバイルの場合はFile.imageを使用
         try {
-          return Container(
+          imageWidget = Container(
             width: double.infinity,
             height: double.infinity,
             child: Image.file(
@@ -94,7 +99,7 @@ class PostCardWidget extends StatelessWidget {
             ),
           );
         } catch (e) {
-          return Container(
+          imageWidget = Container(
             width: double.infinity,
             height: double.infinity,
             color: AppColors.surfaceVariant,
@@ -103,13 +108,115 @@ class PostCardWidget extends StatelessWidget {
         }
       }
     }
+
+    // 拡大機能が有効な場合はGestureDetectorでラップ
+    if (enableZoom) {
+      return Builder(
+        builder: (context) => GestureDetector(
+          onTap: () => _showImageZoomDialog(context, imageUrl),
+          child: imageWidget,
+        ),
+      );
+    }
+
+    return imageWidget;
+  }
+
+  // 画像拡大ダイアログを表示
+  void _showImageZoomDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: Stack(
+              children: [
+                // 背景をタップして閉じる
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: Colors.transparent,
+                  ),
+                ),
+                // 拡大画像
+                Center(
+                  child: InteractiveViewer(
+                    panEnabled: true,
+                    boundaryMargin: const EdgeInsets.all(20),
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: _isNetworkUrl(imageUrl)
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.contain,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.error,
+                              color: Colors.white,
+                              size: 64,
+                            ),
+                          )
+                        : kIsWeb
+                            ? const Icon(
+                                Icons.error,
+                                color: Colors.white,
+                                size: 64,
+                              )
+                            : Image.file(
+                                File(imageUrl),
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.error,
+                                  color: Colors.white,
+                                  size: 64,
+                                ),
+                              ),
+                  ),
+                ),
+                // 閉じるボタン
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.zero, // 余白を完全に削除
-      color: AppColors.background, // 背景色を背景と同一化
+    final userProvider = context.watch<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isOwnPost = currentUser?.id == post.userId; // 自分の投稿かどうか判定
+
+    return Card(
+      margin: EdgeInsets.zero, // 余白を削除
+      elevation: 0, // 影を削除
+      color: isOwnPost
+          ? AppColors.primary.withOpacity(0.1) // 自分の投稿は青い背景
+          : AppColors.background, // 他の投稿は通常の背景
       child: InkWell(
         onTap: onTap ??
             () => context.push('/post/${post.id}', extra: {
@@ -194,7 +301,10 @@ class PostCardWidget extends StatelessWidget {
 
             // コンテンツ
             Padding(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.defaultPadding,
+                vertical: 2, // 上下のパディングを縮小
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -204,7 +314,6 @@ class PostCardWidget extends StatelessWidget {
                       post.comment!,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 8),
                   ],
                 ],
               ),
@@ -213,7 +322,11 @@ class PostCardWidget extends StatelessWidget {
             // END投稿のコメント（完了している場合）- 画像の下に表示
             if (post.isCompleted && post.endComment != null) ...[
               Padding(
-                padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                padding: const EdgeInsets.only(
+                  left: AppConstants.defaultPadding,
+                  right: AppConstants.defaultPadding,
+                  bottom: 2, // 下部パディングも縮小
+                ),
                 child: Text(
                   post.endComment!,
                   style: Theme.of(context).textTheme.bodyMedium,
@@ -223,7 +336,6 @@ class PostCardWidget extends StatelessWidget {
 
             // アクションボタン
             if (showActions) ...[
-              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.defaultPadding),
@@ -314,7 +426,7 @@ class PostCardWidget extends StatelessWidget {
                         child: Container(
                           width: double.infinity,
                           child: _buildImageWidget(post.imageUrl,
-                              fit: BoxFit.cover),
+                              fit: BoxFit.cover, enableZoom: enableImageZoom),
                         ),
                       ),
                       // START画像の下にラベル
@@ -361,6 +473,23 @@ class PostCardWidget extends StatelessWidget {
                             onTap: post.isCompleted
                                 ? null
                                 : () {
+                                    // 投稿者本人のみEND投稿可能
+                                    final userProvider =
+                                        context.read<UserProvider>();
+                                    final currentUser =
+                                        userProvider.currentUser;
+
+                                    if (currentUser == null ||
+                                        post.userId != currentUser.id) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text('自分の投稿のみEND投稿できます'),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
                                     // END投稿作成画面への遷移
                                     context.push('/create-end-post', extra: {
                                       'startPostId': post.id,
@@ -373,7 +502,8 @@ class PostCardWidget extends StatelessWidget {
                               child: post.isCompleted
                                   ? (post.endImageUrl != null
                                       ? _buildImageWidget(post.endImageUrl,
-                                          fit: BoxFit.cover)
+                                          fit: BoxFit.cover,
+                                          enableZoom: enableImageZoom)
                                       : const Center(
                                           child: Icon(Icons.flag,
                                               color: AppColors.completed,

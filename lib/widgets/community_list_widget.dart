@@ -5,17 +5,16 @@ import '../models/community_model.dart';
 import '../providers/community_provider.dart';
 import '../constants/app_colors.dart';
 import '../providers/user_provider.dart';
+import '../widgets/wave_loading_widget.dart';
 
 class CommunityListWidget extends StatefulWidget {
   final List<CommunityModel>? communities;
   final Function(CommunityModel)? onCommunityTap;
-  final String? searchQuery;
 
   const CommunityListWidget({
     super.key,
     this.communities,
     this.onCommunityTap,
-    this.searchQuery,
   });
 
   @override
@@ -23,14 +22,9 @@ class CommunityListWidget extends StatefulWidget {
 }
 
 class _CommunityListWidgetState extends State<CommunityListWidget> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
   @override
   void initState() {
     super.initState();
-    _searchQuery = widget.searchQuery ?? '';
-    _searchController.text = _searchQuery;
 
     // コミュニティ一覧を初期読み込み
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -47,15 +41,11 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
   @override
   void didUpdateWidget(CommunityListWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.searchQuery != oldWidget.searchQuery) {
-      _searchQuery = widget.searchQuery ?? '';
-      _searchController.text = _searchQuery;
-    }
+    // 検索機能を削除したため、このメソッドは空にする
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -63,26 +53,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // HomeScreenから検索バーが提供される場合は表示しない
-        if (widget.searchQuery == null) ...[
-          // 検索バー
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'コミュニティを検索...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.trim().toLowerCase();
-                });
-              },
-            ),
-          ),
-        ],
+        // 検索バーを削除
         // 所属コミュニティのセクションヘッダー
         Container(
           width: double.infinity,
@@ -99,12 +70,29 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         Expanded(
           child: Consumer<CommunityProvider>(
             builder: (context, communityProvider, child) {
-              final communities = _getFilteredCommunities(
-                widget.communities ?? communityProvider.userCommunities,
-              );
+              final communities =
+                  widget.communities ?? communityProvider.userCommunities;
 
               if (communityProvider.isLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      WaveLoadingWidget(
+                        size: 80,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        '読み込み中...',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }
 
               if (communities.isEmpty) {
@@ -113,17 +101,13 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _searchQuery.isEmpty
-                            ? Icons.group_outlined
-                            : Icons.search_off,
+                        Icons.group_outlined,
                         size: 64,
                         color: AppColors.textHint,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        _searchQuery.isEmpty
-                            ? '参加しているコミュニティがありません'
-                            : '検索結果が見つかりませんでした',
+                        '参加しているコミュニティがありません',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -151,19 +135,6 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
         ),
       ],
     );
-  }
-
-  List<CommunityModel> _getFilteredCommunities(
-      List<CommunityModel> communities) {
-    final query = _searchQuery.toLowerCase();
-    if (query.isEmpty) {
-      return communities;
-    }
-
-    return communities.where((community) {
-      return community.name.toLowerCase().contains(query) ||
-          (community.description?.toLowerCase().contains(query) ?? false);
-    }).toList();
   }
 
   Widget _buildCommunityTile(CommunityModel community) {

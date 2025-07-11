@@ -9,6 +9,7 @@ import '../providers/user_provider.dart';
 import '../constants/app_colors.dart';
 import 'post_card_widget.dart';
 import 'user_list_item.dart';
+import 'wave_loading_widget.dart';
 
 enum PostListType { following, community, user }
 
@@ -54,7 +55,8 @@ class _PostListWidgetState extends State<PostListWidget> {
         final userProvider = context.read<UserProvider>();
         final currentUser = userProvider.currentUser;
         if (currentUser != null) {
-          await postProvider.getFollowingPosts(currentUser.followingIds);
+          await postProvider.getFollowingPosts(currentUser.followingIds,
+              currentUserId: currentUser.id);
         }
         break;
       case PostListType.community:
@@ -68,15 +70,17 @@ class _PostListWidgetState extends State<PostListWidget> {
         break;
       case PostListType.user:
         // ユーザーの投稿を取得
+        final userProvider = context.read<UserProvider>();
+        final currentUser = userProvider.currentUser;
         final targetUserId = widget.userId;
         if (targetUserId != null) {
-          await postProvider.getUserPosts(targetUserId);
+          await postProvider.getUserPosts(targetUserId,
+              currentUserId: currentUser?.id);
         } else {
           // userIdが指定されていない場合は現在のユーザーの投稿を取得
-          final userProvider = context.read<UserProvider>();
-          final currentUser = userProvider.currentUser;
           if (currentUser != null) {
-            await postProvider.getUserPosts(currentUser.id);
+            await postProvider.getUserPosts(currentUser.id,
+                currentUserId: currentUser.id);
           }
         }
         break;
@@ -123,7 +127,25 @@ class _PostListWidgetState extends State<PostListWidget> {
         }
 
         if (postProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                WaveLoadingWidget(
+                  size: 80,
+                  color: AppColors.primary,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  '読み込み中...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         if (posts.isEmpty && searchUsers.isEmpty) {
@@ -252,7 +274,10 @@ class _PostListWidgetState extends State<PostListWidget> {
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+        child: WaveLoadingWidget(
+          size: 60,
+          color: AppColors.primary,
+        ),
       ),
     );
 

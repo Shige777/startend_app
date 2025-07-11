@@ -7,369 +7,325 @@ class ProgressService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // 目標管理
-  Future<String?> createGoal({
-    required String title,
-    required String description,
-    required GoalType type,
-    required DateTime targetDate,
-    required int targetCount,
-    String? communityId,
-    List<String> milestones = const [],
-  }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return null;
-
-    try {
-      final goal = Goal(
-        id: '',
-        userId: currentUser.uid,
-        communityId: communityId,
-        title: title,
-        description: description,
-        type: type,
-        status: GoalStatus.active,
-        startDate: DateTime.now(),
-        targetDate: targetDate,
-        targetCount: targetCount,
-        milestones: milestones,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      final docRef =
-          await _firestore.collection('goals').add(goal.toFirestore());
-      return docRef.id;
-    } catch (e) {
-      print('Error creating goal: $e');
-      return null;
-    }
-  }
-
-  Future<bool> updateGoalProgress(String goalId, int increment) async {
-    try {
-      final goalDoc = await _firestore.collection('goals').doc(goalId).get();
-      if (!goalDoc.exists) return false;
-
-      final goal = Goal.fromFirestore(goalDoc);
-      final newCount = goal.currentCount + increment;
-
-      Map<String, dynamic> updateData = {
-        'currentCount': newCount,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      };
-
-      // 目標達成チェック
-      if (newCount >= goal.targetCount && goal.status == GoalStatus.active) {
-        updateData['status'] = GoalStatus.completed.toString();
-        updateData['completedDate'] = Timestamp.fromDate(DateTime.now());
-      }
-
-      await _firestore.collection('goals').doc(goalId).update(updateData);
-      return true;
-    } catch (e) {
-      print('Error updating goal progress: $e');
-      return false;
-    }
-  }
-
-  Future<bool> completeMilestone(String goalId, String milestone) async {
-    try {
-      final goalDoc = await _firestore.collection('goals').doc(goalId).get();
-      if (!goalDoc.exists) return false;
-
-      final goal = Goal.fromFirestore(goalDoc);
-      if (!goal.milestones.contains(milestone)) return false;
-
-      final newCompletedMilestones = [...goal.completedMilestones];
-      if (!newCompletedMilestones.contains(milestone)) {
-        newCompletedMilestones.add(milestone);
-      }
-
-      await _firestore.collection('goals').doc(goalId).update({
-        'completedMilestones': newCompletedMilestones,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error completing milestone: $e');
-      return false;
-    }
-  }
-
-  Future<List<Goal>> getUserGoals(String userId, {String? communityId}) async {
-    try {
-      Query query =
-          _firestore.collection('goals').where('userId', isEqualTo: userId);
-
-      if (communityId != null) {
-        query = query.where('communityId', isEqualTo: communityId);
-      }
-
-      final querySnapshot =
-          await query.orderBy('createdAt', descending: true).get();
-      return querySnapshot.docs.map((doc) => Goal.fromFirestore(doc)).toList();
-    } catch (e) {
-      print('Error getting user goals: $e');
-      return [];
-    }
-  }
-
-  Future<List<Goal>> getCommunityGoals(String communityId) async {
+  // 活動統計の取得
+  Future<List<ActivityStats>> getCommunityActivityStats(
+      String communityId) async {
     try {
       final querySnapshot = await _firestore
-          .collection('goals')
+          .collection('activity_stats')
           .where('communityId', isEqualTo: communityId)
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      return querySnapshot.docs.map((doc) => Goal.fromFirestore(doc)).toList();
-    } catch (e) {
-      print('Error getting community goals: $e');
-      return [];
-    }
-  }
-
-  // 進捗記録
-  Future<String?> createProgressRecord({
-    required String title,
-    String? description,
-    String? imageUrl,
-    String? goalId,
-    String? communityId,
-    Map<String, dynamic> metrics = const {},
-    List<String> tags = const [],
-  }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return null;
-
-    try {
-      final record = ProgressRecord(
-        id: '',
-        userId: currentUser.uid,
-        goalId: goalId,
-        communityId: communityId,
-        title: title,
-        description: description,
-        imageUrl: imageUrl,
-        recordDate: DateTime.now(),
-        metrics: metrics,
-        tags: tags,
-        createdAt: DateTime.now(),
-      );
-
-      final docRef = await _firestore
-          .collection('progress_records')
-          .add(record.toFirestore());
-
-      // 関連する目標の進捗を更新
-      if (goalId != null) {
-        await updateGoalProgress(goalId, 1);
-      }
-
-      return docRef.id;
-    } catch (e) {
-      print('Error creating progress record: $e');
-      return null;
-    }
-  }
-
-  Future<List<ProgressRecord>> getUserProgressRecords(String userId,
-      {int limit = 50}) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('progress_records')
-          .where('userId', isEqualTo: userId)
-          .orderBy('recordDate', descending: true)
-          .limit(limit)
+          .orderBy('totalPosts', descending: true)
           .get();
 
       return querySnapshot.docs
-          .map((doc) => ProgressRecord.fromFirestore(doc))
+          .map((doc) => ActivityStats.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting user progress records: $e');
+      print('Error getting community activity stats: $e');
       return [];
     }
   }
 
-  Future<List<ProgressRecord>> getCommunityProgressRecords(String communityId,
-      {int limit = 50}) async {
+  // メンバー活動ランキングの取得
+  Future<List<ActivityRanking>> getCommunityRanking(
+    String communityId, {
+    String period = 'all', // 'week', 'month', 'all'
+  }) async {
     try {
-      final querySnapshot = await _firestore
-          .collection('progress_records')
-          .where('communityId', isEqualTo: communityId)
-          .orderBy('recordDate', descending: true)
-          .limit(limit)
-          .get();
+      DateTime? startDate;
+      DateTime? endDate;
 
-      return querySnapshot.docs
-          .map((doc) => ProgressRecord.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      print('Error getting community progress records: $e');
-      return [];
-    }
-  }
-
-  // MVP制度
-  Future<void> calculateWeeklyMVP(String communityId) async {
-    try {
       final now = DateTime.now();
-      final weekStart = _getWeekStart(now);
-      final weekEnd = _getWeekEnd(now);
-
-      // 週の投稿データを取得
-      final postsSnapshot = await _firestore
-          .collection('posts')
-          .where('communityId', isEqualTo: communityId)
-          .where('createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
-          .where('createdAt', isLessThan: Timestamp.fromDate(weekEnd))
-          .get();
-
-      // ユーザー別の活動データを集計
-      Map<String, Map<String, dynamic>> userStats = {};
-
-      for (var doc in postsSnapshot.docs) {
-        final post = PostModel.fromFirestore(doc);
-        final userId = post.userId;
-
-        if (!userStats.containsKey(userId)) {
-          userStats[userId] = {
-            'postCount': 0,
-            'totalLikes': 0,
-            'completedGoals': 0,
-          };
-        }
-
-        userStats[userId]!['postCount']++;
-        userStats[userId]!['totalLikes'] += post.likeCount;
-
-        if (post.isCompleted) {
-          userStats[userId]!['completedGoals']++;
-        }
+      switch (period) {
+        case 'week':
+          startDate = _getWeekStart(now);
+          endDate = _getWeekEnd(now);
+          break;
+        case 'month':
+          startDate = DateTime(now.year, now.month, 1);
+          endDate = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+          break;
+        case 'all':
+          // 全期間の場合は制限なし
+          break;
       }
 
-      // MVP を計算
-      String? mvpUserId;
-      double maxScore = 0;
+      // コミュニティメンバーの取得
+      final communityDoc =
+          await _firestore.collection('communities').doc(communityId).get();
+      if (!communityDoc.exists) return [];
 
-      for (var entry in userStats.entries) {
-        final stats = entry.value;
-        final score = _calculateActivityScore(
-          stats['postCount'],
-          stats['completedGoals'],
-          stats['totalLikes'],
+      final communityData = communityDoc.data() as Map<String, dynamic>;
+      final memberIds = List<String>.from(communityData['memberIds'] ?? []);
+
+      // 各メンバーの投稿数を集計
+      final rankings = <ActivityRanking>[];
+
+      for (final memberId in memberIds) {
+        Query postsQuery = _firestore
+            .collection('posts')
+            .where('userId', isEqualTo: memberId)
+            .where('communityIds', arrayContains: communityId);
+
+        if (startDate != null && endDate != null) {
+          postsQuery = postsQuery
+              .where('createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+              .where('createdAt',
+                  isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        }
+
+        final postsSnapshot = await postsQuery.get();
+        final postCount = postsSnapshot.docs.length;
+
+        // ユーザー情報を取得
+        final userDoc =
+            await _firestore.collection('users').doc(memberId).get();
+        if (!userDoc.exists) continue;
+
+        final userData = userDoc.data() as Map<String, dynamic>;
+
+        // 最後の活動日時を取得
+        DateTime lastActivityAt = DateTime.fromMillisecondsSinceEpoch(0);
+        if (postsSnapshot.docs.isNotEmpty) {
+          final latestPost = postsSnapshot.docs.first;
+          final postData = latestPost.data() as Map<String, dynamic>?;
+          if (postData != null && postData['createdAt'] != null) {
+            lastActivityAt = (postData['createdAt'] as Timestamp).toDate();
+          }
+        }
+
+        rankings.add(ActivityRanking(
+          userId: memberId,
+          userName: userData['displayName'] ?? 'ユーザー',
+          userImageUrl: userData['profileImageUrl'],
+          postCount: postCount,
+          rank: 0, // 後で設定
+          lastActivityAt: lastActivityAt,
+        ));
+      }
+
+      // 投稿数でソートしてランクを設定
+      rankings.sort((a, b) => b.postCount.compareTo(a.postCount));
+
+      for (int i = 0; i < rankings.length; i++) {
+        rankings[i] = ActivityRanking(
+          userId: rankings[i].userId,
+          userName: rankings[i].userName,
+          userImageUrl: rankings[i].userImageUrl,
+          postCount: rankings[i].postCount,
+          rank: i + 1,
+          lastActivityAt: rankings[i].lastActivityAt,
         );
-
-        if (score > maxScore) {
-          maxScore = score;
-          mvpUserId = entry.key;
-        }
       }
 
-      // MVP データを保存
-      if (mvpUserId != null && maxScore > 0) {
-        await _saveMVPRecord(
-          communityId,
-          mvpUserId,
-          userStats[mvpUserId]!,
-          maxScore,
-          weekStart,
-          weekEnd,
-        );
-      }
+      return rankings;
     } catch (e) {
-      print('Error calculating weekly MVP: $e');
+      print('Error getting community ranking: $e');
+      return [];
     }
   }
 
-  Future<void> _saveMVPRecord(
+  // 活動サマリーの生成
+  Future<ActivitySummary?> generateActivitySummary(
     String communityId,
-    String userId,
-    Map<String, dynamic> stats,
-    double score,
-    DateTime weekStart,
-    DateTime weekEnd,
+    String period, // 'weekly', 'monthly'
   ) async {
     try {
-      // ユーザー情報を取得
-      final userDoc = await _firestore.collection('users').doc(userId).get();
-      final userData = userDoc.data();
+      final now = DateTime.now();
+      DateTime startDate;
+      DateTime endDate;
 
-      final mvp = WeeklyMVP(
-        id: '',
+      switch (period) {
+        case 'weekly':
+          startDate = _getWeekStart(now);
+          endDate = _getWeekEnd(now);
+          break;
+        case 'monthly':
+          startDate = DateTime(now.year, now.month, 1);
+          endDate = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+          break;
+        default:
+          return null;
+      }
+
+      // コミュニティ情報の取得
+      final communityDoc =
+          await _firestore.collection('communities').doc(communityId).get();
+      if (!communityDoc.exists) return null;
+
+      final communityData = communityDoc.data() as Map<String, dynamic>;
+      final memberIds = List<String>.from(communityData['memberIds'] ?? []);
+
+      // 期間内の投稿を取得
+      final postsSnapshot = await _firestore
+          .collection('posts')
+          .where('communityIds', arrayContains: communityId)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .get();
+
+      final totalPosts = postsSnapshot.docs.length;
+
+      // 日別投稿数の集計
+      final dailyBreakdown = <String, int>{};
+      final activeMemberIds = <String>{};
+
+      for (final doc in postsSnapshot.docs) {
+        final post = PostModel.fromFirestore(doc);
+        final dateKey =
+            '${post.createdAt.year}-${post.createdAt.month.toString().padLeft(2, '0')}-${post.createdAt.day.toString().padLeft(2, '0')}';
+        dailyBreakdown[dateKey] = (dailyBreakdown[dateKey] ?? 0) + 1;
+        activeMemberIds.add(post.userId);
+      }
+
+      // ランキングの取得
+      final rankings = await getCommunityRanking(communityId, period: period);
+
+      final summary = ActivitySummary(
         communityId: communityId,
-        userId: userId,
-        userName: userData?['displayName'] ?? 'ユーザー',
-        userImageUrl: userData?['profileImageUrl'],
-        weekYear: weekStart.year,
-        weekNumber: _getWeekNumber(weekStart),
-        postCount: stats['postCount'],
-        completedGoals: stats['completedGoals'],
-        totalLikes: stats['totalLikes'],
-        activityScore: score,
-        weekStart: weekStart,
-        weekEnd: weekEnd,
+        period: period,
+        startDate: startDate,
+        endDate: endDate,
+        totalPosts: totalPosts,
+        totalMembers: memberIds.length,
+        activeMemberCount: activeMemberIds.length,
+        rankings: rankings,
+        dailyBreakdown: dailyBreakdown,
         createdAt: DateTime.now(),
       );
 
-      await _firestore.collection('weekly_mvps').add(mvp.toFirestore());
+      // サマリーをFirestoreに保存
+      await _firestore
+          .collection('activity_summaries')
+          .add(summary.toFirestore());
+
+      return summary;
     } catch (e) {
-      print('Error saving MVP record: $e');
+      print('Error generating activity summary: $e');
+      return null;
     }
   }
 
-  Future<List<WeeklyMVP>> getCommunityMVPs(String communityId,
-      {int limit = 10}) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('weekly_mvps')
-          .where('communityId', isEqualTo: communityId)
-          .orderBy('weekStart', descending: true)
-          .limit(limit)
-          .get();
-
-      return querySnapshot.docs
-          .map((doc) => WeeklyMVP.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      print('Error getting community MVPs: $e');
-      return [];
-    }
-  }
-
-  Future<WeeklyMVP?> getCurrentWeekMVP(String communityId) async {
+  // 活動統計の更新（投稿作成時に呼び出す）
+  Future<void> updateActivityStats(String userId, String communityId) async {
     try {
       final now = DateTime.now();
       final weekStart = _getWeekStart(now);
+      final monthStart = DateTime(now.year, now.month, 1);
 
-      final querySnapshot = await _firestore
-          .collection('weekly_mvps')
+      // 既存の統計を取得
+      final statsQuery = await _firestore
+          .collection('activity_stats')
+          .where('userId', isEqualTo: userId)
           .where('communityId', isEqualTo: communityId)
-          .where('weekStart', isEqualTo: Timestamp.fromDate(weekStart))
           .limit(1)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        return WeeklyMVP.fromFirestore(querySnapshot.docs.first);
+      ActivityStats? existingStats;
+      String? docId;
+
+      if (statsQuery.docs.isNotEmpty) {
+        existingStats = ActivityStats.fromFirestore(statsQuery.docs.first);
+        docId = statsQuery.docs.first.id;
       }
-      return null;
+
+      // 投稿数を集計
+      final totalPostsSnapshot = await _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: userId)
+          .where('communityIds', arrayContains: communityId)
+          .get();
+
+      final weeklyPostsSnapshot = await _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: userId)
+          .where('communityIds', arrayContains: communityId)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+          .get();
+
+      final monthlyPostsSnapshot = await _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: userId)
+          .where('communityIds', arrayContains: communityId)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+          .get();
+
+      // コミュニティ参加日時を取得
+      DateTime joinedAt = now;
+      if (existingStats != null) {
+        joinedAt = existingStats.joinedAt;
+      } else {
+        // 初回の場合、コミュニティ参加日時を取得
+        final communityDoc =
+            await _firestore.collection('communities').doc(communityId).get();
+        if (communityDoc.exists) {
+          final communityData = communityDoc.data() as Map<String, dynamic>;
+          final memberDetails =
+              communityData['memberDetails'] as Map<String, dynamic>?;
+          if (memberDetails != null && memberDetails.containsKey(userId)) {
+            joinedAt =
+                (memberDetails[userId]['joinedAt'] as Timestamp).toDate();
+          }
+        }
+      }
+
+      final newStats = ActivityStats(
+        userId: userId,
+        communityId: communityId,
+        totalPosts: totalPostsSnapshot.docs.length,
+        weeklyPosts: weeklyPostsSnapshot.docs.length,
+        monthlyPosts: monthlyPostsSnapshot.docs.length,
+        joinedAt: joinedAt,
+        lastActivityAt: now,
+        dailyPosts: existingStats?.dailyPosts ?? {},
+        weeklyPostsHistory: existingStats?.weeklyPostsHistory ?? {},
+        monthlyPostsHistory: existingStats?.monthlyPostsHistory ?? {},
+      );
+
+      if (docId != null) {
+        await _firestore
+            .collection('activity_stats')
+            .doc(docId)
+            .update(newStats.toFirestore());
+      } else {
+        await _firestore
+            .collection('activity_stats')
+            .add(newStats.toFirestore());
+      }
     } catch (e) {
-      print('Error getting current week MVP: $e');
-      return null;
+      print('Error updating activity stats: $e');
+    }
+  }
+
+  // 過去の活動サマリーを取得
+  Future<List<ActivitySummary>> getActivitySummaries(
+    String communityId, {
+    String period = 'weekly',
+    int limit = 10,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('activity_summaries')
+          .where('communityId', isEqualTo: communityId)
+          .where('period', isEqualTo: period)
+          .orderBy('startDate', descending: true)
+          .limit(limit)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => ActivitySummary.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting activity summaries: $e');
+      return [];
     }
   }
 
   // ヘルパーメソッド
-  double _calculateActivityScore(
-      int postCount, int completedGoals, int totalLikes) {
-    // 投稿数 * 2 + 完了目標 * 5 + いいね数 * 0.5
-    return (postCount * 2) + (completedGoals * 5) + (totalLikes * 0.5);
-  }
-
   DateTime _getWeekStart(DateTime date) {
     final weekday = date.weekday;
     return DateTime(date.year, date.month, date.day - weekday + 1);
@@ -382,61 +338,8 @@ class ProgressService {
   }
 
   int _getWeekNumber(DateTime date) {
-    final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
-    return ((dayOfYear - date.weekday + 10) / 7).floor();
-  }
-
-  // 統計データ
-  Future<Map<String, dynamic>> getUserStats(String userId,
-      {String? communityId}) async {
-    try {
-      // 目標統計
-      Query goalsQuery =
-          _firestore.collection('goals').where('userId', isEqualTo: userId);
-      if (communityId != null) {
-        goalsQuery = goalsQuery.where('communityId', isEqualTo: communityId);
-      }
-
-      final goalsSnapshot = await goalsQuery.get();
-      final goals =
-          goalsSnapshot.docs.map((doc) => Goal.fromFirestore(doc)).toList();
-
-      final completedGoals = goals.where((g) => g.isCompleted).length;
-      final activeGoals = goals.where((g) => g.isActive).length;
-
-      // 進捗記録統計
-      Query recordsQuery = _firestore
-          .collection('progress_records')
-          .where('userId', isEqualTo: userId);
-      if (communityId != null) {
-        recordsQuery =
-            recordsQuery.where('communityId', isEqualTo: communityId);
-      }
-
-      final recordsSnapshot = await recordsQuery.get();
-      final totalRecords = recordsSnapshot.docs.length;
-
-      // 今月の記録数
-      final thisMonth = DateTime.now();
-      final monthStart = DateTime(thisMonth.year, thisMonth.month, 1);
-      final monthRecordsSnapshot = await recordsQuery
-          .where('recordDate',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
-          .get();
-      final monthlyRecords = monthRecordsSnapshot.docs.length;
-
-      return {
-        'totalGoals': goals.length,
-        'completedGoals': completedGoals,
-        'activeGoals': activeGoals,
-        'totalRecords': totalRecords,
-        'monthlyRecords': monthlyRecords,
-        'completionRate':
-            goals.isNotEmpty ? completedGoals / goals.length : 0.0,
-      };
-    } catch (e) {
-      print('Error getting user stats: $e');
-      return {};
-    }
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final dayOfYear = date.difference(firstDayOfYear).inDays + 1;
+    return ((dayOfYear - 1) ~/ 7) + 1;
   }
 }

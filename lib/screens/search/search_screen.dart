@@ -176,8 +176,9 @@ class _SearchScreenState extends State<SearchScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('検索'),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(100),
           child: Column(
@@ -185,6 +186,7 @@ class _SearchScreenState extends State<SearchScreen>
               // 検索バー
               Container(
                 padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                color: AppColors.background, // 背景色を統一
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -199,12 +201,11 @@ class _SearchScreenState extends State<SearchScreen>
                             },
                           )
                         : null,
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppConstants.borderRadius),
-                    ),
+                    border: InputBorder.none, // 枠線を削除
+                    focusedBorder: InputBorder.none, // フォーカス時の枠線も削除
+                    enabledBorder: InputBorder.none, // 通常時の枠線も削除
                     filled: true,
-                    fillColor: AppColors.surface,
+                    fillColor: AppColors.background, // 背景色を統一
                   ),
                   onChanged: (value) {
                     if (value.length > 2 || value.isEmpty) {
@@ -215,12 +216,18 @@ class _SearchScreenState extends State<SearchScreen>
                 ),
               ),
               // タブバー
-              TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: '投稿'),
-                  Tab(text: 'ユーザー'),
-                ],
+              Container(
+                color: AppColors.background, // 背景色を統一
+                child: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: '投稿'),
+                    Tab(text: 'ユーザー'),
+                  ],
+                  indicatorColor: AppColors.primary,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -232,7 +239,7 @@ class _SearchScreenState extends State<SearchScreen>
           if (_followingUsers.isNotEmpty && _searchQuery.isEmpty) ...[
             Container(
               padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              color: AppColors.surface,
+              color: AppColors.background, // 背景色を統一
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -273,7 +280,7 @@ class _SearchScreenState extends State<SearchScreen>
                 ],
               ),
             ),
-            const Divider(height: 1),
+            // Dividerを削除してシームレスに
           ],
 
           // 検索結果

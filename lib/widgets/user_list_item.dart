@@ -123,7 +123,8 @@ class _UserListItemState extends State<UserListItem> {
           followingId: widget.user.id,
         );
       } else {
-        if (widget.user.requiresApproval) {
+        // プライベートアカウントの場合はフォローリクエストを送信
+        if (widget.user.isPrivate) {
           success = await FollowService.sendFollowRequest(
             requesterId: currentUser.id,
             targetUserId: widget.user.id,
@@ -131,10 +132,11 @@ class _UserListItemState extends State<UserListItem> {
           );
           if (success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('フォロー申請を送信しました')),
+              const SnackBar(content: Text('フォローリクエストを送信しました')),
             );
           }
         } else {
+          // 公開アカウントの場合は直接フォロー
           success = await FollowService.followUser(
             followerId: currentUser.id,
             followingId: widget.user.id,
@@ -143,7 +145,7 @@ class _UserListItemState extends State<UserListItem> {
         }
       }
 
-      if (success && !widget.user.requiresApproval && mounted) {
+      if (success && !widget.user.isPrivate && mounted) {
         setState(() {
           _isFollowing = !_isFollowing;
         });
@@ -261,8 +263,8 @@ class _UserListItemState extends State<UserListItem> {
                         child: Text(
                           _isFollowing
                               ? 'フォロー中'
-                              : widget.user.requiresApproval
-                                  ? '申請'
+                              : widget.user.isPrivate
+                                  ? 'リクエスト'
                                   : 'フォロー',
                           style: const TextStyle(fontSize: 12),
                         ),

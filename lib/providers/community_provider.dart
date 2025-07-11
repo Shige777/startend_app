@@ -114,24 +114,30 @@ class CommunityProvider extends ChangeNotifier {
         return _searchResults;
       }
 
+      // 部分一致検索のため、全コミュニティを取得してフィルタリング
       Query queryRef = _firestore.collection('communities');
 
       if (genre != null && genre.isNotEmpty) {
         queryRef = queryRef.where('genre', isEqualTo: genre);
       }
 
-      // 名前での検索
-      queryRef = queryRef
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThan: query + '\uf8ff');
+      final querySnapshot = await queryRef
+          .orderBy('createdAt', descending: true)
+          .limit(100) // パフォーマンスのため上限を設定
+          .get();
 
-      final querySnapshot = await queryRef.limit(20).get();
-
-      _searchResults = querySnapshot.docs
+      final communities = querySnapshot.docs
           .map((doc) => CommunityModel.fromFirestore(doc))
           .toList();
 
-      return _searchResults;
+      // 部分一致でフィルタリング
+      final searchQuery = query.toLowerCase();
+      _searchResults = communities.where((community) {
+        return community.name.toLowerCase().contains(searchQuery) ||
+            community.description.toLowerCase().contains(searchQuery);
+      }).toList();
+
+      return _searchResults.take(20).toList(); // 結果を20件に制限
     } catch (e) {
       _setError('コミュニティ検索に失敗しました');
       _searchResults = [];

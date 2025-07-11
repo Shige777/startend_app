@@ -27,7 +27,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
-  late PrivacyLevel _selectedPrivacyLevel;
+
   bool _isLoading = false;
   bool _imageChanged = false;
 
@@ -36,7 +36,6 @@ class _EditPostScreenState extends State<EditPostScreen> {
     super.initState();
     _titleController = TextEditingController(text: widget.post.title);
     _commentController = TextEditingController(text: widget.post.comment ?? '');
-    _selectedPrivacyLevel = widget.post.privacyLevel;
   }
 
   @override
@@ -92,7 +91,6 @@ class _EditPostScreenState extends State<EditPostScreen> {
             ? null
             : _commentController.text.trim(),
         imageUrl: imageUrl,
-        privacyLevel: _selectedPrivacyLevel,
       );
 
       final success = await postProvider.updatePost(updatedPost);
@@ -198,69 +196,10 @@ class _EditPostScreenState extends State<EditPostScreen> {
                 onImageSelected: _onImageSelected,
               ),
               const SizedBox(height: 16),
-
-              // プライバシーレベル選択
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.privacy_tip),
-                          SizedBox(width: 8),
-                          Text('プライバシー', style: TextStyle(fontSize: 16)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...PrivacyLevel.values.map((level) {
-                        return RadioListTile<PrivacyLevel>(
-                          title: Text(_getPrivacyLevelText(level)),
-                          subtitle: Text(_getPrivacyLevelDescription(level)),
-                          value: level,
-                          groupValue: _selectedPrivacyLevel,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPrivacyLevel = value!;
-                            });
-                          },
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _getPrivacyLevelText(PrivacyLevel level) {
-    switch (level) {
-      case PrivacyLevel.public:
-        return '全体公開';
-      case PrivacyLevel.mutualFollowersOnly:
-        return '相互フォローのみ';
-      case PrivacyLevel.communityOnly:
-        return 'コミュニティのみ';
-      case PrivacyLevel.mutualFollowersAndCommunity:
-        return '相互フォロー + コミュニティのみ';
-    }
-  }
-
-  String _getPrivacyLevelDescription(PrivacyLevel level) {
-    switch (level) {
-      case PrivacyLevel.public:
-        return '誰でも見ることができます';
-      case PrivacyLevel.mutualFollowersOnly:
-        return '相互フォローのユーザーのみ見ることができます';
-      case PrivacyLevel.communityOnly:
-        return 'コミュニティメンバーのみ見ることができます';
-      case PrivacyLevel.mutualFollowersAndCommunity:
-        return '相互フォローとコミュニティメンバーのみ見ることができます';
-    }
   }
 }

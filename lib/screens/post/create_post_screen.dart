@@ -31,7 +31,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
-  PrivacyLevel _selectedPrivacyLevel = PrivacyLevel.public;
+
   bool _isLoading = false;
 
   @override
@@ -129,29 +129,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 公開範囲選択
-              DropdownButtonFormField<PrivacyLevel>(
-                value: _selectedPrivacyLevel,
-                decoration: const InputDecoration(
-                  labelText: '公開範囲',
-                  prefixIcon: Icon(Icons.visibility),
-                ),
-                items: PrivacyLevel.values.map((level) {
-                  return DropdownMenuItem(
-                    value: level,
-                    child: Text(_getPrivacyLevelText(level)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedPrivacyLevel = value;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-
               // 投稿ボタン
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleSubmit,
@@ -203,19 +180,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           );
         });
       }
-    }
-  }
-
-  String _getPrivacyLevelText(PrivacyLevel level) {
-    switch (level) {
-      case PrivacyLevel.public:
-        return '全体公開';
-      case PrivacyLevel.mutualFollowersOnly:
-        return '相互フォローのみ';
-      case PrivacyLevel.communityOnly:
-        return 'コミュニティのみ';
-      case PrivacyLevel.mutualFollowersAndCommunity:
-        return '相互フォロー + コミュニティのみ';
     }
   }
 
@@ -273,7 +237,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         title: _titleController.text.trim(),
         imageUrl: imageUrl,
         scheduledEndTime: _selectedDateTime,
-        privacyLevel: _selectedPrivacyLevel,
+        privacyLevel: PrivacyLevel.public,
         communityIds: widget.communityId != null ? [widget.communityId!] : [],
         likedByUserIds: [],
         likeCount: 0,
@@ -296,7 +260,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         }
 
         // 投稿作成後にユーザーの投稿一覧を更新
-        await postProvider.getUserPosts(userProvider.currentUser!.id);
+        await postProvider.getUserPosts(userProvider.currentUser!.id,
+            currentUserId: userProvider.currentUser!.id);
 
         if (mounted) {
           if (widget.communityId != null) {

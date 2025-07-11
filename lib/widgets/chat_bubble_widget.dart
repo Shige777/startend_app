@@ -1,0 +1,680 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
+import '../models/post_model.dart';
+import '../models/user_model.dart';
+import '../providers/user_provider.dart';
+import '../providers/post_provider.dart';
+import '../constants/app_colors.dart';
+import '../utils/date_time_utils.dart';
+
+class ChatBubbleWidget extends StatefulWidget {
+  final PostModel post;
+  final bool isOwnMessage;
+  final VoidCallback? onTap;
+  final VoidCallback? onDelete;
+
+  const ChatBubbleWidget({
+    super.key,
+    required this.post,
+    required this.isOwnMessage,
+    this.onTap,
+    this.onDelete,
+  });
+
+  @override
+  State<ChatBubbleWidget> createState() => _ChatBubbleWidgetState();
+}
+
+class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
+  late PostModel _currentPost;
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPost = widget.post;
+  }
+
+  @override
+  void didUpdateWidget(ChatBubbleWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post != widget.post) {
+      _currentPost = widget.post;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: widget.isOwnMessage
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 他人のメッセージの場合、左側にアバター表示
+          if (!widget.isOwnMessage) ...[
+            _buildAvatar(context),
+            const SizedBox(width: 8),
+          ],
+
+          // メッセージ本体
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+              ),
+              child: Column(
+                crossAxisAlignment: widget.isOwnMessage
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  // ユーザー名（他人のメッセージの場合のみ）
+                  if (!widget.isOwnMessage) _buildUserName(context),
+
+                  // 吹き出し
+                  GestureDetector(
+                    onTap: widget.onTap,
+                    onLongPress: widget.isOwnMessage ? _showDeleteOption : null,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: widget.isOwnMessage
+                            ? AppColors.primary
+                            : AppColors.surface,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(20),
+                          topRight: const Radius.circular(20),
+                          bottomLeft:
+                              Radius.circular(widget.isOwnMessage ? 20 : 4),
+                          bottomRight:
+                              Radius.circular(widget.isOwnMessage ? 4 : 20),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 投稿タイトル
+                            Text(
+                              _currentPost.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: widget.isOwnMessage
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+
+                            // START/END画像セクション（2枚並び）
+                            const SizedBox(height: 6),
+                            _buildImageSection(context),
+
+                            // START投稿のコメント
+                            if (_currentPost.comment != null &&
+                                _currentPost.comment!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                _currentPost.comment!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: widget.isOwnMessage
+                                      ? Colors.white.withOpacity(0.9)
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+
+                            // END投稿のコメント（完了している場合）
+                            if (_currentPost.isCompleted &&
+                                _currentPost.endComment != null &&
+                                _currentPost.endComment!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                _currentPost.endComment!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: widget.isOwnMessage
+                                      ? Colors.white.withOpacity(0.9)
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+
+                            // ステータス・時間情報
+                            const SizedBox(height: 6),
+                            _buildMetaInfo(context),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // リアクションボタン
+                  const SizedBox(height: 2),
+                  _buildReactionButton(context),
+
+                  // タイムスタンプ
+                  const SizedBox(height: 1),
+                  Text(
+                    DateTimeUtils.getRelativeTime(_currentPost.createdAt),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 自分のメッセージの場合、右側にアバター表示
+          if (widget.isOwnMessage) ...[
+            const SizedBox(width: 8),
+            _buildAvatar(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSection(BuildContext context) {
+    return Container(
+      height: 140,
+      child: Row(
+        children: [
+          // START画像（左側）
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showImageZoom(context, _currentPost.imageUrl),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: _buildImageWidget(_currentPost.imageUrl),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // START画像のラベル
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.play_arrow,
+                      size: 12,
+                      color: widget.isOwnMessage
+                          ? Colors.white.withOpacity(0.8)
+                          : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      'START',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: widget.isOwnMessage
+                            ? Colors.white.withOpacity(0.8)
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          // END画像（右側）
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      // 完了している場合は画像拡大、自分の投稿で未完了の場合はEND投稿画面へ
+                      if (_currentPost.isCompleted &&
+                          _currentPost.endImageUrl != null) {
+                        _showImageZoom(context, _currentPost.endImageUrl);
+                      } else if (widget.isOwnMessage &&
+                          !_currentPost.isCompleted) {
+                        context.go('/edit-post/${_currentPost.id}');
+                      }
+                      // 他人の未完了投稿の場合は何もしない
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: _currentPost.isCompleted &&
+                                _currentPost.endImageUrl != null
+                            ? _buildImageWidget(_currentPost.endImageUrl)
+                            : _buildEndPlaceholder(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // END画像のラベル
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _currentPost.isCompleted
+                          ? Icons.flag
+                          : Icons.add_photo_alternate,
+                      size: 12,
+                      color: widget.isOwnMessage
+                          ? Colors.white.withOpacity(0.8)
+                          : (_currentPost.isCompleted
+                              ? AppColors.completed
+                              : AppColors.textSecondary),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      'END',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: widget.isOwnMessage
+                            ? Colors.white.withOpacity(0.8)
+                            : (_currentPost.isCompleted
+                                ? AppColors.completed
+                                : AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndPlaceholder() {
+    return Container(
+      color: widget.isOwnMessage
+          ? Colors.white.withOpacity(0.2)
+          : AppColors.surfaceVariant,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              widget.isOwnMessage
+                  ? Icons.add_photo_alternate
+                  : Icons.hourglass_empty,
+              color: widget.isOwnMessage
+                  ? Colors.white.withOpacity(0.6)
+                  : AppColors.textSecondary,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.isOwnMessage ? 'END投稿' : 'END',
+              style: TextStyle(
+                color: widget.isOwnMessage
+                    ? Colors.white.withOpacity(0.6)
+                    : AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetaInfo(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          _currentPost.isCompleted ? Icons.check_circle : Icons.play_arrow,
+          size: 14,
+          color: widget.isOwnMessage
+              ? Colors.white.withOpacity(0.8)
+              : (_currentPost.isCompleted
+                  ? AppColors.completed
+                  : AppColors.inProgress),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _currentPost.isCompleted ? '完了' : '進行中',
+          style: TextStyle(
+            fontSize: 12,
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.8)
+                : (_currentPost.isCompleted
+                    ? AppColors.completed
+                    : AppColors.inProgress),
+          ),
+        ),
+        if (_currentPost.scheduledEndTime != null) ...[
+          const SizedBox(width: 8),
+          Icon(
+            Icons.schedule,
+            size: 12,
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.6)
+                : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            _currentPost.isCompleted
+                ? DateTimeUtils.formatDateTime(_currentPost.actualEndTime ??
+                    _currentPost.scheduledEndTime!)
+                : DateTimeUtils.formatDateTime(_currentPost.scheduledEndTime!),
+            style: TextStyle(
+              fontSize: 10,
+              color: widget.isOwnMessage
+                  ? Colors.white.withOpacity(0.6)
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReactionButton(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final currentUser = userProvider.currentUser;
+        final isLiked =
+            currentUser != null && _currentPost.isLikedBy(currentUser.id);
+        final isOwnPost =
+            currentUser != null && _currentPost.userId == currentUser.id;
+
+        return InkWell(
+          onTap: (_isUpdating || isOwnPost)
+              ? null
+              : () => _toggleLike(context, currentUser),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.local_fire_department,
+                  size: 16,
+                  color: isLiked ? AppColors.flame : AppColors.textSecondary,
+                ),
+                if (_currentPost.likeCount > 0) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    _currentPost.likeCount.toString(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          isLiked ? AppColors.flame : AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _toggleLike(BuildContext context, UserModel? currentUser) async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    if (_isUpdating) return;
+
+    setState(() {
+      _isUpdating = true;
+    });
+
+    final postProvider = context.read<PostProvider>();
+    final isLiked = _currentPost.isLikedBy(currentUser.id);
+
+    // 即座にローカル状態を更新（楽観的更新）
+    final newLikeCount = isLiked
+        ? (_currentPost.likeCount > 0 ? _currentPost.likeCount - 1 : 0)
+        : _currentPost.likeCount + 1;
+
+    final newLikedByUserIds = isLiked
+        ? _currentPost.likedByUserIds
+            .where((id) => id != currentUser.id)
+            .toList()
+        : [..._currentPost.likedByUserIds, currentUser.id];
+
+    // ローカル状態を即座に更新
+    setState(() {
+      _currentPost = _currentPost.copyWith(
+        likeCount: newLikeCount,
+        likedByUserIds: newLikedByUserIds,
+      );
+    });
+
+    try {
+      bool success;
+      if (isLiked) {
+        success =
+            await postProvider.unlikePost(_currentPost.id, currentUser.id);
+      } else {
+        success = await postProvider.likePost(_currentPost.id, currentUser.id);
+      }
+
+      if (success) {
+        // サーバー更新も成功した場合、PostProviderの各リストも更新
+        postProvider.updatePostInLists(_currentPost);
+      } else {
+        // 失敗した場合は元の状態に戻す
+        setState(() {
+          _currentPost = widget.post;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'エラーが発生しました')),
+        );
+      }
+    } catch (e) {
+      // エラーが発生した場合は元の状態に戻す
+      setState(() {
+        _currentPost = widget.post;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUpdating = false;
+      });
+    }
+  }
+
+  void _showImageZoom(BuildContext context, String? imageUrl) {
+    if (imageUrl == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: _buildImageWidget(imageUrl),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, _) {
+        return FutureBuilder<UserModel?>(
+          future: userProvider.getUserById(_currentPost.userId),
+          builder: (context, snapshot) {
+            final user = snapshot.data;
+            return GestureDetector(
+              onTap: () {
+                if (user != null) {
+                  context.go('/profile/${user.id}');
+                }
+              },
+              child: CircleAvatar(
+                radius: 16,
+                backgroundImage: user?.profileImageUrl != null
+                    ? CachedNetworkImageProvider(user!.profileImageUrl!)
+                    : null,
+                child: user?.profileImageUrl == null
+                    ? const Icon(Icons.person, size: 16)
+                    : null,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserName(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, _) {
+        return FutureBuilder<UserModel?>(
+          future: userProvider.getUserById(_currentPost.userId),
+          builder: (context, snapshot) {
+            final user = snapshot.data;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                user?.displayName ?? 'ユーザー名',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildImageWidget(String? imageUrl) {
+    if (imageUrl == null) {
+      return Container(
+        color: widget.isOwnMessage
+            ? Colors.white.withOpacity(0.2)
+            : AppColors.surfaceVariant,
+        child: Center(
+          child: Icon(
+            Icons.image,
+            size: 32,
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.6)
+                : AppColors.textHint,
+          ),
+        ),
+      );
+    }
+
+    if (_isNetworkUrl(imageUrl)) {
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          color: widget.isOwnMessage
+              ? Colors.white.withOpacity(0.2)
+              : AppColors.surfaceVariant,
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: widget.isOwnMessage
+              ? Colors.white.withOpacity(0.2)
+              : AppColors.surfaceVariant,
+          child: Icon(
+            Icons.error,
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.6)
+                : AppColors.error,
+          ),
+        ),
+      );
+    } else {
+      try {
+        return Image.file(
+          File(imageUrl),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.2)
+                : AppColors.surfaceVariant,
+            child: Icon(
+              Icons.error,
+              color: widget.isOwnMessage
+                  ? Colors.white.withOpacity(0.6)
+                  : AppColors.error,
+            ),
+          ),
+        );
+      } catch (e) {
+        return Container(
+          color: widget.isOwnMessage
+              ? Colors.white.withOpacity(0.2)
+              : AppColors.surfaceVariant,
+          child: Icon(
+            Icons.error,
+            color: widget.isOwnMessage
+                ? Colors.white.withOpacity(0.6)
+                : AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  bool _isNetworkUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
+  void _showDeleteOption() {
+    if (widget.onDelete != null) {
+      widget.onDelete!();
+    }
+  }
+}

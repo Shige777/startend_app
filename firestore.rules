@@ -10,8 +10,12 @@ service cloud.firestore {
     // Posts collection
     match /posts/{postId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+      // 投稿の作成：自分のuserIdの投稿のみ作成可能
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // 投稿の更新：投稿者本人のみ可能（END投稿も含む）
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      // 投稿の削除：投稿者本人のみ可能
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
     // Communities collection

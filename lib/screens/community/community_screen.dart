@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:typed_data';
 import '../../models/community_model.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/wave_loading_widget.dart';
-import '../../services/storage_service.dart';
 
 class CommunityScreen extends StatefulWidget {
   final String? searchQuery;
@@ -183,7 +180,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         physics: const ClampingScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 1.2,
+          childAspectRatio: 0.8,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
         ),
@@ -205,9 +202,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
         return GestureDetector(
           onTap: () async {
             if (isJoined) {
+              // 参加済みの場合はコミュニティ画面に遷移
               context.push('/community/${community.id}');
             } else {
-              await _joinCommunity(community);
+              // 未参加の場合の処理を検索状態によって分ける
+              final isSearching = widget.searchQuery?.isNotEmpty ?? false;
+
+              if (isSearching) {
+                // 検索結果の場合は詳細画面（参加画面）に遷移
+                context.push('/community/${community.id}');
+              } else {
+                // 所属コミュニティ表示の場合は直接参加（従来の動作）
+                await _joinCommunity(community);
+              }
             }
           },
           onLongPress: () {
@@ -217,19 +224,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.background, // 背景色を統一
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.divider,
+                color: AppColors.divider.withOpacity(0.3), // 境界線を薄く
                 width: 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Column(
               children: [
@@ -334,7 +334,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         color: AppColors.primary.withOpacity(0.1),
         child: const Icon(
           Icons.group,
-          size: 60,
+          size: 160,
           color: AppColors.primary,
         ),
       );
@@ -351,7 +351,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             color: AppColors.primary.withOpacity(0.1),
             child: const Icon(
               Icons.group,
-              size: 60,
+              size: 160,
               color: AppColors.primary,
             ),
           );
@@ -383,6 +383,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
           SnackBar(content: Text('${community.name}に参加しました')),
         );
 
+        // ユーザー情報を更新
+        await userProvider.refreshCurrentUser();
+
+        // ユーザーのコミュニティ一覧を更新
         await communityProvider.getUserCommunities(currentUser.id);
       }
     } catch (e) {

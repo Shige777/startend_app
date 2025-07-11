@@ -3,11 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/post_model.dart';
 import '../services/notification_service.dart';
+import '../services/progress_service.dart';
 
 class PostProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final NotificationService _notificationService = NotificationService();
+  final ProgressService _progressService = ProgressService();
 
   List<PostModel> _posts = [];
   List<PostModel> _followingPosts = [];
@@ -55,6 +57,11 @@ class PostProvider extends ChangeNotifier {
         _communityPosts.insert(0, createdPost);
         if (kDebugMode) {
           print('コミュニティ投稿リストに追加: ${createdPost.title}');
+        }
+
+        // 各コミュニティの活動統計を更新
+        for (final communityId in createdPost.communityIds) {
+          _progressService.updateActivityStats(createdPost.userId, communityId);
         }
       }
 
@@ -132,7 +139,8 @@ class PostProvider extends ChangeNotifier {
   }
 
   // フォロー中の投稿取得
-  Future<List<PostModel>> getFollowingPosts(List<String> followingIds) async {
+  Future<List<PostModel>> getFollowingPosts(List<String> followingIds,
+      {String? currentUserId}) async {
     try {
       _setLoading(true);
       _setError(null);
@@ -154,10 +162,18 @@ class PostProvider extends ChangeNotifier {
           .where(_shouldShowInFollowing)
           .toList();
 
-      // クライアント側でソート
-      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // プライベートアカウントの制限を適用
+      final filteredPosts = <PostModel>[];
+      for (final post in posts) {
+        if (await _canViewPost(post, currentUserId)) {
+          filteredPosts.add(post);
+        }
+      }
 
-      _followingPosts = posts;
+      // クライアント側でソート
+      filteredPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      _followingPosts = filteredPosts;
       return _followingPosts;
     } catch (e) {
       _setError('フォロー中の投稿取得に失敗しました');
@@ -291,7 +307,8 @@ class PostProvider extends ChangeNotifier {
   }
 
   // ユーザーの投稿取得（コミュニティ投稿も含む）
-  Future<List<PostModel>> getUserPosts(String userId) async {
+  Future<List<PostModel>> getUserPosts(String userId,
+      {String? currentUserId}) async {
     // 同じユーザーIDで既に読み込み中の場合は重複実行を防ぐ
     if (_currentUserId == userId && _isLoading) {
       if (kDebugMode) {
@@ -307,6 +324,25 @@ class PostProvider extends ChangeNotifier {
 
       if (kDebugMode) {
         print('ユーザー投稿取得開始: $userId');
+      }
+
+      // プライベートアカウントの場合、閲覧権限をチェック
+      if (currentUserId != userId) {
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final isPrivate = userData['isPrivate'] ?? false;
+
+          if (isPrivate) {
+            final followerIds =
+                List<String>.from(userData['followerIds'] ?? []);
+            if (currentUserId == null || !followerIds.contains(currentUserId)) {
+              // プライベートアカウントで、フォロワーでない場合は空のリストを返す
+              _userPosts = [];
+              return _userPosts;
+            }
+          }
+        }
       }
 
       final querySnapshot = await _firestore
@@ -345,16 +381,30 @@ class PostProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      if (query.isEmpty) {
+        return [];
+      }
+
+      // 部分一致検索のため、全投稿を取得してフィルタリング
       final querySnapshot = await _firestore
           .collection('posts')
-          .where('title', isGreaterThanOrEqualTo: query)
-          .where('title', isLessThan: query + '\uf8ff')
-          .limit(20)
+          .orderBy('createdAt', descending: true)
+          .limit(100) // パフォーマンスのため上限を設定
           .get();
 
-      return querySnapshot.docs
+      final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
+
+      // 部分一致でフィルタリング
+      final searchQuery = query.toLowerCase();
+      final filteredPosts = posts.where((post) {
+        return post.title.toLowerCase().contains(searchQuery) ||
+            (post.comment?.toLowerCase().contains(searchQuery) ?? false) ||
+            (post.endComment?.toLowerCase().contains(searchQuery) ?? false);
+      }).toList();
+
+      return filteredPosts.take(20).toList(); // 結果を20件に制限
     } catch (e) {
       _setError('投稿検索に失敗しました');
       return [];
@@ -470,6 +520,44 @@ class PostProvider extends ChangeNotifier {
       return PostStatus.inProgress;
     } else {
       return PostStatus.concentration;
+    }
+  }
+
+  // 投稿を閲覧可能かチェック（プライベートアカウント制限）
+  Future<bool> _canViewPost(PostModel post, String? currentUserId) async {
+    // 自分の投稿は常に表示
+    if (currentUserId != null && post.userId == currentUserId) {
+      return true;
+    }
+
+    try {
+      // 投稿者のユーザー情報を取得
+      final userDoc =
+          await _firestore.collection('users').doc(post.userId).get();
+      if (!userDoc.exists) {
+        return false;
+      }
+
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final isPrivate = userData['isPrivate'] ?? false;
+
+      // 公開アカウントの場合は表示
+      if (!isPrivate) {
+        return true;
+      }
+
+      // プライベートアカウントの場合、フォロワーのみ表示
+      if (currentUserId != null) {
+        final followerIds = List<String>.from(userData['followerIds'] ?? []);
+        return followerIds.contains(currentUserId);
+      }
+
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        print('投稿閲覧権限チェックエラー: $e');
+      }
+      return false;
     }
   }
 

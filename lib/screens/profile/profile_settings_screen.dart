@@ -11,7 +11,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 
 import '../../models/post_model.dart';
-import '../../widgets/platform_image_picker.dart';
+import '../../widgets/platform_image_picker_mobile.dart';
 import '../../services/storage_service.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
@@ -30,24 +30,36 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   Uint8List? _selectedImageBytes;
   String? _selectedImageFileName;
   bool _isPrivate = false;
-  bool _requiresApproval = false;
   bool _isLoading = false;
-  PrivacyLevel _defaultPrivacyLevel = PrivacyLevel.public;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    print('ProfileSettingsScreen: initState called');
+    // ビルド完了後にユーザーデータを読み込み
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+    });
   }
 
   void _loadUserData() {
+    print('ProfileSettingsScreen: _loadUserData called');
     final user = context.read<UserProvider>().currentUser;
+    print('ProfileSettingsScreen: Loading user data - ${user?.displayName}');
     if (user != null) {
-      _displayNameController.text = user.displayName;
-      _bioController.text = user.bio ?? '';
-      _selectedImagePath = user.profileImageUrl;
-      _isPrivate = user.isPrivate;
-      _requiresApproval = user.requiresApproval;
+      setState(() {
+        _displayNameController.text = user.displayName;
+        _bioController.text = user.bio ?? '';
+        _selectedImagePath = user.profileImageUrl;
+        _isPrivate = user.isPrivate;
+      });
+      print('ProfileSettingsScreen: User data loaded successfully');
+      print(
+          'ProfileSettingsScreen: Display Name: ${_displayNameController.text}');
+      print('ProfileSettingsScreen: Bio: ${_bioController.text}');
+      print('ProfileSettingsScreen: Image Path: $_selectedImagePath');
+    } else {
+      print('ProfileSettingsScreen: No user data available');
     }
   }
 
@@ -112,223 +124,229 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('プロフィール設定'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              // 自分のプロフィール設定から戻る場合は軌跡画面に遷移
-              context.go('/home?tab=1');
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveProfile,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('保存'),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // プロフィール画像
-              Center(
-                child: kIsWeb
-                    ? Column(
-                        children: [
-                          _buildProfileImage(),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _pickImageWeb,
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('画像を選択'),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '※ 大きな画像は自動的に圧縮されます',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
+    print('ProfileSettingsScreen: build called');
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final user = userProvider.currentUser;
+        print(
+            'ProfileSettingsScreen: build - user is ${user != null ? 'available' : 'null'}');
+
+        if (user == null) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: const Text('プロフィール設定'),
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+            ),
+            body: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline,
+                      size: 64, color: AppColors.textSecondary),
+                  SizedBox(height: 16),
+                  Text(
+                    'ユーザー情報を取得できません',
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: const Text('プロフィール設定'),
+            backgroundColor: AppColors.background, // 背景色を統一
+            elevation: 0, // 影を削除
+            scrolledUnderElevation: 0, // スクロール時の影も削除
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  // 自分のプロフィール設定から戻る場合は軌跡画面に遷移
+                  context.go('/home?tab=1');
+                }
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isLoading ? null : _saveProfile,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Column(
-                        children: [
-                          Stack(
+                    : const Text('保存'),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppConstants.defaultPadding),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // プロフィール画像
+                  Center(
+                    child: kIsWeb
+                        ? Column(
                             children: [
                               _buildProfileImage(),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.camera_alt,
-                                      color: AppColors.textOnPrimary,
-                                      size: 20,
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _pickImageWeb,
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('画像を選択'),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '※ 大きな画像は自動的に圧縮されます',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              Stack(
+                                children: [
+                                  _buildProfileImage(),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: IconButton(
+                                        icon: const Icon(
+                                          Icons.camera_alt,
+                                          color: AppColors.textOnPrimary,
+                                          size: 20,
+                                        ),
+                                        onPressed: _pickImage,
+                                      ),
                                     ),
-                                    onPressed: _pickImage,
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '※ 大きな画像は自動的に圧縮されます',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 表示名
+                  TextFormField(
+                    controller: _displayNameController,
+                    decoration: const InputDecoration(
+                      labelText: '表示名',
+                      hintText: 'あなたの名前を入力してください',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    maxLength: 50,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '表示名を入力してください';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 自己紹介
+                  TextFormField(
+                    controller: _bioController,
+                    decoration: const InputDecoration(
+                      labelText: '自己紹介',
+                      hintText: 'あなたについて教えてください',
+                      prefixIcon: Icon(Icons.description),
+                    ),
+                    maxLines: 3,
+                    maxLength: 200,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // プライバシー設定
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '※ 大きな画像は自動的に圧縮されます',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
+                            'プライバシー設定',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // プライベートアカウント
+                          SwitchListTile(
+                            title: const Text('プライベートアカウント'),
+                            subtitle: const Text('フォロワーのみが投稿とプロフィールを閲覧できます'),
+                            value: _isPrivate,
+                            onChanged: (value) {
+                              setState(() {
+                                _isPrivate = value;
+                              });
+                            },
                           ),
                         ],
                       ),
-              ),
-              const SizedBox(height: 32),
-
-              // 表示名
-              TextFormField(
-                controller: _displayNameController,
-                decoration: const InputDecoration(
-                  labelText: '表示名',
-                  hintText: 'あなたの名前を入力してください',
-                  prefixIcon: Icon(Icons.person),
-                ),
-                maxLength: 50,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '表示名を入力してください';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 自己紹介
-              TextFormField(
-                controller: _bioController,
-                decoration: const InputDecoration(
-                  labelText: '自己紹介',
-                  hintText: 'あなたについて教えてください',
-                  prefixIcon: Icon(Icons.description),
-                ),
-                maxLines: 3,
-                maxLength: 200,
-              ),
-              const SizedBox(height: 24),
-
-              // プライバシー設定
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'プライバシー設定',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 軌跡の公開範囲
-                      DropdownButtonFormField<PrivacyLevel>(
-                        value: _defaultPrivacyLevel,
-                        decoration: const InputDecoration(
-                          labelText: '軌跡の公開範囲',
-                          prefixIcon: Icon(Icons.visibility),
-                        ),
-                        items: PrivacyLevel.values.map((level) {
-                          return DropdownMenuItem(
-                            value: level,
-                            child: Text(_getPrivacyLevelText(level)),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _defaultPrivacyLevel = value;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // プライベートアカウント
-                      SwitchListTile(
-                        title: const Text('プライベートアカウント'),
-                        subtitle: const Text('フォローリクエストが必要になります'),
-                        value: _isPrivate,
-                        onChanged: (value) {
-                          setState(() {
-                            _isPrivate = value;
-                          });
-                        },
-                      ),
-
-                      // フォロー承認
-                      SwitchListTile(
-                        title: const Text('フォロー承認'),
-                        subtitle: const Text('フォローリクエストを手動で承認します'),
-                        value: _requiresApproval,
-                        onChanged: (value) {
-                          setState(() {
-                            _requiresApproval = value;
-                          });
-                        },
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-              // 保存ボタン
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveProfile,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textOnPrimary,
-                          ),
-                        ),
-                      )
-                    : const Text('プロフィールを保存'),
+                  // 保存ボタン
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.textOnPrimary,
+                              ),
+                            ),
+                          )
+                        : const Text('プロフィールを保存'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -351,7 +369,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         content: SizedBox(
           width: 300,
           height: 300,
-          child: PlatformImagePicker(
+          child: PlatformImagePickerWidget(
             width: 300,
             height: 300,
             placeholder: 'プロフィール画像を選択',
@@ -372,19 +390,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         ],
       ),
     );
-  }
-
-  String _getPrivacyLevelText(PrivacyLevel level) {
-    switch (level) {
-      case PrivacyLevel.public:
-        return '全体公開';
-      case PrivacyLevel.mutualFollowersOnly:
-        return '相互フォローのみ';
-      case PrivacyLevel.communityOnly:
-        return 'コミュニティのみ';
-      case PrivacyLevel.mutualFollowersAndCommunity:
-        return '相互フォロー + コミュニティのみ';
-    }
   }
 
   Future<void> _saveProfile() async {
@@ -444,7 +449,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             : _bioController.text.trim(),
         profileImageUrl: imageUrl,
         isPrivate: _isPrivate,
-        requiresApproval: _requiresApproval,
+        requiresApproval: false, // フォロー承認機能は無効
         updatedAt: DateTime.now(),
       );
 

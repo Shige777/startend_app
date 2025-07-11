@@ -13,7 +13,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 
 import '../../widgets/wave_loading_widget.dart';
-import '../../widgets/post_card_widget.dart';
+import '../../widgets/chat_bubble_widget.dart'; // チャット風吹き出しウィジェットをインポート
 
 class CommunityChatScreen extends StatefulWidget {
   final String communityId;
@@ -48,9 +48,10 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 画面に戻ってきた時に投稿を再読み込み
-    if (_community != null) {
+    // ただし、初回読み込み時は実行しない
+    if (_community != null && !_isLoading) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
-        _loadCommunityPosts();
+        _loadCommunityPosts(); // 投稿のみ再読み込み
       });
     }
   }
@@ -71,13 +72,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _createPost() async {
-    await context
-        .push('/create-post', extra: {'communityId': widget.communityId});
-    // 投稿作成から戻ってきた時に投稿を再読み込み（常に実行）
-    await _loadCommunityPosts();
   }
 
   Future<void> _loadCommunityPosts() async {
@@ -182,6 +176,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -195,39 +192,65 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ),
         title: Text(_community!.name),
         actions: [
-          if (_isLeader)
+          if (_isJoined)
             PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
+                  case 'progress':
+                    context.push('/community/${widget.communityId}/progress');
+                    break;
                   case 'settings':
-                    _showSettingsDialog();
+                    if (_isLeader) {
+                      context.push('/community/${widget.communityId}/settings');
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('リーダーのみアクセス可能です')),
+                      );
+                    }
                     break;
                   case 'members':
-                    _showMembersDialog();
+                    if (_isLeader) {
+                      context.push('/community/${widget.communityId}/members');
+                    } else {
+                      _showMembersDialog();
+                    }
                     break;
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
-                  value: 'settings',
+                  value: 'progress',
                   child: Row(
                     children: [
-                      Icon(Icons.settings),
+                      Icon(Icons.trending_up),
                       SizedBox(width: 8),
-                      Text('設定'),
+                      Text('活動統計'),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'members',
                   child: Row(
                     children: [
                       Icon(Icons.people),
                       SizedBox(width: 8),
-                      Text('メンバー管理'),
+                      Text(_isLeader ? 'メンバー管理' : 'メンバー一覧'),
                     ],
                   ),
                 ),
+                if (_isLeader) ...[
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings),
+                        SizedBox(width: 8),
+                        Text('設定'),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           if (!_isJoined)
@@ -251,36 +274,115 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   Widget _buildPostsView() {
-    return Column(
-      children: [
-        // 投稿一覧
-        Expanded(
-          child: _communityPosts.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.post_add, size: 64, color: AppColors.textHint),
-                      SizedBox(height: 16),
-                      Text(
-                        'まだ投稿がありません\n最初の投稿を作成してみましょう！',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  itemCount: _communityPosts.length,
-                  itemBuilder: (context, index) {
-                    final post = _communityPosts[index];
-                    return _buildCommunityPostCard(post);
-                  },
-                ),
+    // 今日の投稿件数を計算
+    final today = DateTime.now();
+    final todayPosts = _communityPosts.where((post) {
+      final postDate = post.createdAt;
+      return postDate.year == today.year &&
+          postDate.month == today.month &&
+          postDate.day == today.day;
+    }).length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-      ],
+      ),
+      child: Column(
+        children: [
+          // 投稿件数表示
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: AppColors.divider.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.today,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '本日${todayPosts}件の投稿',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+
+          // 投稿一覧（チャット風）
+          Expanded(
+            child: _communityPosts.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat_bubble_outline,
+                            size: 64, color: AppColors.textHint),
+                        SizedBox(height: 16),
+                        Text(
+                          'まだメッセージがありません\n最初のメッセージを送信してみましょう！',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.background,
+                    ),
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _communityPosts.length,
+                      itemBuilder: (context, index) {
+                        final post = _communityPosts[index];
+                        return _buildChatBubble(post);
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatBubble(PostModel post) {
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isOwnMessage = currentUser != null && post.userId == currentUser.id;
+
+    return ChatBubbleWidget(
+      post: post,
+      isOwnMessage: isOwnMessage,
+      onTap: () {
+        // コミュニティ投稿の詳細画面に遷移する際に、戻り先をコミュニティ画面に指定
+        context.push('/post/${post.id}', extra: {
+          'post': post,
+          'fromCommunity': widget.communityId,
+        });
+      },
+      onDelete: isOwnMessage ? () => _showDeleteConfirmation(post) : null,
     );
   }
 
@@ -291,7 +393,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildCommunityImage(_community!.imageUrl, radius: 80),
+            _buildCommunityImage(_community!.imageUrl, radius: 200),
             const SizedBox(height: 24),
             Text(
               _community!.name,
@@ -332,48 +434,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     );
   }
 
-  Widget _buildCommunityPostCard(PostModel post) {
-    final userProvider = context.read<UserProvider>();
-    final currentUser = userProvider.currentUser;
-    final isOwnPost = currentUser != null && post.userId == currentUser.id;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-      decoration: BoxDecoration(
-        color:
-            isOwnPost ? AppColors.primary.withOpacity(0.15) : AppColors.surface,
-        // 自分の投稿には左側に濃い青い線を追加
-        border: isOwnPost
-            ? const Border(left: BorderSide(color: AppColors.primary, width: 6))
-            : Border.all(color: AppColors.divider.withOpacity(0.3), width: 1),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Transform.scale(
-        scale: 0.95, // 全体的に5%小さく
-        child: PostCardWidget(
-          post: post,
-          onTap: () {
-            // コミュニティ投稿の詳細画面に遷移する際に、戻り先をコミュニティ画面に指定
-            context.push('/post/${post.id}', extra: {
-              'post': post,
-              'fromCommunity': widget.communityId,
-            });
-          },
-          onDelete: isOwnPost ? () => _showDeleteConfirmation(post) : null,
-          showActions: true, // アクションボタンを表示してリアクション可能に
-          fromPage: 'community', // コミュニティ画面から来たことを識別
-        ),
-      ),
-    );
-  }
-
   bool _canJoin() {
     if (_community == null) return false;
     return _community!.memberIds.length < 8; // 上限8人
@@ -401,95 +461,27 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       success = await communityProvider.joinCommunity(widget.communityId,
           userId: currentUser.id);
       if (success && mounted) {
-        setState(() {
-          _isJoined = true;
-        });
+        // ユーザー情報を更新
+        await userProvider.refreshCurrentUser();
+
+        // 最新のコミュニティ情報を取得
+        final updatedCommunity =
+            await communityProvider.getCommunity(widget.communityId);
+        if (updatedCommunity != null) {
+          setState(() {
+            _isJoined = true;
+            _community = updatedCommunity;
+          });
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('コミュニティに参加しました')),
         );
-        _loadCommunityData();
+
+        // 参加後に投稿を読み込み
+        await _loadCommunityPosts();
       }
     }
-  }
-
-  void _showSettingsDialog() {
-    bool isPrivate = _community!.isPrivate;
-    int maxMembers = _community!.maxMembers;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('コミュニティ設定'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CheckboxListTile(
-                    title: const Text('承認制'),
-                    subtitle: const Text('新しいメンバーの参加に承認が必要'),
-                    value: isPrivate,
-                    onChanged: (value) {
-                      setState(() {
-                        isPrivate = value ?? false;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Text('最大メンバー数: '),
-                      Expanded(
-                        child: Slider(
-                          value: maxMembers.toDouble(),
-                          min: 2,
-                          max: 50,
-                          divisions: 48,
-                          label: maxMembers.toString(),
-                          onChanged: (value) {
-                            setState(() {
-                              maxMembers = value.round();
-                            });
-                          },
-                        ),
-                      ),
-                      Text(maxMembers.toString()),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('キャンセル'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final success = await context
-                        .read<CommunityProvider>()
-                        .updateCommunitySettings(
-                          communityId: widget.communityId,
-                          isPrivate: isPrivate,
-                          maxMembers: maxMembers,
-                        );
-
-                    if (success && context.mounted) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('設定を更新しました')),
-                      );
-                      _loadCommunityData();
-                    }
-                  },
-                  child: const Text('保存'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   void _showMembersDialog() {
@@ -612,6 +604,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     final userProvider = context.read<UserProvider>();
     final List<UserModel> members = [];
 
+    // 全メンバーIDを処理（自分も含む）
     for (final memberId in _community!.memberIds) {
       try {
         final user = await userProvider.getUserById(memberId);
@@ -619,6 +612,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           members.add(user);
         }
       } catch (e) {
+        print('メンバー情報取得エラー: $e');
         // エラーの場合は基本的なユーザー情報を作成
         members.add(UserModel(
           id: memberId,
@@ -634,6 +628,17 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ));
       }
     }
+
+    // リーダーを最初に、その後は参加日順にソート
+    members.sort((a, b) {
+      final aIsLeader = a.id == _community!.leaderId;
+      final bIsLeader = b.id == _community!.leaderId;
+
+      if (aIsLeader && !bIsLeader) return -1;
+      if (!aIsLeader && bIsLeader) return 1;
+
+      return 0; // 同じ権限の場合は元の順序を保持
+    });
 
     return members;
   }

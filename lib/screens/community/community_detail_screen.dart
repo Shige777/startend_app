@@ -15,10 +15,6 @@ import '../../models/post_model.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/platform_image_picker_mobile.dart';
 import '../../utils/date_time_utils.dart';
-import '../../widgets/user_avatar.dart';
-import '../../widgets/mvp_widget.dart';
-import '../../services/progress_service.dart';
-import '../../models/progress_model.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -37,7 +33,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   bool _isLoading = true;
   CommunityModel? _community;
   List<PostModel> _communityPosts = [];
-  final ProgressService _progressService = ProgressService();
 
   @override
   void initState() {
@@ -49,9 +44,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 画面に戻ってきた時に投稿を再読み込み
-    if (_community != null) {
+    // ただし、初回読み込み時は実行しない
+    if (_community != null && !_isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _loadCommunityData();
+        _loadCommunityPosts(); // 投稿のみ再読み込み
       });
     }
   }
@@ -92,6 +88,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       print('CommunityDetailScreen: コミュニティ情報取得失敗');
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadCommunityPosts() async {
+    final postProvider = context.read<PostProvider>();
+    final posts = await postProvider.getCommunityPosts(widget.communityId);
+
+    if (mounted) {
+      setState(() {
+        _communityPosts = posts;
       });
     }
   }
@@ -219,13 +226,29 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     context.push('/community/${widget.communityId}/progress');
                     break;
                   case 'members':
-                    context.push('/community/${widget.communityId}/members');
+                    if (_isLeader()) {
+                      context.push('/community/${widget.communityId}/members');
+                    } else {
+                      _showMembersDialog();
+                    }
                     break;
                   case 'settings':
-                    context.push('/community/${widget.communityId}/settings');
+                    if (_isLeader()) {
+                      context.push('/community/${widget.communityId}/settings');
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('リーダーのみアクセス可能です')),
+                      );
+                    }
                     break;
                   case 'edit':
-                    _showEditCommunityDialog();
+                    if (_isLeader()) {
+                      _showEditCommunityDialog();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('リーダーのみアクセス可能です')),
+                      );
+                    }
                     break;
                   case 'members_old':
                     _showMembersDialog();
@@ -249,17 +272,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     children: [
                       Icon(Icons.trending_up),
                       SizedBox(width: 8),
-                      Text('進捗'),
+                      Text('活動統計'),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'members',
                   child: Row(
                     children: [
                       Icon(Icons.group),
                       SizedBox(width: 8),
-                      Text('メンバー管理'),
+                      Text(_isLeader() ? 'メンバー管理' : 'メンバー一覧'),
                     ],
                   ),
                 ),
@@ -292,7 +315,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               children: [
                 Row(
                   children: [
-                    _buildCommunityImage(_community!.imageUrl, radius: 30),
+                    _buildCommunityImage(_community!.imageUrl, radius: 100),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -707,6 +730,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     final userProvider = context.read<UserProvider>();
     final List<UserModel> members = [];
 
+    // 全メンバーIDを処理（自分も含む）
     for (final memberId in _community!.memberIds) {
       try {
         final user = await userProvider.getUserById(memberId);
@@ -714,6 +738,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           members.add(user);
         }
       } catch (e) {
+        print('メンバー情報取得エラー: $e');
         // エラーの場合は基本的なユーザー情報を作成
         members.add(UserModel(
           id: memberId,
@@ -729,6 +754,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         ));
       }
     }
+
+    // リーダーを最初に、その後は参加日順にソート
+    members.sort((a, b) {
+      final aIsLeader = a.id == _community!.leaderId;
+      final bIsLeader = b.id == _community!.leaderId;
+
+      if (aIsLeader && !bIsLeader) return -1;
+      if (!aIsLeader && bIsLeader) return 1;
+
+      return 0; // 同じ権限の場合は元の順序を保持
+    });
 
     return members;
   }
@@ -991,9 +1027,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         // UserProviderの現在のユーザー情報も更新
         await userProvider.refreshCurrentUser();
 
-        // 投稿を再読み込み
-        await _loadCommunityData();
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('コミュニティから脱退しました')),
@@ -1004,19 +1037,27 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       // 参加
       final success = await communityProvider.joinCommunity(widget.communityId);
       if (success) {
-        setState(() {
-          _isJoined = true;
-          _community = _community!.copyWith(
-            memberIds: [..._community!.memberIds, userProvider.currentUser!.id],
-          );
-        });
+        // ユーザー情報を更新
+        await userProvider.refreshCurrentUser();
+
+        // 最新のコミュニティ情報を取得
+        final updatedCommunity =
+            await communityProvider.getCommunity(widget.communityId);
+        if (updatedCommunity != null) {
+          setState(() {
+            _isJoined = true;
+            _community = updatedCommunity;
+          });
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('コミュニティに参加しました')),
           );
         }
-        // 参加後に投稿を再読み込み
-        await _loadCommunityData();
+
+        // 参加後に投稿を読み込み
+        await _loadCommunityPosts();
       }
     }
   }

@@ -74,8 +74,9 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
           },
         ),
         title: Text(widget.title),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
       ),
       body: _isLoading
           ? const Center(

@@ -76,8 +76,9 @@ class _FollowListScreenState extends State<FollowListScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () {

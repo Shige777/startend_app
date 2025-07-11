@@ -73,6 +73,8 @@ class _HomeScreenState extends State<HomeScreen>
             _selectedIndex = index;
           });
         },
+        backgroundColor: AppColors.background, // 背景色を統一
+        elevation: 0, // 影を削除
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: '投稿'),
           BottomNavigationBarItem(icon: Icon(Icons.timeline), label: '軌跡'),
@@ -107,8 +109,9 @@ class _HomeScreenState extends State<HomeScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('startend'),
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.background, // 背景色を統一
         elevation: 0,
+        scrolledUnderElevation: 0, // スクロール時の影も削除
         bottom: CustomTabBar(
           controller: _tabController,
           tabs: const [
@@ -122,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen>
           // 検索バー
           Container(
             padding: const EdgeInsets.all(16),
+            color: AppColors.background, // 背景色を明示的に指定
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -138,16 +142,11 @@ class _HomeScreenState extends State<HomeScreen>
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
+                border: InputBorder.none, // 枠線を削除
+                focusedBorder: InputBorder.none, // フォーカス時の枠線も削除
+                enabledBorder: InputBorder.none, // 通常時の枠線も削除
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: AppColors.background, // 検索バーの背景色も統一
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,

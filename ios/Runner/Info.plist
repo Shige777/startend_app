@@ -46,6 +46,10 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	
+	<!-- Google Sign-In configuration -->
+	<key>GIDClientID</key>
+	<string>201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l.apps.googleusercontent.com</string>
+	
 	<!-- 通知とバックグラウンド処理のための設定 -->
 	<key>UIBackgroundModes</key>
 	<array>
@@ -70,7 +74,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>REVERSED_CLIENT_ID</string>
+			<string>com.example.startendapp</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l</string>

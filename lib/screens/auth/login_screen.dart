@@ -165,6 +165,43 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // ソーシャルログイン説明
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.info_outline, color: AppColors.primary),
+                      const SizedBox(height: 8),
+                      Text(
+                        'ソーシャルログインについて',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'このアプリは現在テスト中です。\n'
+                        'startendofficial.appのGoogleアカウントでログインしてください。\n'
+                        'その他のGmailアドレスでは「エラーが発生しました」と表示される場合があります。\n\n'
+                        '※ 開発者がOAuth同意画面を本番環境に変更するか、\n'
+                        'テストユーザーリストにあなたのGmailアドレスを追加する必要があります。',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.primary,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Googleサインイン
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
@@ -173,7 +210,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? null
                           : () => _handleGoogleSignIn(context, authProvider),
                       icon: const Icon(Icons.g_mobiledata, size: 24),
-                      label: const Text('Googleでログイン'),
+                      label: const Text('Googleでログイン・アカウント作成'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     );
                   },
                 ),
@@ -187,9 +227,39 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? null
                           : () => _handleAppleSignIn(context, authProvider),
                       icon: const Icon(Icons.apple, size: 24),
-                      label: const Text('Apple IDでログイン'),
+                      label: const Text('Apple IDでログイン・アカウント作成'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     );
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // シミュレーター制限の注意
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_outlined,
+                          color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'シミュレーターでは制限があります。\n実機での利用をお勧めします。',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.orange[700],
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 // エラーメッセージ
@@ -198,10 +268,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (authProvider.errorMessage != null) {
                       return Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          authProvider.errorMessage!,
-                          style: const TextStyle(color: AppColors.error),
-                          textAlign: TextAlign.center,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AppColors.error.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.error_outline,
+                                  color: AppColors.error, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  authProvider.errorMessage!,
+                                  style:
+                                      const TextStyle(color: AppColors.error),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     }
@@ -243,6 +332,9 @@ class _LoginScreenState extends State<LoginScreen> {
     BuildContext context,
     AuthProvider authProvider,
   ) async {
+    // まず状態をチェック
+    await authProvider.checkGoogleSignInStatus();
+
     final success = await authProvider.signInWithGoogle();
     if (success && mounted) {
       // 通知サービスを初期化
