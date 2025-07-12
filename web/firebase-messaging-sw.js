@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDzgqOJdJKcqgNKKQOYHRQNJPfJMhLJHJI",
+  apiKey: "${FIREBASE_API_KEY}",
   authDomain: "startend-app-6b2e4.firebaseapp.com",
   projectId: "startend-app-6b2e4",
   storageBucket: "startend-app-6b2e4.appspot.com",
