@@ -27,10 +27,12 @@ Web版をデプロイする際は、以下の環境変数を設定：
 
 ```bash
 FIREBASE_API_KEY=your_web_api_key
+GOOGLE_SIGNIN_CLIENT_ID=your_google_signin_client_id
 ```
 
 #### 設定ファイルの更新
 - `web/index.html` と `web/firebase-messaging-sw.js` の `${FIREBASE_API_KEY}` を実際のAPIキーに置き換え
+- `web/index.html` の `${GOOGLE_SIGNIN_CLIENT_ID}` を実際のGoogle Sign-In Client IDに置き換え
 
 ### 3. 重要な注意事項
 
@@ -52,4 +54,22 @@ FIREBASE_API_KEY=your_web_api_key
 - `ios/Runner/GoogleService-Info.plist`
 - `macos/Runner/GoogleService-Info.plist`
 
-これらのファイルは各開発者が個別に設定する必要があります。 
+これらのファイルは各開発者が個別に設定する必要があります。
+
+### 5. 本番リリース前の確認事項
+
+#### Bundle Identifierの確認
+- iOS: `com.example.startendapp` → 本番用に変更を推奨
+- Android: `com.startend.app.startend_app` → 統一性を確認
+
+#### デバッグ情報の削除
+- 本番ビルドでは `kDebugMode` でデバッグ情報が自動的に除外されます
+- 必要に応じて追加のログ出力を削除してください
+
+#### 署名設定
+- Android: 本番用keystoreファイルを作成し、適切に設定
+- iOS: App Store Connect用の証明書を設定
+
+#### セキュリティルール
+- Firestore、Firebase Storageのセキュリティルールを本番環境に適用
+- 必要に応じてAPIキーの制限を設定 
