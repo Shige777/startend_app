@@ -112,6 +112,60 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: AppColors.background, // 背景色を統一
         elevation: 0,
         scrolledUnderElevation: 0, // スクロール時の影も削除
+        actions: [
+          Consumer<UserProvider>(
+            builder: (context, userProvider, child) {
+              final currentUser = userProvider.currentUser;
+              if (currentUser == null) return const SizedBox.shrink();
+
+              return StreamBuilder<int>(
+                stream: NotificationService()
+                    .getUnreadNotificationCount(currentUser.id),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+
+                  return IconButton(
+                    icon: Stack(
+                      children: [
+                        const Icon(Icons.notifications),
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                unreadCount > 99
+                                    ? '99+'
+                                    : unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    onPressed: () {
+                      context.push('/notifications');
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
         bottom: CustomTabBar(
           controller: _tabController,
           tabs: const [
@@ -195,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen>
           return FloatingActionButton(
             heroTag: "home_community_fab",
             onPressed: () {
-              _showCreateCommunityDialog(context);
+              context.push('/community/create');
             },
             backgroundColor: AppColors.primary,
             child: const Icon(

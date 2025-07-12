@@ -31,6 +31,9 @@ import 'screens/community/community_detail_screen.dart';
 import 'screens/community/community_progress_screen.dart';
 import 'screens/community/community_member_management_screen.dart';
 import 'screens/community/community_settings_screen.dart';
+import 'screens/community/create_community_screen.dart';
+import 'screens/notifications/notification_screen.dart';
+import 'screens/settings/notification_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -229,6 +232,18 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/search',
       builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/community/create',
+      builder: (context, state) => const CreateCommunityScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationScreen(),
+    ),
+    GoRoute(
+      path: '/settings/notifications',
+      builder: (context, state) => const NotificationSettingsScreen(),
     ),
     GoRoute(
       path: '/post/create',

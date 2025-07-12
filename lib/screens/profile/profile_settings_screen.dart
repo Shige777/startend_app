@@ -322,6 +322,38 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  // 通知設定
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '通知設定',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 16),
+                          ListTile(
+                            leading: const Icon(Icons.notifications),
+                            title: const Text('通知設定'),
+                            subtitle: const Text('プッシュ通知の設定を変更'),
+                            trailing: const Icon(Icons.keyboard_arrow_right),
+                            onTap: () {
+                              context.push('/settings/notifications');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   // 保存ボタン
                   ElevatedButton(
                     onPressed: _isLoading ? null : _saveProfile,

@@ -159,7 +159,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           if (searchQuery.isEmpty) ...[
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _showCreateCommunityDialog,
+              onPressed: () => context.push('/community/create'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.textOnPrimary,

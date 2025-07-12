@@ -120,6 +120,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       } else {
         // 他のユーザーのプロフィールの場合
         if (widget.userId != null) {
+          // 他のユーザーのプロフィールでは、まず_profileUserをnullにしてから読み込む
+          setState(() {
+            _profileUser = null;
+          });
+
           _profileUser = await userProvider.getUser(widget.userId!);
           if (_profileUser != null) {
             if (kDebugMode) {
