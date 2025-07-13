@@ -3,29 +3,64 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users collection
     match /users/{userId} {
+      // 自分のプロフィールは読み書き可能
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read: if request.auth != null;
+      // 他のユーザーのプロフィールは読み取りのみ（プライベートアカウントは除く）
+      allow read: if request.auth != null && (
+        !resource.data.get('isPrivate', false) ||
+        request.auth.uid in resource.data.get('followerIds', [])
+      );
+      
+      // 新規ユーザー作成時のバリデーション
+      allow create: if request.auth != null && 
+        request.auth.uid == userId &&
+        validateUserData(request.resource.data);
+      
+      // ユーザー更新時のバリデーション
+      allow update: if request.auth != null && 
+        request.auth.uid == userId &&
+        validateUserUpdate(resource.data, request.resource.data);
     }
     
     // Posts collection
     match /posts/{postId} {
-      allow read: if request.auth != null;
+      // 投稿の読み取り：認証済みユーザーのみ
+      allow read: if request.auth != null && canReadPost(resource.data);
+      
       // 投稿の作成：自分のuserIdの投稿のみ作成可能
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId &&
+        validatePostData(request.resource.data);
+      
       // 投稿の更新：投稿者本人のみ可能（END投稿も含む）
-      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId &&
+        validatePostUpdate(resource.data, request.resource.data);
+      
       // 投稿の削除：投稿者本人のみ可能
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
     }
     
     // Communities collection
     match /communities/{communityId} {
+      // コミュニティの読み取り：認証済みユーザーのみ
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (
+      
+      // コミュニティの作成：認証済みユーザーのみ
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.leaderId &&
+        validateCommunityData(request.resource.data);
+      
+      // コミュニティの更新：リーダーまたはメンバーのみ
+      allow update: if request.auth != null && (
         request.auth.uid == resource.data.leaderId ||
         request.auth.uid in resource.data.memberIds
-      );
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.leaderId;
+      ) && validateCommunityUpdate(resource.data, request.resource.data);
+      
+      // コミュニティの削除：リーダーのみ
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.leaderId;
     }
     
     // Community applications collection
@@ -34,7 +69,97 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         request.auth.uid == resource.data.leaderId
       );
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // 通知の読み取り：本人のみ
+      allow read: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      
+      // 通知の作成：システムのみ（実際にはCloud Functionsから）
+      allow create: if request.auth != null;
+      
+      // 通知の更新：本人のみ（既読状態の更新）
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId &&
+        onlyUpdatingReadStatus(resource.data, request.resource.data);
+    }
+    
+    // Follow requests collection
+    match /follow_requests/{requestId} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == resource.data.requesterId ||
+        request.auth.uid == resource.data.targetUserId
+      );
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.requesterId;
+    }
+    
+    // Helper functions
+    function validateUserData(data) {
+      return data.keys().hasAll(['displayName', 'email', 'createdAt', 'updatedAt']) &&
+        data.displayName is string &&
+        data.displayName.size() <= 50 &&
+        data.email is string &&
+        data.email.matches('.*@.*\\..*');
+    }
+    
+    function validateUserUpdate(oldData, newData) {
+      return newData.keys().hasAll(['displayName', 'email', 'updatedAt']) &&
+        newData.displayName is string &&
+        newData.displayName.size() <= 50 &&
+        newData.email == oldData.email; // メールアドレスは変更不可
+    }
+    
+    function validatePostData(data) {
+      return data.keys().hasAll(['userId', 'title', 'type', 'createdAt', 'updatedAt']) &&
+        data.title is string &&
+        data.title.size() <= 100 &&
+        data.type in ['start'] &&
+        data.get('comment', '').size() <= 500 &&
+        data.get('endComment', '').size() <= 500;
+    }
+    
+    function validatePostUpdate(oldData, newData) {
+      return newData.userId == oldData.userId &&
+        newData.title == oldData.title &&
+        newData.type == oldData.type &&
+        newData.get('endComment', '').size() <= 500;
+    }
+    
+    function validateCommunityData(data) {
+      return data.keys().hasAll(['name', 'leaderId', 'memberIds', 'createdAt', 'updatedAt']) &&
+        data.name is string &&
+        data.name.size() <= 50 &&
+        data.get('description', '').size() <= 200 &&
+        data.memberIds.size() <= 8 &&
+        data.leaderId in data.memberIds;
+    }
+    
+    function validateCommunityUpdate(oldData, newData) {
+      return newData.leaderId == oldData.leaderId &&
+        newData.memberIds.size() <= 8;
+    }
+    
+    function canReadPost(postData) {
+      // 投稿者本人は常に読み取り可能
+      if (request.auth.uid == postData.userId) {
+        return true;
+      }
+      
+      // プライバシーレベルに応じた制御
+      let privacyLevel = postData.get('privacyLevel', 'public');
+      
+      return privacyLevel == 'public' ||
+        (privacyLevel == 'communityOnly' && 
+         request.auth.uid in postData.get('communityIds', []));
+    }
+    
+    function onlyUpdatingReadStatus(oldData, newData) {
+      return newData.diff(oldData).affectedKeys().hasOnly(['read', 'updatedAt']);
     }
   }
 } 
