@@ -92,16 +92,28 @@ class PostProvider extends ChangeNotifier {
       });
 
       // ローカルの投稿リストも更新
-      final index = _userPosts.indexWhere((post) => post.id == startPostId);
-      if (index != -1) {
-        _userPosts[index] = _userPosts[index].copyWith(
-          endComment: endComment,
-          endImageUrl: endImageUrl,
-          actualEndTime: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        notifyListeners();
+      final now = DateTime.now();
+      final updatedPost =
+          _userPosts.firstWhere((post) => post.id == startPostId).copyWith(
+                endComment: endComment,
+                endImageUrl: endImageUrl,
+                actualEndTime: now,
+                updatedAt: now,
+              );
+
+      // 各リストから既存の投稿を削除
+      _userPosts.removeWhere((post) => post.id == startPostId);
+      _followingPosts.removeWhere((post) => post.id == startPostId);
+      _communityPosts.removeWhere((post) => post.id == startPostId);
+
+      // 更新された投稿を各リストの先頭に追加（最新として扱う）
+      _userPosts.insert(0, updatedPost);
+      _followingPosts.insert(0, updatedPost);
+      if (updatedPost.communityIds.isNotEmpty) {
+        _communityPosts.insert(0, updatedPost);
       }
+
+      notifyListeners();
 
       return true;
     } catch (e) {
@@ -159,7 +171,7 @@ class PostProvider extends ChangeNotifier {
 
       final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
-          .where(_shouldShowInFollowing)
+          .where((post) => _shouldShowInFollowing(post, currentUserId))
           .toList();
 
       // プライベートアカウントの制限を適用
@@ -170,8 +182,13 @@ class PostProvider extends ChangeNotifier {
         }
       }
 
-      // クライアント側でソート
-      filteredPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // クライアント側でソート（END投稿を最新として扱う）
+      filteredPosts.sort((a, b) {
+        // END投稿がある場合は、actualEndTimeを使用
+        final aTime = a.actualEndTime ?? a.createdAt;
+        final bTime = b.actualEndTime ?? b.createdAt;
+        return bTime.compareTo(aTime);
+      });
 
       _followingPosts = filteredPosts;
       return _followingPosts;
@@ -293,8 +310,13 @@ class PostProvider extends ChangeNotifier {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
-      // クライアント側でソート
-      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // クライアント側でソート（END投稿を最新として扱う）
+      posts.sort((a, b) {
+        // END投稿がある場合は、actualEndTimeを使用
+        final aTime = a.actualEndTime ?? a.createdAt;
+        final bTime = b.actualEndTime ?? b.createdAt;
+        return bTime.compareTo(aTime);
+      });
 
       _communityPosts = posts;
       return _communityPosts;
@@ -345,6 +367,9 @@ class PostProvider extends ChangeNotifier {
         }
       }
 
+      // 期限切れ投稿を自動更新
+      await _checkAndUpdateExpiredPosts();
+
       final querySnapshot = await _firestore
           .collection('posts')
           .where('userId', isEqualTo: userId)
@@ -354,6 +379,14 @@ class PostProvider extends ChangeNotifier {
       _userPosts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
+
+      // END投稿を最新として扱うようにソート
+      _userPosts.sort((a, b) {
+        // END投稿がある場合は、actualEndTimeを使用
+        final aTime = a.actualEndTime ?? a.createdAt;
+        final bTime = b.actualEndTime ?? b.createdAt;
+        return bTime.compareTo(aTime);
+      });
 
       if (kDebugMode) {
         print('ユーザー投稿取得完了: ${_userPosts.length}件');
@@ -491,8 +524,20 @@ class PostProvider extends ChangeNotifier {
   }
 
   // フォロー中タブでの表示判定
-  bool _shouldShowInFollowing(PostModel post) {
+  bool _shouldShowInFollowing(PostModel post, String? currentUserId) {
     final now = DateTime.now();
+
+    // 自分のコミュニティ投稿は表示しない
+    if (currentUserId != null &&
+        post.userId == currentUserId &&
+        post.communityIds.isNotEmpty) {
+      return false;
+    }
+
+    // 24時間経過により自動完了された投稿は表示しない
+    if (post.isCompleted && post.endComment == '24時間経過により自動完了') {
+      return false;
+    }
 
     // 完了している場合、END投稿（actualEndTime）から24時間以内なら表示
     if (post.isCompleted && post.actualEndTime != null) {
@@ -521,6 +566,66 @@ class PostProvider extends ChangeNotifier {
     } else {
       return PostStatus.concentration;
     }
+  }
+
+  // 24時間経過した投稿のステータスを自動更新
+  Future<void> updateExpiredPosts() async {
+    try {
+      final now = DateTime.now();
+      final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+
+      // インデックスエラーを回避するため、複数のクエリに分割
+      // まず、START投稿で未完了のものを取得
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .where('type', isEqualTo: 'start')
+          .where('actualEndTime', isNull: true)
+          .get();
+
+      final batch = _firestore.batch();
+      final expiredPosts = <PostModel>[];
+
+      for (final doc in querySnapshot.docs) {
+        final post = PostModel.fromFirestore(doc);
+
+        // クライアント側で24時間経過をチェック
+        if (post.scheduledEndTime != null &&
+            post.scheduledEndTime!.isBefore(twentyFourHoursAgo)) {
+          // 24時間経過した投稿を完了状態に変更
+          batch.update(doc.reference, {
+            'actualEndTime': FieldValue.serverTimestamp(),
+            'endComment': '24時間経過により自動完了',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // ローカルリスト更新用の投稿データを作成
+          final updatedPost = post.copyWith(
+            actualEndTime: now,
+            endComment: '24時間経過により自動完了',
+          );
+          expiredPosts.add(updatedPost);
+        }
+      }
+
+      // バッチ更新を実行
+      if (expiredPosts.isNotEmpty) {
+        await batch.commit();
+
+        // ローカルの投稿リストを更新
+        for (final updatedPost in expiredPosts) {
+          updatePostInLists(updatedPost);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('期限切れ投稿の自動更新エラー: $e');
+      }
+    }
+  }
+
+  // 投稿リスト取得時に期限切れ投稿を自動更新
+  Future<void> _checkAndUpdateExpiredPosts() async {
+    await updateExpiredPosts();
   }
 
   // 投稿を閲覧可能かチェック（プライベートアカウント制限）

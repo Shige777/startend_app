@@ -10,6 +10,7 @@ import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../services/storage_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/custom_tab_bar.dart';
 import '../community/community_screen.dart';
@@ -42,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen>
       final tabParam = uri.queryParameters['tab'];
       if (tabParam == '1') {
         setState(() {
-          _selectedIndex = 1;
+          _selectedIndex = 1; // 軌跡タブ
         });
       } else if (tabParam == 'community') {
         setState(() {
@@ -50,6 +51,12 @@ class _HomeScreenState extends State<HomeScreen>
         });
         // コミュニティタブを選択
         _tabController.index = 1;
+      } else {
+        // デフォルトまたは投稿タブ
+        setState(() {
+          _selectedIndex = 0;
+        });
+        _tabController.index = 0;
       }
     });
   }
@@ -157,8 +164,14 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                       ],
                     ),
-                    onPressed: () {
-                      context.push('/notifications');
+                    onPressed: () async {
+                      // 通知アイコンをタップした時に全て既読にする
+                      await NotificationService().markAllAsRead(currentUser.id);
+
+                      // 通知画面に遷移
+                      if (context.mounted) {
+                        context.push('/notifications');
+                      }
                     },
                   );
                 },
@@ -245,18 +258,8 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           );
         } else {
-          // コミュニティタブ：コミュニティ作成
-          return FloatingActionButton(
-            heroTag: "home_community_fab",
-            onPressed: () {
-              context.push('/community/create');
-            },
-            backgroundColor: AppColors.primary,
-            child: const Icon(
-              Icons.group_add,
-              color: AppColors.textOnPrimary,
-            ),
-          );
+          // コミュニティタブ：FloatingActionButtonはCommunityScreenで処理
+          return null;
         }
       case 1:
         // 軌跡タブ：投稿作成

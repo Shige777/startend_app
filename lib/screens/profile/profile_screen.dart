@@ -36,13 +36,18 @@ class ProfileScreen extends StatefulWidget {
 
 enum TimePeriod { day, week, month, year, all }
 
+// 投稿の並び順を選択するenum
+enum PostSortType { startDate, endDate }
+
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isGridView = true;
   bool _hasLoadedPosts = false;
   UserModel? _profileUser; // 表示するユーザー情報
-  TimePeriod _selectedPeriod = TimePeriod.all;
+  TimePeriod _selectedPeriod = TimePeriod.day;
+  bool _showCommunityPosts = true; // コミュニティ投稿を表示するかどうか
+  PostSortType _sortType = PostSortType.startDate; // デフォルトはSTART投稿の日付
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
@@ -60,10 +65,48 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (_isNetworkUrl(imageUrl)) {
       // ネットワーク画像
-      return CircleAvatar(
-        radius: 40,
-        backgroundImage: NetworkImage(imageUrl),
-      );
+      if (kIsWeb) {
+        // Web環境では画像読み込みエラーを適切に処理
+        return CircleAvatar(
+          radius: 40,
+          backgroundColor: AppColors.surfaceVariant,
+          child: ClipOval(
+            child: Image.network(
+              imageUrl,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                if (kDebugMode) {
+                  print('プロフィール画像読み込みエラー: $error');
+                  print('URL: $imageUrl');
+                }
+                return const Icon(Icons.person, size: 40);
+              },
+            ),
+          ),
+        );
+      } else {
+        // モバイル環境では従来通り
+        return CircleAvatar(
+          radius: 40,
+          backgroundImage: NetworkImage(imageUrl),
+          onBackgroundImageError: (error, stackTrace) {
+            print('プロフィール画像読み込みエラー: $error');
+          },
+        );
+      }
     } else {
       // ローカルファイル
       if (kIsWeb) {
@@ -94,6 +137,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
+    // 他のユーザーのプロフィールの場合は、初期状態で_profileUserをnullに設定
+    if (!widget.isOwnProfile) {
+      _profileUser = null;
+    }
+
     // ビルド完了後に非同期処理を実行
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _loadProfileData();
@@ -114,6 +162,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           if (kDebugMode) {
             print('軌跡画面: 自分の投稿を読み込み開始 - ${_profileUser!.id}');
           }
+          // 期限切れ投稿を自動更新してから投稿を取得
+          await postProvider.updateExpiredPosts();
           await postProvider.getUserPosts(_profileUser!.id,
               currentUserId: userProvider.currentUser?.id);
         }
@@ -130,6 +180,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             if (kDebugMode) {
               print('他のユーザーのプロフィール: 投稿を読み込み開始 - ${_profileUser!.id}');
             }
+            // 期限切れ投稿を自動更新してから投稿を取得
+            await postProvider.updateExpiredPosts();
             await postProvider.getUserPosts(_profileUser!.id,
                 currentUserId: userProvider.currentUser?.id);
           }
@@ -150,16 +202,94 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _refreshProfileData() async {
+    final userProvider = context.read<UserProvider>();
+    final postProvider = context.read<PostProvider>();
+
+    try {
+      if (widget.isOwnProfile) {
+        // 自分のプロフィールの場合
+        await userProvider.refreshCurrentUser();
+        _profileUser = userProvider.currentUser;
+        if (_profileUser != null) {
+          if (kDebugMode) {
+            print('軌跡画面: 自分の投稿を再読み込み開始 - ${_profileUser!.id}');
+          }
+          // 期限切れ投稿を自動更新してから投稿を取得
+          await postProvider.updateExpiredPosts();
+          await postProvider.getUserPosts(_profileUser!.id,
+              currentUserId: userProvider.currentUser?.id);
+        }
+      } else {
+        // 他のユーザーのプロフィールの場合
+        if (widget.userId != null) {
+          if (mounted) {
+            setState(() {
+              _profileUser = null;
+            });
+          }
+
+          _profileUser = await userProvider.getUser(widget.userId!);
+          if (_profileUser != null && mounted) {
+            if (kDebugMode) {
+              print('他のユーザーのプロフィール: 投稿を再読み込み開始 - ${_profileUser!.id}');
+            }
+            // 期限切れ投稿を自動更新してから投稿を取得
+            await postProvider.updateExpiredPosts();
+            await postProvider.getUserPosts(_profileUser!.id,
+                currentUserId: userProvider.currentUser?.id);
+          }
+        }
+      }
+
+      if (kDebugMode) {
+        print('プロフィールデータの再読み込み完了');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('プロフィールデータの再読み込みエラー: $e');
+      }
+    }
+  }
+
   // 期間フィルタ機能
   Map<String, List<PostModel>> _groupPostsByPeriod(List<PostModel> posts) {
     if (_selectedPeriod == TimePeriod.all) {
-      return {'すべて': posts};
+      // ソート方法に応じて投稿をソート
+      List<PostModel> sortedPosts = List.from(posts);
+      sortedPosts.sort((a, b) {
+        DateTime dateA, dateB;
+
+        if (_sortType == PostSortType.endDate) {
+          // END投稿の日付でソート（actualEndTimeがない場合はcreatedAtを使用）
+          dateA = a.actualEndTime ?? a.createdAt;
+          dateB = b.actualEndTime ?? b.createdAt;
+        } else {
+          // START投稿の日付でソート
+          dateA = a.createdAt;
+          dateB = b.createdAt;
+        }
+
+        return dateB.compareTo(dateA); // 新しい順
+      });
+
+      return {'すべて': sortedPosts};
     }
 
     final Map<String, List<PostModel>> groupedPosts = {};
 
     for (final post in posts) {
-      final postDate = post.createdAt;
+      DateTime postDate;
+
+      // ソート方法に応じて基準となる日付を決定
+      if (_sortType == PostSortType.endDate) {
+        // END投稿の日付を使用（actualEndTimeがない場合はcreatedAtを使用）
+        postDate = post.actualEndTime ?? post.createdAt;
+      } else {
+        // START投稿の日付を使用
+        postDate = post.createdAt;
+      }
+
       String groupKey;
 
       switch (_selectedPeriod) {
@@ -188,9 +318,51 @@ class _ProfileScreenState extends State<ProfileScreen>
       groupedPosts[groupKey]!.add(post);
     }
 
-    // 期間順にソート
+    // 各グループ内でもソート方法に応じてソート
+    for (final key in groupedPosts.keys) {
+      groupedPosts[key]!.sort((a, b) {
+        DateTime dateA, dateB;
+
+        if (_sortType == PostSortType.endDate) {
+          dateA = a.actualEndTime ?? a.createdAt;
+          dateB = b.actualEndTime ?? b.createdAt;
+        } else {
+          dateA = a.createdAt;
+          dateB = b.createdAt;
+        }
+
+        return dateB.compareTo(dateA); // 新しい順
+      });
+    }
+
+    // 期間順にソート（日付を基準にソート）
     final sortedKeys = groupedPosts.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
+      ..sort((a, b) {
+        if (a == 'すべて' || b == 'すべて') {
+          return a == 'すべて' ? -1 : 1;
+        }
+
+        // 各期間の最新投稿の日付を取得してソート
+        final postsA = groupedPosts[a]!;
+        final postsB = groupedPosts[b]!;
+
+        if (postsA.isEmpty || postsB.isEmpty) {
+          return postsA.isEmpty ? 1 : -1;
+        }
+
+        // 各グループの最新投稿の日付を取得
+        DateTime dateA, dateB;
+
+        if (_sortType == PostSortType.endDate) {
+          dateA = postsA.first.actualEndTime ?? postsA.first.createdAt;
+          dateB = postsB.first.actualEndTime ?? postsB.first.createdAt;
+        } else {
+          dateA = postsA.first.createdAt;
+          dateB = postsB.first.createdAt;
+        }
+
+        return dateB.compareTo(dateA); // 新しい順
+      });
     final sortedGroupedPosts = <String, List<PostModel>>{};
     for (final key in sortedKeys) {
       sortedGroupedPosts[key] = groupedPosts[key]!;
@@ -218,41 +390,86 @@ class _ProfileScreenState extends State<ProfileScreen>
       return const SizedBox.shrink();
     }
 
+    // 進行期間（予定時間）を合計
+    Duration totalScheduledDuration = Duration.zero;
     // 実際にかかった時間を合計
-    Duration totalDuration = Duration.zero;
+    Duration totalActualDuration = Duration.zero;
+
     for (final post in completedPosts) {
-      final duration = post.actualEndTime!.difference(post.createdAt);
-      totalDuration += duration;
+      // 実際にかかった時間
+      final actualDuration = post.actualEndTime!.difference(post.createdAt);
+      totalActualDuration += actualDuration;
+
+      // 進行期間（予定時間）
+      if (post.scheduledEndTime != null) {
+        final scheduledDuration =
+            post.scheduledEndTime!.difference(post.createdAt);
+        totalScheduledDuration += scheduledDuration;
+      }
     }
 
-    // 時間を表示形式に変換
-    String formattedTime = _formatDuration(totalDuration);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.completed.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.completed.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.timer,
-            size: 16,
-            color: AppColors.completed,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '実際にかかった時間: $formattedTime',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.completed,
-                  fontWeight: FontWeight.w500,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 進行期間（予定時間）を表示
+        if (totalScheduledDuration > Duration.zero) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.schedule,
+                  size: 16,
+                  color: AppColors.primary,
                 ),
+                const SizedBox(width: 6),
+                Text(
+                  '進行期間: ${_formatDuration(totalScheduledDuration)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 8),
         ],
-      ),
+
+        // 実際にかかった時間を表示
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.completed.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.completed.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.timer,
+                size: 16,
+                color: AppColors.completed,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '実際にかかった時間: ${_formatDuration(totalActualDuration)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.completed,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -321,6 +538,48 @@ class _ProfileScreenState extends State<ProfileScreen>
         scrolledUnderElevation: 0, // スクロール時の影も削除
         actions: widget.isOwnProfile
             ? [
+                // 投稿のソート選択
+                PopupMenuButton<PostSortType>(
+                  icon: const Icon(Icons.sort),
+                  tooltip: '並び順',
+                  onSelected: (sortType) {
+                    setState(() {
+                      _sortType = sortType;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<PostSortType>(
+                      value: PostSortType.startDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortType == PostSortType.startDate
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('START投稿の日付'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<PostSortType>(
+                      value: PostSortType.endDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortType == PostSortType.endDate
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('END投稿の日付'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 PopupMenuButton<TimePeriod>(
                   icon: const Icon(Icons.date_range),
                   onSelected: (period) {
@@ -359,9 +618,52 @@ class _ProfileScreenState extends State<ProfileScreen>
                   onSelected: (value) {
                     if (value == 'logout') {
                       _showLogoutDialog();
+                    } else if (value == 'privacy') {
+                      _showPrivacySettings();
+                    } else if (value == 'notifications') {
+                      _showNotificationSettings();
+                    } else if (value == 'community_posts') {
+                      _toggleCommunityPosts();
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    if (widget.isOwnProfile) ...[
+                      PopupMenuItem<String>(
+                        value: 'community_posts',
+                        child: Row(
+                          children: [
+                            Icon(_showCommunityPosts
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            const SizedBox(width: 8),
+                            Text(_showCommunityPosts
+                                ? 'コミュニティ投稿を非表示'
+                                : 'コミュニティ投稿を表示'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'privacy',
+                        child: Row(
+                          children: [
+                            Icon(Icons.privacy_tip),
+                            SizedBox(width: 8),
+                            Text('プライバシー設定'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'notifications',
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications),
+                            SizedBox(width: 8),
+                            Text('通知設定'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                    ],
                     const PopupMenuItem<String>(
                       value: 'logout',
                       child: Row(
@@ -376,6 +678,48 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ]
             : [
+                // 投稿のソート選択
+                PopupMenuButton<PostSortType>(
+                  icon: const Icon(Icons.sort),
+                  tooltip: '並び順',
+                  onSelected: (sortType) {
+                    setState(() {
+                      _sortType = sortType;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<PostSortType>(
+                      value: PostSortType.startDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortType == PostSortType.startDate
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('START投稿の日付'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<PostSortType>(
+                      value: PostSortType.endDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortType == PostSortType.endDate
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('END投稿の日付'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 PopupMenuButton<TimePeriod>(
                   icon: const Icon(Icons.date_range),
                   onSelected: (period) {
@@ -942,6 +1286,20 @@ class _ProfileScreenState extends State<ProfileScreen>
               if (_profileUser != null && post.userId != _profileUser!.id) {
                 return false;
               }
+
+              // 他のユーザーのコミュニティ投稿表示設定を確認
+              if (_profileUser != null &&
+                  !_profileUser!.showCommunityPostsToOthers &&
+                  post.communityIds.isNotEmpty) {
+                return false;
+              }
+            }
+
+            // 自分の軌跡画面でのコミュニティ投稿の表示設定を確認
+            if (widget.isOwnProfile &&
+                !_showCommunityPosts &&
+                post.communityIds.isNotEmpty) {
+              return false;
             }
 
             final status = post.status;
@@ -952,14 +1310,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               return true;
             }
 
-            // 進行中投稿は、終了予定時刻から24時間以内なら表示
+            // 進行中投稿は、実際の終了時刻がない場合のみ表示
+            // （24時間経過した投稿は自動的に完了状態に変更されるため）
             if (status == PostStatus.inProgress) {
-              if (post.scheduledEndTime != null) {
-                final hoursSinceScheduledEnd =
-                    now.difference(post.scheduledEndTime!).inHours;
-                return hoursSinceScheduledEnd <= 24;
-              }
-              return true; // 終了予定時刻が設定されていない場合は表示
+              return post.actualEndTime == null;
             }
 
             return false;
@@ -974,7 +1328,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                 b.status == PostStatus.concentration) {
               return 1;
             }
-            return b.createdAt.compareTo(a.createdAt); // 新しい順
+
+            // 同じステータス内での並び順はソート方法に応じて決定
+            DateTime dateA, dateB;
+
+            if (_sortType == PostSortType.endDate) {
+              // END投稿の日付でソート（actualEndTimeがない場合はcreatedAtを使用）
+              dateA = a.actualEndTime ?? a.createdAt;
+              dateB = b.actualEndTime ?? b.createdAt;
+            } else {
+              // START投稿の日付でソート
+              dateA = a.createdAt;
+              dateB = b.createdAt;
+            }
+
+            return dateB.compareTo(dateA); // 新しい順
           });
         } else {
           // 完了した投稿
@@ -993,7 +1361,15 @@ class _ProfileScreenState extends State<ProfileScreen>
               }
             }
 
-            return post.status == PostStatus.completed;
+            // コミュニティ投稿の表示設定を確認
+            if (widget.isOwnProfile &&
+                !_showCommunityPosts &&
+                post.communityIds.isNotEmpty) {
+              return false;
+            }
+
+            return post.status == PostStatus.completed ||
+                post.actualEndTime != null;
           }).toList();
         }
 
@@ -1074,104 +1450,116 @@ class _ProfileScreenState extends State<ProfileScreen>
               .where((post) => post.status == PostStatus.inProgress)
               .toList();
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 集中セクション（集中投稿がある場合のみ表示）
-                if (concentrationPosts.isNotEmpty) ...[
+          return RefreshIndicator(
+            onRefresh: _refreshProfileData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 集中セクション（集中投稿がある場合のみ表示）
+                  if (concentrationPosts.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      child: Text(
+                        '集中',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                      ),
+                    ),
+                    // 集中の投稿を表示
+                    _isGridView
+                        ? _buildPostGrid(concentrationPosts)
+                        : _buildPostList(concentrationPosts),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // 進行中セクション
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     child: Text(
-                      '集中',
+                      '進行中',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
                     ),
                   ),
-                  // 集中の投稿を表示
-                  _isGridView
-                      ? _buildPostGrid(concentrationPosts)
-                      : _buildPostList(concentrationPosts),
-                  const SizedBox(height: 24),
-                ],
-
-                // 進行中セクション
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(
-                    '進行中',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                  // 進行中の投稿を表示
+                  if (inProgressPosts.isNotEmpty) ...[
+                    _isGridView
+                        ? _buildPostGrid(inProgressPosts)
+                        : _buildPostList(inProgressPosts),
+                  ] else ...[
+                    // 進行中投稿がない場合の表示
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 20),
+                      child: Center(
+                        child: Text(
+                          '進行中の投稿はありません',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                         ),
-                  ),
-                ),
-                // 進行中の投稿を表示
-                if (inProgressPosts.isNotEmpty) ...[
-                  _isGridView
-                      ? _buildPostGrid(inProgressPosts)
-                      : _buildPostList(inProgressPosts),
-                ] else ...[
-                  // 進行中投稿がない場合の表示
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 20),
-                    child: Center(
-                      child: Text(
-                        '進行中の投稿はありません',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
 
-                const SizedBox(height: 24),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           );
         } else {
           // 過去の投稿を期間別に表示
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final entry in groupedPosts.entries) ...[
-                  // 期間ラベルと実際にかかった時間
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.key,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildPeriodTimeDisplay(entry.value),
-                      ],
+          return RefreshIndicator(
+            onRefresh: _refreshProfileData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final entry in groupedPosts.entries) ...[
+                    // 期間ラベルと実際にかかった時間
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPeriodTimeDisplay(entry.value),
+                        ],
+                      ),
                     ),
-                  ),
-                  // 投稿表示
-                  _isGridView
-                      ? _buildPostGrid(entry.value)
-                      : _buildPostList(entry.value),
-                  const SizedBox(height: 16),
+                    // 投稿表示
+                    _isGridView
+                        ? _buildPostGrid(entry.value)
+                        : _buildPostList(entry.value),
+                    const SizedBox(height: 16),
+                  ],
                 ],
-              ],
+              ),
             ),
           );
         }
@@ -1179,13 +1567,31 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // 期間に応じた列数を取得
+  int _getColumnCount() {
+    switch (_selectedPeriod) {
+      case TimePeriod.week:
+        return 5;
+      case TimePeriod.month:
+        return 7;
+      case TimePeriod.year:
+        return 9;
+      case TimePeriod.all:
+        return 11;
+      case TimePeriod.day:
+        return 3;
+      default:
+        return 3;
+    }
+  }
+
   // グリッド表示用のWidget（START/END画像を2つ並べて表示）
   Widget _buildPostGrid(List<PostModel> posts) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: _getColumnCount(),
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
         childAspectRatio: 1.0,
@@ -1392,6 +1798,75 @@ class _ProfileScreenState extends State<ProfileScreen>
         );
       }
     }
+  }
+
+  // プライバシー設定画面を表示
+  void _showPrivacySettings() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('プライバシー設定'),
+        content: Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final currentUser = userProvider.currentUser;
+            if (currentUser == null) return const SizedBox.shrink();
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  title: const Text('プライベートアカウント'),
+                  subtitle: const Text('フォロワーのみが投稿を見ることができます'),
+                  value: currentUser.isPrivate,
+                  onChanged: (value) async {
+                    final updatedUser = currentUser.copyWith(isPrivate: value);
+                    await userProvider.updateUser(updatedUser);
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('フォロー申請の承認制'),
+                  subtitle: const Text('フォロー申請を手動で承認する必要があります'),
+                  value: currentUser.requiresApproval,
+                  onChanged: (value) async {
+                    final updatedUser =
+                        currentUser.copyWith(requiresApproval: value);
+                    await userProvider.updateUser(updatedUser);
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('コミュニティ投稿を他のユーザーに表示'),
+                  subtitle: const Text('他のユーザーに自分のコミュニティ内での投稿を表示するかどうか'),
+                  value: currentUser.showCommunityPostsToOthers,
+                  onChanged: (value) async {
+                    final updatedUser =
+                        currentUser.copyWith(showCommunityPostsToOthers: value);
+                    await userProvider.updateUser(updatedUser);
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 通知設定画面を表示
+  void _showNotificationSettings() {
+    context.push('/settings/notifications');
+  }
+
+  // コミュニティ投稿の表示切り替え
+  void _toggleCommunityPosts() {
+    setState(() {
+      _showCommunityPosts = !_showCommunityPosts;
+    });
   }
 
   void _toggleLike(PostModel post) async {

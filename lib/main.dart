@@ -159,6 +159,17 @@ final GoRouter _router = GoRouter(
 
     // 認証済みでログイン画面にいる場合はホームへリダイレクト
     if (isAuthenticated && isOnLoginScreen) {
+      // 認証済みユーザーのホーム画面遷移時に期限切れ投稿を自動更新
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          final postProvider = context.read<PostProvider>();
+          await postProvider.updateExpiredPosts();
+        } catch (e) {
+          if (kDebugMode) {
+            print('アプリ起動時の期限切れ投稿更新エラー: $e');
+          }
+        }
+      });
       return '/home';
     }
 

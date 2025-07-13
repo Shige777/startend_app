@@ -53,24 +53,83 @@ class PostCardWidget extends StatelessWidget {
 
     if (_isNetworkUrl(imageUrl)) {
       // ネットワーク画像
-      imageWidget = Container(
-        width: double.infinity,
-        height: double.infinity,
-        child: CachedNetworkImage(
-          imageUrl: imageUrl,
-          fit: fit,
+      if (kIsWeb) {
+        // Web環境ではImage.networkを使用し、エラーハンドリングを改善
+        imageWidget = Container(
           width: double.infinity,
           height: double.infinity,
-          placeholder: (context, url) => Container(
-            color: AppColors.surfaceVariant,
-            child: const Center(child: CircularProgressIndicator()),
+          child: Image.network(
+            imageUrl,
+            fit: fit,
+            width: double.infinity,
+            height: double.infinity,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                color: AppColors.surfaceVariant,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              if (kDebugMode) {
+                print('Web画像読み込みエラー: $error');
+                print('URL: $imageUrl');
+              }
+              return Container(
+                color: AppColors.surfaceVariant,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image, color: AppColors.error, size: 32),
+                    SizedBox(height: 8),
+                    Text(
+                      '画像を読み込めません',
+                      style: TextStyle(color: AppColors.error, fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-          errorWidget: (context, url, error) => Container(
-            color: AppColors.surfaceVariant,
-            child: const Icon(Icons.error, color: AppColors.error),
+        );
+      } else {
+        // モバイル環境ではCachedNetworkImageを使用
+        imageWidget = Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: fit,
+            width: double.infinity,
+            height: double.infinity,
+            placeholder: (context, url) => Container(
+              color: AppColors.surfaceVariant,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: AppColors.surfaceVariant,
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, color: AppColors.error, size: 32),
+                  SizedBox(height: 8),
+                  Text(
+                    '画像を読み込めません',
+                    style: TextStyle(color: AppColors.error, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else {
       // ローカルファイル
       if (kIsWeb) {
@@ -214,9 +273,9 @@ class PostCardWidget extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero, // 余白を削除
       elevation: 0, // 影を削除
-      color: isOwnPost
-          ? AppColors.primary.withOpacity(0.1) // 自分の投稿は青い背景
-          : AppColors.background, // 他の投稿は通常の背景
+      color: (isOwnPost && fromPage != 'profile' && fromPage != 'following')
+          ? AppColors.primary.withOpacity(0.1) // 自分の投稿は青い背景（軌跡画面とフォロー中タブ以外）
+          : AppColors.background, // 他の投稿は通常の背景、軌跡画面とフォロー中タブでは背景色なし
       child: InkWell(
         onTap: onTap ??
             () => context.push('/post/${post.id}', extra: {
@@ -548,7 +607,7 @@ class PostCardWidget extends StatelessWidget {
                                         ? AppColors.error
                                         : post.isCompleted
                                             ? AppColors.completed
-                                            : AppColors.textSecondary,
+                                            : AppColors.primary,
                                   ),
                                   const SizedBox(width: 2),
                                   Expanded(
@@ -564,7 +623,7 @@ class PostCardWidget extends StatelessWidget {
                                                 ? AppColors.error
                                                 : post.isCompleted
                                                     ? AppColors.completed
-                                                    : AppColors.textSecondary,
+                                                    : AppColors.primary,
                                             fontSize: 9,
                                           ),
                                       overflow: TextOverflow.ellipsis,
@@ -606,33 +665,64 @@ class PostCardWidget extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         // 完了予定時刻 or 完了時刻
-        if (post.scheduledEndTime != null)
+        if (post.scheduledEndTime != null) ...[
+          // 進行期間（予定時間）を表示
           Row(
             children: [
               Icon(
-                post.isCompleted ? Icons.flag : Icons.schedule,
+                Icons.schedule,
                 size: 16,
-                color: post.isOverdue
-                    ? AppColors.error
-                    : post.isCompleted
-                        ? AppColors.completed
-                        : AppColors.textSecondary,
+                color: AppColors.primary,
               ),
               const SizedBox(width: 4),
               Text(
-                post.isCompleted
-                    ? '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime ?? post.scheduledEndTime!)}'
-                    : '予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
+                '進行期間: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: post.isOverdue
-                          ? AppColors.error
-                          : post.isCompleted
-                              ? AppColors.completed
-                              : AppColors.textSecondary,
+                      color: AppColors.primary,
                     ),
               ),
             ],
           ),
+
+          // 実際にかかった時間を表示（完了した場合のみ）
+          if (post.isCompleted && post.actualEndTime != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  Icons.flag,
+                  size: 16,
+                  color: AppColors.completed,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '実際の完了: ${DateTimeUtils.formatDateTime(post.actualEndTime!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.completed,
+                      ),
+                ),
+              ],
+            ),
+          ],
+        ] else if (post.isCompleted && post.actualEndTime != null) ...[
+          // scheduledEndTimeがない場合でも、actualEndTimeがあれば表示
+          Row(
+            children: [
+              Icon(
+                Icons.flag,
+                size: 16,
+                color: AppColors.completed,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime!)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.completed,
+                    ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

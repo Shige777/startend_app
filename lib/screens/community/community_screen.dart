@@ -6,6 +6,7 @@ import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/wave_loading_widget.dart';
+import 'create_community_screen.dart'; // Added import for CreateCommunityScreen
 
 class CommunityScreen extends StatefulWidget {
   final String? searchQuery;
@@ -80,9 +81,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
       floatingActionButton: FloatingActionButton(
         heroTag: "community_screen_fab",
         onPressed: () {
-          context.push('/community/create');
+          print('コミュニティ作成ボタンがタップされました');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const CreateCommunityScreen(),
+            ),
+          );
         },
-        child: const Icon(Icons.add),
+        backgroundColor: AppColors.primary,
+        child: const Icon(
+          Icons.group_add,
+          color: AppColors.textOnPrimary,
+        ),
       ),
     );
   }
@@ -108,28 +118,32 @@ class _CommunityScreenState extends State<CommunityScreen> {
           sectionTitle = '検索結果';
         }
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                    left: 16, right: 16, top: 16, bottom: 8),
-                child: Text(
-                  sectionTitle,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+        return RefreshIndicator(
+          onRefresh: _loadCommunities,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(
+                      left: 16, right: 16, top: 16, bottom: 8),
+                  child: Text(
+                    sectionTitle,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              displayCommunities.isEmpty
-                  ? SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.6,
-                      child: _buildEmptyState(),
-                    )
-                  : _buildCommunityGrid(displayCommunities),
-            ],
+                displayCommunities.isEmpty
+                    ? SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        child: _buildEmptyState(),
+                      )
+                    : _buildCommunityGrid(displayCommunities),
+              ],
+            ),
           ),
         );
       },
@@ -159,10 +173,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
           if (searchQuery.isEmpty) ...[
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => context.push('/community/create'),
+              onPressed: () {
+                print('空の状態からコミュニティ作成ボタンがタップされました');
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const CreateCommunityScreen(),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.textOnPrimary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
               child: const Text('コミュニティを作成'),
             ),
@@ -198,6 +221,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
         final currentUser = userProvider.currentUser;
         final isJoined =
             currentUser != null && community.memberIds.contains(currentUser.id);
+        final isPending = currentUser != null &&
+            community.pendingMemberIds.contains(currentUser.id);
 
         return GestureDetector(
           onTap: () async {
@@ -224,18 +249,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.background, // 背景色を統一
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.divider.withOpacity(0.3), // 境界線を薄く
+                color: AppColors.divider.withOpacity(0.3),
                 width: 1,
               ),
             ),
             child: Column(
               children: [
-                // コミュニティ画像
+                // コミュニティ画像 - サイズを大きく
                 Expanded(
-                  flex: 2,
+                  flex: 3, // 2から3に変更
                   child: Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
@@ -253,11 +278,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   ),
                 ),
-                // コミュニティ情報
+                // コミュニティ情報 - サイズを小さく
                 Expanded(
-                  flex: 3,
+                  flex: 2, // 3から2に変更
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8), // 12から8に変更
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -265,12 +290,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           community.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                            fontSize: 14, // 15から14に変更
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 2), // 4から2に変更
                         if (community.description != null &&
                             community.description!.isNotEmpty) ...[
                           Expanded(
@@ -278,22 +303,22 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               community.description!,
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 12,
-                                height: 1.3,
+                                fontSize: 11, // 12から11に変更
+                                height: 1.2, // 1.3から1.2に変更
                               ),
-                              maxLines: 3,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ] else ...[
                           const Expanded(child: SizedBox()),
                         ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 2), // 4から2に変更
                         Row(
                           children: [
                             const Icon(
                               Icons.people,
-                              size: 16,
+                              size: 14, // 16から14に変更
                               color: AppColors.textSecondary,
                             ),
                             const SizedBox(width: 4),
@@ -301,17 +326,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               '${community.memberIds.length}人',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 12,
+                                fontSize: 11, // 12から11に変更
                               ),
                             ),
                             const Spacer(),
-                            if (!isJoined &&
+                            // 検索時のみバッジを表示
+                            if (isJoined &&
                                 (widget.searchQuery?.isNotEmpty ?? false))
-                              const Icon(
-                                Icons.add_circle_outline,
-                                size: 18,
-                                color: AppColors.primary,
-                              ),
+                              _buildStatusIndicator(
+                                  isJoined, isPending, community),
                           ],
                         ),
                       ],
@@ -324,6 +347,50 @@ class _CommunityScreenState extends State<CommunityScreen> {
         );
       },
     );
+  }
+
+  Widget _buildStatusIndicator(
+      bool isJoined, bool isPending, CommunityModel community) {
+    // 検索時のみバッジを表示
+    final isSearching = widget.searchQuery?.isNotEmpty ?? false;
+
+    if (!isSearching) {
+      return const SizedBox.shrink();
+    }
+
+    if (isJoined) {
+      // 参加済みの場合はチェックマーク
+      return Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 2), // パディングを小さく
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.green, width: 1),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check,
+              size: 12, // 14から12に変更
+              color: Colors.green,
+            ),
+            SizedBox(width: 3), // 4から3に変更
+            Text(
+              '参加済み',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 10, // 11から10に変更
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    // 他の状態では何も表示しない
+    return const SizedBox.shrink();
   }
 
   Widget _buildCommunityImage(String? imageUrl) {
@@ -373,14 +440,28 @@ class _CommunityScreenState extends State<CommunityScreen> {
         return;
       }
 
-      final success = await communityProvider.joinCommunity(
-        community.id,
-        userId: currentUser.id,
-      );
+      bool success;
+      String message;
+
+      if (community.isPrivate || community.settings.requireApproval) {
+        // 承認制の場合は参加申請
+        success = await communityProvider.requestJoinCommunity(
+          community.id,
+          currentUser.id,
+        );
+        message = success ? '${community.name}に参加申請を送信しました' : '参加申請に失敗しました';
+      } else {
+        // オープンの場合は直接参加
+        success = await communityProvider.joinCommunity(
+          community.id,
+          userId: currentUser.id,
+        );
+        message = success ? '${community.name}に参加しました' : '参加に失敗しました';
+      }
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${community.name}に参加しました')),
+          SnackBar(content: Text(message)),
         );
 
         // ユーザー情報を更新
@@ -388,11 +469,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
         // ユーザーのコミュニティ一覧を更新
         await communityProvider.getUserCommunities(currentUser.id);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('参加に失敗しました: $e')),
+          SnackBar(content: Text('エラーが発生しました: $e')),
         );
       }
     }
@@ -527,127 +612,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('脱退に失敗しました: $e')),
-        );
-      }
-    }
-  }
-
-  void _showCreateCommunityDialog() {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    bool requiresApproval = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('コミュニティを作成'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'コミュニティ名',
-                        hintText: '例: 朝活コミュニティ',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLength: 50,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: '説明（任意）',
-                        hintText: 'コミュニティの説明を入力してください',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                      maxLength: 200,
-                    ),
-                    const SizedBox(height: 16),
-                    CheckboxListTile(
-                      title: const Text('承認制'),
-                      subtitle: const Text('新しいメンバーの参加に承認が必要'),
-                      value: requiresApproval,
-                      onChanged: (value) {
-                        setState(() {
-                          requiresApproval = value ?? false;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('キャンセル'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('コミュニティ名を入力してください')),
-                      );
-                      return;
-                    }
-
-                    Navigator.of(context).pop();
-                    await _createCommunity(
-                      nameController.text.trim(),
-                      descriptionController.text.trim(),
-                      requiresApproval,
-                    );
-                  },
-                  child: const Text('作成'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _createCommunity(
-    String name,
-    String description,
-    bool requiresApproval,
-  ) async {
-    try {
-      final userProvider = context.read<UserProvider>();
-      final communityProvider = context.read<CommunityProvider>();
-      final currentUser = userProvider.currentUser;
-
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ログインしてください')),
-        );
-        return;
-      }
-
-      final success = await communityProvider.createCommunity(
-        name: name,
-        description: description,
-        userId: currentUser.id,
-        requiresApproval: requiresApproval,
-      );
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('コミュニティを作成しました')),
-        );
-
-        await communityProvider.getUserCommunities(currentUser.id);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('コミュニティの作成に失敗しました: $e')),
         );
       }
     }

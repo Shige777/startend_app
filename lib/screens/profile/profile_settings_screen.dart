@@ -5,8 +5,11 @@ import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:typed_data';
 import '../../providers/user_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' as auth;
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 
@@ -79,10 +82,38 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     } else if (_selectedImagePath != null) {
       if (_isNetworkUrl(_selectedImagePath!)) {
         // ネットワーク画像
-        return CircleAvatar(
-          radius: 60,
-          backgroundImage: NetworkImage(_selectedImagePath!),
-        );
+        if (kIsWeb) {
+          // Web環境では画像読み込みエラーを適切に処理
+          return CircleAvatar(
+            radius: 60,
+            backgroundColor: AppColors.surfaceVariant,
+            child: ClipOval(
+              child: Image.network(
+                _selectedImagePath!,
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('プロフィール画像読み込みエラー: $error');
+                  print('URL: $_selectedImagePath');
+                  return const Icon(Icons.person, size: 60);
+                },
+              ),
+            ),
+          );
+        } else {
+          // モバイル環境では従来通り
+          return CircleAvatar(
+            radius: 60,
+            backgroundImage: NetworkImage(_selectedImagePath!),
+          );
+        }
       } else {
         // ローカルファイル
         if (kIsWeb) {
@@ -198,61 +229,41 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 children: [
                   // プロフィール画像
                   Center(
-                    child: kIsWeb
-                        ? Column(
-                            children: [
-                              _buildProfileImage(),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: _pickImageWeb,
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('画像を選択'),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '※ 大きな画像は自動的に圧縮されます',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
+                    child: Column(
+                      children: [
+                        Stack(
+                          children: [
+                            _buildProfileImage(),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
                                 ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            children: [
-                              Stack(
-                                children: [
-                                  _buildProfileImage(),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: IconButton(
-                                        icon: const Icon(
-                                          Icons.camera_alt,
-                                          color: AppColors.textOnPrimary,
-                                          size: 20,
-                                        ),
-                                        onPressed: _pickImage,
-                                      ),
-                                    ),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.camera_alt,
+                                    color: AppColors.textOnPrimary,
+                                    size: 20,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '※ 大きな画像は自動的に圧縮されます',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
+                                  onPressed: _pickImage,
                                 ),
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '※ 大きな画像は自動的に圧縮されます',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
 
@@ -284,73 +295,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     ),
                     maxLines: 3,
                     maxLength: 200,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // プライバシー設定
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'プライバシー設定',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // プライベートアカウント
-                          SwitchListTile(
-                            title: const Text('プライベートアカウント'),
-                            subtitle: const Text('フォロワーのみが投稿とプロフィールを閲覧できます'),
-                            value: _isPrivate,
-                            onChanged: (value) {
-                              setState(() {
-                                _isPrivate = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 通知設定
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '通知設定',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          ListTile(
-                            leading: const Icon(Icons.notifications),
-                            title: const Text('通知設定'),
-                            subtitle: const Text('プッシュ通知の設定を変更'),
-                            trailing: const Icon(Icons.keyboard_arrow_right),
-                            onTap: () {
-                              context.push('/settings/notifications');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -387,41 +331,23 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      setState(() {
-        _selectedImagePath = pickedFile.path;
-      });
+      if (kIsWeb) {
+        // Web環境では、バイトデータを取得
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedImageBytes = bytes;
+          _selectedImageFileName = pickedFile.name;
+          _selectedImagePath = null; // 既存のパスをクリア
+        });
+      } else {
+        // モバイル環境では、パスを設定
+        setState(() {
+          _selectedImagePath = pickedFile.path;
+          _selectedImageBytes = null; // 既存のバイトデータをクリア
+          _selectedImageFileName = null;
+        });
+      }
     }
-  }
-
-  void _pickImageWeb() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('プロフィール画像を選択'),
-        content: SizedBox(
-          width: 300,
-          height: 300,
-          child: PlatformImagePickerWidget(
-            width: 300,
-            height: 300,
-            placeholder: 'プロフィール画像を選択',
-            onImageSelected: (bytes, fileName) {
-              setState(() {
-                _selectedImageBytes = bytes;
-                _selectedImageFileName = fileName;
-              });
-              Navigator.of(context).pop();
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('キャンセル'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _saveProfile() async {
@@ -433,7 +359,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
     try {
       final userProvider = context.read<UserProvider>();
-      final authProvider = context.read<AuthProvider>();
+      final authProvider = context.read<auth.AuthProvider>();
 
       final currentUser = userProvider.currentUser;
       if (currentUser == null || authProvider.user == null) {

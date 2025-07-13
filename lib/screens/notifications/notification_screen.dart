@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
+import '../../models/user_model.dart';
+import '../../constants/app_colors.dart';
 import '../../services/follow_service.dart';
 import '../../services/notification_service.dart';
-import '../../constants/app_colors.dart';
-import '../../constants/app_constants.dart';
+import '../../widgets/user_avatar.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../utils/date_time_utils.dart';
 

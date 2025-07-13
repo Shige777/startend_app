@@ -3,7 +3,6 @@ import '../../models/community_model.dart';
 import '../../models/progress_model.dart';
 import '../../services/progress_service.dart';
 import '../../constants/app_colors.dart';
-import '../../constants/app_constants.dart';
 import '../../widgets/wave_loading_widget.dart';
 import '../../widgets/user_avatar.dart';
 import '../../utils/date_time_utils.dart';

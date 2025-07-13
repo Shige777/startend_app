@@ -12,6 +12,7 @@ class UserModel {
   final int postCount;
   final bool isPrivate;
   final bool requiresApproval;
+  final bool showCommunityPostsToOthers; // コミュニティ投稿を他のユーザーに表示するか
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +28,7 @@ class UserModel {
     this.postCount = 0,
     required this.isPrivate,
     required this.requiresApproval,
+    this.showCommunityPostsToOthers = true, // デフォルトは公開
     required this.createdAt,
     required this.updatedAt,
   });
@@ -45,6 +47,7 @@ class UserModel {
       postCount: data['postCount'] ?? 0,
       isPrivate: data['isPrivate'] ?? false,
       requiresApproval: data['requiresApproval'] ?? false,
+      showCommunityPostsToOthers: data['showCommunityPostsToOthers'] ?? true,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );
@@ -62,6 +65,7 @@ class UserModel {
       'postCount': postCount,
       'isPrivate': isPrivate,
       'requiresApproval': requiresApproval,
+      'showCommunityPostsToOthers': showCommunityPostsToOthers,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -79,6 +83,7 @@ class UserModel {
     int? postCount,
     bool? isPrivate,
     bool? requiresApproval,
+    bool? showCommunityPostsToOthers,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -94,6 +99,8 @@ class UserModel {
       postCount: postCount ?? this.postCount,
       isPrivate: isPrivate ?? this.isPrivate,
       requiresApproval: requiresApproval ?? this.requiresApproval,
+      showCommunityPostsToOthers:
+          showCommunityPostsToOthers ?? this.showCommunityPostsToOthers,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

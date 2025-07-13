@@ -49,13 +49,21 @@ class _PostListWidgetState extends State<PostListWidget> {
   void _loadPosts() async {
     final postProvider = context.read<PostProvider>();
 
+    // 期限切れ投稿を自動更新
+    await postProvider.updateExpiredPosts();
+
     switch (widget.type) {
       case PostListType.following:
-        // フォロー中の投稿を取得
+        // フォロー中の投稿を取得（自分の投稿も含める）
         final userProvider = context.read<UserProvider>();
         final currentUser = userProvider.currentUser;
         if (currentUser != null) {
-          await postProvider.getFollowingPosts(currentUser.followingIds,
+          // フォロー中のユーザーIDに自分のIDも追加
+          final followingIdsWithSelf = [
+            ...currentUser.followingIds,
+            currentUser.id
+          ];
+          await postProvider.getFollowingPosts(followingIdsWithSelf,
               currentUserId: currentUser.id);
         }
         break;
@@ -196,7 +204,9 @@ class _PostListWidgetState extends State<PostListWidget> {
                 onDelete: _canDeletePost(posts[postIndex])
                     ? () => _showDeleteConfirmation(posts[postIndex])
                     : null,
-                fromPage: 'posts', // 投稿画面から来たことを識別
+                fromPage: widget.type == PostListType.following
+                    ? 'following'
+                    : 'posts', // フォロー中タブの場合は'following'、それ以外は'posts'
               );
             },
           ),

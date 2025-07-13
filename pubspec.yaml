@@ -2,7 +2,7 @@ name: startend_app
 description: "START/END投稿を軸とした進捗共有SNSアプリ"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.5.0

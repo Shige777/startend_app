@@ -186,6 +186,92 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  // 現在のユーザー情報をクリア
+  void clearCurrentUser() {
+    _currentUser = null;
+    _userCache.clear();
+    _searchResults.clear();
+    notifyListeners();
+  }
+
+  // フォロー操作の即座反映
+  void updateFollowStatus({
+    required String targetUserId,
+    required bool isFollowing,
+    required String currentUserId,
+  }) {
+    // 現在のユーザーのフォロー中リストを更新
+    if (_currentUser?.id == currentUserId) {
+      final updatedFollowingIds = List<String>.from(_currentUser!.followingIds);
+      if (isFollowing) {
+        if (!updatedFollowingIds.contains(targetUserId)) {
+          updatedFollowingIds.add(targetUserId);
+        }
+      } else {
+        updatedFollowingIds.remove(targetUserId);
+      }
+
+      _currentUser = _currentUser!.copyWith(followingIds: updatedFollowingIds);
+    }
+
+    // キャッシュされたターゲットユーザーのフォロワーリストを更新
+    if (_userCache.containsKey(targetUserId)) {
+      final targetUser = _userCache[targetUserId]!;
+      final updatedFollowerIds = List<String>.from(targetUser.followerIds);
+      if (isFollowing) {
+        if (!updatedFollowerIds.contains(currentUserId)) {
+          updatedFollowerIds.add(currentUserId);
+        }
+      } else {
+        updatedFollowerIds.remove(currentUserId);
+      }
+
+      _userCache[targetUserId] =
+          targetUser.copyWith(followerIds: updatedFollowerIds);
+    }
+
+    notifyListeners();
+  }
+
+  // フォロー関連の数値を即座に更新
+  void updateFollowCounts({
+    required String userId,
+    int? followerCountDelta,
+    int? followingCountDelta,
+  }) {
+    // 現在のユーザーを更新
+    if (_currentUser?.id == userId) {
+      List<String> updatedFollowerIds =
+          List<String>.from(_currentUser!.followerIds);
+      List<String> updatedFollowingIds =
+          List<String>.from(_currentUser!.followingIds);
+
+      if (followerCountDelta != null) {
+        // フォロワー数の変更（実際のIDは後でFirestoreから同期）
+        // ここでは数値のみを一時的に調整
+      }
+
+      if (followingCountDelta != null) {
+        // フォロー中数の変更（実際のIDは後でFirestoreから同期）
+        // ここでは数値のみを一時的に調整
+      }
+    }
+
+    // キャッシュされたユーザーを更新
+    if (_userCache.containsKey(userId)) {
+      final user = _userCache[userId]!;
+      List<String> updatedFollowerIds = List<String>.from(user.followerIds);
+      List<String> updatedFollowingIds = List<String>.from(user.followingIds);
+
+      _userCache[userId] = user.copyWith(
+        followerIds: updatedFollowerIds,
+        followingIds: updatedFollowingIds,
+      );
+    }
+
+    notifyListeners();
+  }
+
   // ユーザー検索
   Future<List<UserModel>> searchUsers(String query) async {
     try {
@@ -398,13 +484,6 @@ class UserProvider extends ChangeNotifier {
   // 現在のユーザーを設定
   void setCurrentUser(UserModel user) {
     _currentUser = user;
-    notifyListeners();
-  }
-
-  // 現在のユーザーをクリア
-  void clearCurrentUser() {
-    _currentUser = null;
-    _searchResults = [];
     notifyListeners();
   }
 }

@@ -326,6 +326,32 @@ class NotificationService {
     }
   }
 
+  /// 全ての通知を既読にする
+  Future<void> markAllAsRead(String userId) async {
+    try {
+      final batch = _firestore.batch();
+
+      // 未読の通知を取得
+      final querySnapshot = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .where('read', isEqualTo: false)
+          .get();
+
+      // バッチで全て既読に更新
+      for (final doc in querySnapshot.docs) {
+        batch.update(doc.reference, {
+          'read': true,
+          'readAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print('全通知既読エラー: $e');
+    }
+  }
+
   /// 未読通知数の取得
   Stream<int> getUnreadNotificationCount(String userId) {
     return _firestore

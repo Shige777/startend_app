@@ -36,39 +36,14 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   Future<void> _handleImageSelection() async {
     try {
-      // 画像選択方法を選択するダイアログを表示
-      final source = await showDialog<ImageSource>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('画像を選択'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('ギャラリーから選択'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('カメラで撮影'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('キャンセル'),
-            ),
-          ],
-        ),
-      );
-
-      if (source == null) return;
-
+      // 直接ギャラリーから画像を選択
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: source);
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
 
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
@@ -146,11 +121,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         );
 
         // 成功時は前の画面に戻る
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go('/home?tab=1'); // コミュニティタブに戻る
-        }
+        Navigator.of(context).pop();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('コミュニティの作成に失敗しました')),
@@ -173,6 +144,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('CreateCommunityScreen build メソッドが実行されました');
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -186,7 +158,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home?tab=1');
+              context.go('/home?tab=community');
             }
           },
         ),

@@ -31,6 +31,8 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   bool _isJoined = false;
   bool _isLoading = true;
   bool _isLeader = false;
+  bool _isRefreshing = false;
+  bool _hasRequestedJoin = false; // 参加申請済みかどうか
   CommunityModel? _community;
   List<PostModel> _communityPosts = [];
   final TextEditingController _messageController = TextEditingController();
@@ -104,6 +106,34 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     }
   }
 
+  Future<void> _refreshCommunityPosts() async {
+    if (_isRefreshing) return; // 既にリフレッシュ中の場合は何もしない
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    if (kDebugMode) {
+      print('CommunityChatScreen: 投稿再読み込み開始 - ${widget.communityId}');
+    }
+
+    final postProvider = context.read<PostProvider>();
+    final posts = await postProvider.getCommunityPosts(widget.communityId);
+
+    if (kDebugMode) {
+      print('CommunityChatScreen: 投稿再読み込み完了 - ${posts.length}件');
+    }
+
+    if (mounted) {
+      setState(() {
+        _communityPosts = posts;
+        _isRefreshing = false;
+      });
+
+      // リフレッシュ時は自動スクロールしない（ユーザーが過去のメッセージを見ている可能性があるため）
+    }
+  }
+
   Future<void> _loadCommunityData() async {
     final communityProvider = context.read<CommunityProvider>();
     final userProvider = context.read<UserProvider>();
@@ -117,6 +147,8 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         _isJoined =
             currentUser?.communityIds.contains(widget.communityId) ?? false;
         _isLeader = currentUser?.id == community.leaderId;
+        _hasRequestedJoin =
+            currentUser?.communityIds.contains(widget.communityId) ?? false;
       });
 
       // コミュニティの投稿を取得
@@ -255,8 +287,13 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             ),
           if (!_isJoined)
             TextButton(
-              onPressed: _canJoin() ? _joinCommunity : null,
-              child: const Text('参加'),
+              onPressed:
+                  _canJoin() && !_hasRequestedJoin ? _joinCommunity : null,
+              style: TextButton.styleFrom(
+                foregroundColor:
+                    _hasRequestedJoin ? AppColors.textSecondary : null,
+              ),
+              child: Text(_hasRequestedJoin ? '申請済み' : '参加'),
             ),
         ],
       ),
@@ -332,33 +369,106 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           // 投稿一覧（チャット風）
           Expanded(
             child: _communityPosts.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 64, color: AppColors.textHint),
-                        SizedBox(height: 16),
-                        Text(
-                          'まだメッセージがありません\n最初のメッセージを送信してみましょう！',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
+                ? NotificationListener<ScrollNotification>(
+                    onNotification: (ScrollNotification scrollInfo) {
+                      // 最下部に到達したときにリフレッシュ
+                      if (scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 50) {
+                        if (scrollInfo is ScrollEndNotification) {
+                          _refreshCommunityPosts();
+                        }
+                      }
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        child: Center(
+                          child: _isRefreshing
+                              ? const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 40,
+                                      height: 40,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      '更新中...',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline,
+                                        size: 64, color: AppColors.textHint),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'まだメッセージがありません\n最初のメッセージを送信してみましょう！',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
                         ),
-                      ],
+                      ),
                     ),
                   )
                 : Container(
                     decoration: const BoxDecoration(
                       color: AppColors.background,
                     ),
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _communityPosts.length,
-                      itemBuilder: (context, index) {
-                        final post = _communityPosts[index];
-                        return _buildChatBubble(post);
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification scrollInfo) {
+                        // 最下部に到達したときにリフレッシュ
+                        if (scrollInfo.metrics.pixels >=
+                            scrollInfo.metrics.maxScrollExtent - 50) {
+                          if (scrollInfo is ScrollEndNotification) {
+                            _refreshCommunityPosts();
+                          }
+                        }
+                        return false;
                       },
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _communityPosts.length +
+                            1, // +1 for refresh indicator
+                        itemBuilder: (context, index) {
+                          if (index == _communityPosts.length) {
+                            // 最下部にリフレッシュインジケーターを表示
+                            return Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: _isRefreshing
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.primary,
+                                        ),
+                                      )
+                                    : const SizedBox(height: 16), // 空のスペース
+                              ),
+                            );
+                          }
+                          final post = _communityPosts[index];
+                          return _buildChatBubble(post);
+                        },
+                      ),
                     ),
                   ),
           ),
@@ -421,11 +531,16 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _canJoin() ? _joinCommunity : null,
+                onPressed:
+                    _canJoin() && !_hasRequestedJoin ? _joinCommunity : null,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor:
+                      _hasRequestedJoin ? AppColors.surfaceVariant : null,
                 ),
-                child: Text(_community!.isPrivate ? '参加申請' : '参加'),
+                child: Text(_hasRequestedJoin
+                    ? '参加申請済み'
+                    : (_community!.isPrivate ? '参加申請' : '参加')),
               ),
             ),
           ],
@@ -452,6 +567,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       success = await communityProvider.requestJoinCommunity(
           widget.communityId, currentUser.id);
       if (success && mounted) {
+        setState(() {
+          _hasRequestedJoin = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('参加申請を送信しました')),
         );
