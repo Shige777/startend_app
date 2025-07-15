@@ -497,16 +497,7 @@ class AuthProvider extends ChangeNotifier {
                 'Client ID configured: ${_googleSignIn.clientId ?? 'Default'}');
           }
 
-          if (retryCount < maxRetries - 1) {
-            retryCount++;
-            if (kDebugMode) {
-              print('Retrying Google Sign-In... (${retryCount}/$maxRetries)');
-            }
-            await Future.delayed(
-                Duration(milliseconds: 1500 + (retryCount * 500)));
-            continue;
-          }
-
+          // ユーザーがキャンセルした場合は即座に終了（リトライしない）
           _setError('Google Sign-Inがキャンセルされました');
           return false;
         }
@@ -664,7 +655,9 @@ class AuthProvider extends ChangeNotifier {
         }
 
         // ユーザーフレンドリーなエラーメッセージ
-        if (e.toString().contains('sign_in_canceled')) {
+        if (e.toString().contains('sign_in_canceled') ||
+            e.toString().contains('canceled') ||
+            e.toString().contains('cancelled')) {
           _setError('Google Sign-Inがキャンセルされました');
         } else if (e.toString().contains('network_error')) {
           _setError('ネットワークエラーが発生しました。インターネット接続を確認してください。');
@@ -858,12 +851,22 @@ class AuthProvider extends ChangeNotifier {
 
       while (retryCount < maxRetries) {
         try {
+          // 認証前に少し待機（システムの準備時間を確保）
+          if (retryCount > 0) {
+            await Future.delayed(Duration(milliseconds: 1000 * retryCount));
+          }
+
           appleCredential = await SignInWithApple.getAppleIDCredential(
             scopes: [
               AppleIDAuthorizationScopes.email,
               AppleIDAuthorizationScopes.fullName,
             ],
           );
+
+          if (kDebugMode) {
+            print(
+                'Apple Sign In: Successfully got credentials on attempt ${retryCount + 1}');
+          }
           break; // 成功したらループを抜ける
         } catch (e) {
           retryCount++;
@@ -872,11 +875,22 @@ class AuthProvider extends ChangeNotifier {
           }
 
           if (retryCount >= maxRetries) {
+            if (kDebugMode) {
+              print('Apple Sign In: Max retries reached, throwing error');
+            }
             rethrow; // 最大リトライ回数に達したら例外を再スロー
           }
 
-          // 短い待機時間を入れる
-          await Future.delayed(Duration(milliseconds: 500 * retryCount));
+          // エラーの種類に応じて待機時間を調整
+          if (e.toString().contains('1000') ||
+              e.toString().contains('canceled')) {
+            // ユーザーキャンセルの場合は即座に終了
+            if (kDebugMode) {
+              print('Apple Sign In: User canceled, stopping retries');
+            }
+            _setError('Apple IDサインインがキャンセルされました。');
+            return false;
+          }
         }
       }
 
@@ -920,6 +934,11 @@ class AuthProvider extends ChangeNotifier {
         print('User Email: ${_user?.email}');
       }
 
+      // ユーザー情報をFirestoreに保存/更新
+      if (_user != null) {
+        await _createOrUpdateUser(_user!);
+      }
+
       // 初回サインインの場合、ユーザー情報を更新
       if (result.additionalUserInfo?.isNewUser == true) {
         String displayName = '';
@@ -945,7 +964,8 @@ class AuthProvider extends ChangeNotifier {
 
       // 具体的なエラーコードに基づいてメッセージを設定
       if (e.toString().contains('1000') ||
-          e.toString().contains('ASAuthorizationErrorCanceled')) {
+          e.toString().contains('ASAuthorizationErrorCanceled') ||
+          e.toString().contains('canceled')) {
         errorMessage = 'Apple IDサインインがキャンセルされました。';
       } else if (e.toString().contains('1001') ||
           e.toString().contains('ASAuthorizationErrorFailed')) {
