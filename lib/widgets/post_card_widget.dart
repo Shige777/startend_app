@@ -529,32 +529,43 @@ class PostCardWidget extends StatelessWidget {
                       Expanded(
                         child: Builder(
                           builder: (context) => GestureDetector(
-                            onTap: post.isCompleted
-                                ? null
-                                : () {
-                                    // 投稿者本人のみEND投稿可能
-                                    final userProvider =
-                                        context.read<UserProvider>();
-                                    final currentUser =
-                                        userProvider.currentUser;
+                            onTap: () {
+                              // 投稿者本人のみEND投稿可能
+                              final userProvider = context.read<UserProvider>();
+                              final currentUser = userProvider.currentUser;
 
-                                    if (currentUser == null ||
-                                        post.userId != currentUser.id) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text('自分の投稿のみEND投稿できます'),
-                                        ),
-                                      );
-                                      return;
-                                    }
+                              if (currentUser == null ||
+                                  post.userId != currentUser.id) {
+                                // 他人の投稿の場合
+                                if (post.isCompleted &&
+                                    post.endImageUrl != null) {
+                                  // 完了済みで画像がある場合は画像拡大
+                                  _showImageZoomDialog(
+                                      context, post.endImageUrl!);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('自分の投稿のみEND投稿できます'),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
 
-                                    // END投稿作成画面への遷移
-                                    context.push('/create-end-post', extra: {
-                                      'startPostId': post.id,
-                                      'startPost': post,
-                                    });
-                                  },
+                              // 自分の投稿の場合
+                              if (post.isCompleted &&
+                                  post.endImageUrl != null) {
+                                // 完了済みで画像がある場合は画像拡大
+                                _showImageZoomDialog(
+                                    context, post.endImageUrl!);
+                              } else {
+                                // 未完了、または完了済みだが画像がない場合（自動完了含む）はEND投稿画面へ
+                                context.push('/create-end-post', extra: {
+                                  'startPostId': post.id,
+                                  'startPost': post,
+                                });
+                              }
+                            },
                             child: Container(
                               width: double.infinity,
                               color: AppColors.surfaceVariant,
@@ -564,9 +575,21 @@ class PostCardWidget extends StatelessWidget {
                                           fit: BoxFit.cover,
                                           enableZoom: enableImageZoom)
                                       : const Center(
-                                          child: Icon(Icons.flag,
-                                              color: AppColors.completed,
-                                              size: 32),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.add_photo_alternate,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  size: 32),
+                                              SizedBox(height: 4),
+                                              Text('END投稿',
+                                                  style: TextStyle(
+                                                      color: AppColors
+                                                          .textSecondary)),
+                                            ],
+                                          ),
                                         ))
                                   : const Center(
                                       child: Column(
@@ -600,7 +623,7 @@ class PostCardWidget extends StatelessWidget {
                                 children: [
                                   Icon(
                                     post.isCompleted
-                                        ? Icons.flag
+                                        ? Icons.check_circle
                                         : Icons.schedule,
                                     size: 12,
                                     color: post.isOverdue
@@ -690,7 +713,7 @@ class PostCardWidget extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.flag,
+                  Icons.check_circle,
                   size: 16,
                   color: AppColors.completed,
                 ),
@@ -709,7 +732,7 @@ class PostCardWidget extends StatelessWidget {
           Row(
             children: [
               Icon(
-                Icons.flag,
+                Icons.check_circle,
                 size: 16,
                 color: AppColors.completed,
               ),

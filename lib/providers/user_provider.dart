@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -36,46 +37,111 @@ class UserProvider extends ChangeNotifier {
 
   // ユーザーを取得または作成
   Future<void> _getOrCreateUser(String userId) async {
-    try {
-      _setLoading(true);
-      _setError(null);
+    int retryCount = 0;
+    const maxRetries = 3;
 
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        _currentUser = UserModel.fromFirestore(doc);
-      } else {
-        // ユーザーが存在しない場合は新規作成
-        final authUser = _authProvider?.user;
-        if (authUser != null) {
-          _currentUser = UserModel(
-            id: userId,
-            displayName: authUser.displayName ?? 'ユーザー',
-            email: authUser.email ?? '',
-            profileImageUrl: authUser.photoURL,
-            bio: '',
-            isPrivate: false,
-            requiresApproval: false,
-            followerIds: [],
-            followingIds: [],
-            communityIds: [],
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
+    while (retryCount < maxRetries) {
+      try {
+        _setLoading(true);
+        _setError(null);
 
-          // Firestoreに保存
-          await _firestore
-              .collection('users')
-              .doc(userId)
-              .set(_currentUser!.toFirestore());
+        if (kDebugMode) {
+          print('ユーザー取得/作成開始 (試行 ${retryCount + 1}/$maxRetries): $userId');
+        }
+
+        final doc =
+            await _firestore.collection('users').doc(userId).get().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw TimeoutException(
+                'Firestore get timeout', const Duration(seconds: 10));
+          },
+        );
+
+        if (doc.exists) {
+          _currentUser = UserModel.fromFirestore(doc);
+          if (kDebugMode) {
+            print('既存ユーザー取得成功: ${_currentUser?.displayName}');
+          }
+        } else {
+          // ユーザーが存在しない場合は新規作成
+          final authUser = _authProvider?.user;
+          if (authUser != null) {
+            _currentUser = UserModel(
+              id: userId,
+              displayName: authUser.displayName ?? 'ユーザー',
+              email: authUser.email ?? '',
+              profileImageUrl: authUser.photoURL,
+              bio: '',
+              isPrivate: false,
+              requiresApproval: false,
+              followerIds: [],
+              followingIds: [],
+              communityIds: [],
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+
+            // Firestoreに保存（タイムアウト付き）
+            await _firestore
+                .collection('users')
+                .doc(userId)
+                .set(_currentUser!.toFirestore())
+                .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                throw TimeoutException(
+                    'Firestore set timeout', const Duration(seconds: 15));
+              },
+            );
+
+            if (kDebugMode) {
+              print('新規ユーザー作成成功: ${_currentUser?.displayName}');
+            }
+
+            // 作成後の短い待機時間
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        }
+
+        // 成功した場合はリターン
+        return;
+      } on TimeoutException catch (e) {
+        retryCount++;
+        if (kDebugMode) {
+          print(
+              'UserProvider Firestore操作タイムアウト (試行 $retryCount/$maxRetries): $e');
+        }
+
+        if (retryCount >= maxRetries) {
+          _setError('ネットワーク接続が不安定です。しばらく待ってからもう一度お試しください。');
+          return;
+        }
+
+        await Future.delayed(Duration(milliseconds: 1000 * retryCount));
+      } catch (e) {
+        retryCount++;
+        if (kDebugMode) {
+          print('UserProvider エラー (試行 $retryCount/$maxRetries): $e');
+        }
+
+        if (retryCount >= maxRetries) {
+          _setError('ユーザー情報の取得に失敗しました: ${e.toString()}');
+          return;
+        }
+
+        // ネットワーク関連のエラーの場合は長めに待機
+        if (e.toString().contains('network') ||
+            e.toString().contains('connection')) {
+          await Future.delayed(Duration(milliseconds: 2000 * retryCount));
+        } else {
+          await Future.delayed(Duration(milliseconds: 1000 * retryCount));
+        }
+      } finally {
+        if (retryCount >= maxRetries || _currentUser != null) {
+          _setLoading(false);
         }
       }
-    } catch (e) {
-      _setError('ユーザー情報の取得に失敗しました: ${e.toString()}');
-      if (kDebugMode) {
-        print('Error getting or creating user: $e');
-      }
-    } finally {
-      _setLoading(false);
     }
   }
 

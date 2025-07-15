@@ -153,8 +153,19 @@ class PostGridWidget extends StatelessWidget {
                           : Container(
                               color: AppColors.surfaceVariant,
                               child: const Center(
-                                child: Icon(Icons.flag,
-                                    color: AppColors.completed, size: 32),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_photo_alternate,
+                                        color: AppColors.textSecondary,
+                                        size: 24),
+                                    SizedBox(height: 4),
+                                    Text('END',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 10)),
+                                  ],
+                                ),
                               ),
                             ))
                       : Container(

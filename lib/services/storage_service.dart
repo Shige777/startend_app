@@ -276,11 +276,22 @@ class StorageService {
 
   /// Firebase Storageエラーの統一的な処理
   static String? _handleFirebaseStorageError(FirebaseException e) {
+    print('Firebase Storage Error Details:');
+    print('  Code: ${e.code}');
+    print('  Message: ${e.message}');
+    print('  Plugin: ${e.plugin}');
+
     switch (e.code) {
       case 'object-not-found':
         return null;
       case 'unauthorized':
-        throw Exception('アップロード権限がありません');
+        print('  詳細: Firebase Storage のセキュリティルールで書き込み権限が拒否されました');
+        print('  解決策: Firebase Console でセキュリティルールを確認してください');
+        throw Exception('アップロード権限がありません。Firebase Storage の設定を確認してください。');
+      case 'permission-denied':
+        print('  詳細: 権限が拒否されました');
+        print('  解決策: ユーザーが認証されているか、適切な権限があるか確認してください');
+        throw Exception('アップロード権限がありません。ログイン状態を確認してください。');
       case 'canceled':
         throw Exception('アップロードがキャンセルされました');
       case 'unknown':
@@ -288,14 +299,25 @@ class StorageService {
           throw Exception('ファイルサイズが大きすぎます。画像を圧縮してください。');
         } else if (e.message?.contains('network') == true) {
           throw Exception('ネットワークエラーが発生しました。接続を確認してください。');
+        } else if (e.message?.contains('PERMISSION_DENIED') == true) {
+          print('  詳細: セキュリティルールによる権限拒否');
+          throw Exception('アップロード権限がありません。Firebase Storage の設定を確認してください。');
         } else {
+          print('  不明なエラー: ${e.message}');
           throw Exception('アップロードに失敗しました。しばらく待ってから再試行してください。');
         }
       case 'retry-limit-exceeded':
         throw Exception('アップロードがタイムアウトしました。ファイルサイズを小さくしてください。');
       case 'quota-exceeded':
         throw Exception('ストレージ容量が不足しています。');
+      case 'invalid-argument':
+        print('  詳細: 無効な引数が渡されました');
+        throw Exception('アップロード処理でエラーが発生しました。');
+      case 'unauthenticated':
+        print('  詳細: ユーザーが認証されていません');
+        throw Exception('ログインしてからアップロードしてください。');
       default:
+        print('  未知のエラーコード: ${e.code}');
         throw Exception('アップロードに失敗しました: ${e.message}');
     }
   }

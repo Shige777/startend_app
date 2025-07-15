@@ -6,9 +6,8 @@ service firebase.storage {
       // プロフィール画像の読み取り：認証済みユーザーのみ
       allow read: if request.auth != null;
       
-      // プロフィール画像のアップロード：本人のみ、ファイル制限あり
+      // プロフィール画像のアップロード：認証済みユーザーのみ、ファイル制限あり
       allow write: if request.auth != null && 
-        isOwner(fileName) &&
         isValidImageFile() &&
         isValidFileSize(10 * 1024 * 1024); // 10MB制限
     }
@@ -18,9 +17,8 @@ service firebase.storage {
       // 投稿画像の読み取り：認証済みユーザーのみ
       allow read: if request.auth != null;
       
-      // 投稿画像のアップロード：本人のみ、ファイル制限あり
+      // 投稿画像のアップロード：認証済みユーザーのみ、ファイル制限あり
       allow write: if request.auth != null && 
-        isOwner(fileName) &&
         isValidImageFile() &&
         isValidFileSize(10 * 1024 * 1024); // 10MB制限
     }
@@ -37,11 +35,6 @@ service firebase.storage {
     }
     
     // Helper functions
-    function isOwner(fileName) {
-      // ファイル名にユーザーIDが含まれているかチェック
-      return fileName.matches('.*' + request.auth.uid + '.*');
-    }
-    
     function isValidImageFile() {
       // 画像ファイルの形式をチェック
       return request.resource.contentType.matches('image/.*') &&

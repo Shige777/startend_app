@@ -134,7 +134,7 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Row(
                             children: [
-                              const Icon(Icons.flag,
+                              const Icon(Icons.schedule,
                                   size: 16, color: AppColors.textSecondary),
                               const SizedBox(width: 4),
                               Text(

@@ -408,6 +408,25 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
+  // 投稿をIDで取得
+  Future<PostModel?> getPostById(String postId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final doc = await _firestore.collection('posts').doc(postId).get();
+      if (doc.exists) {
+        return PostModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      _setError('投稿取得に失敗しました');
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // 投稿検索
   Future<List<PostModel>> searchPosts(String query) async {
     try {
@@ -534,10 +553,7 @@ class PostProvider extends ChangeNotifier {
       return false;
     }
 
-    // 24時間経過により自動完了された投稿は表示しない
-    if (post.isCompleted && post.endComment == '24時間経過により自動完了') {
-      return false;
-    }
+    // 24時間経過により自動完了された投稿も表示する（修正）
 
     // 完了している場合、END投稿（actualEndTime）から24時間以内なら表示
     if (post.isCompleted && post.actualEndTime != null) {

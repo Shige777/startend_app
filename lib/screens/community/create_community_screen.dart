@@ -121,7 +121,11 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         );
 
         // 成功時は前の画面に戻る
-        Navigator.of(context).pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home?tab=community');
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('コミュニティの作成に失敗しました')),

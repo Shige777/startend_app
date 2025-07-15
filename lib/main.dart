@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
@@ -34,15 +35,60 @@ import 'screens/community/community_settings_screen.dart';
 import 'screens/community/create_community_screen.dart';
 import 'screens/notifications/notification_screen.dart';
 import 'screens/settings/notification_settings_screen.dart';
+import 'screens/invite/invite_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase初期化
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // 通知サービスの初期化
   await NotificationService().initialize();
+
+  // Google Sign-Inの事前初期化（新しいデバイスでの初回ログイン成功率を向上）
+  try {
+    if (!kIsWeb) {
+      // モバイル環境でのGoogle Sign-In事前初期化
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        forceCodeForRefreshToken: true, // 新しいデバイスでの認証成功率向上
+      );
+
+      // 初期化の確認（複数回試行）
+      bool initSuccess = false;
+      for (int i = 0; i < 3; i++) {
+        try {
+          await googleSignIn.isSignedIn();
+          initSuccess = true;
+          break;
+        } catch (e) {
+          if (kDebugMode) {
+            print('Google Sign-In init attempt ${i + 1} failed: $e');
+          }
+          if (i < 2) {
+            await Future.delayed(Duration(milliseconds: 500 + (i * 300)));
+          }
+        }
+      }
+
+      if (initSuccess) {
+        if (kDebugMode) {
+          print('Google Sign-In pre-initialization successful');
+        }
+      } else {
+        if (kDebugMode) {
+          print('Google Sign-In pre-initialization failed after 3 attempts');
+        }
+      }
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('Google Sign-In pre-initialization error (non-critical): $e');
+    }
+  }
 
   runApp(const MyApp());
 }
@@ -222,10 +268,18 @@ final GoRouter _router = GoRouter(
           searchQuery = extra['searchQuery'] as String?;
         }
 
-        return ProfileScreen(
-          userId: userId,
-          fromPage: fromPage,
-          searchQuery: searchQuery,
+        return Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final currentUser = userProvider.currentUser;
+            final isOwnProfile = currentUser?.id == userId;
+
+            return ProfileScreen(
+              userId: userId,
+              isOwnProfile: isOwnProfile,
+              fromPage: fromPage,
+              searchQuery: searchQuery,
+            );
+          },
         );
       },
     ),
@@ -238,6 +292,13 @@ final GoRouter _router = GoRouter(
       builder: (context, state) {
         final communityId = state.pathParameters['id']!;
         return CommunityChatScreen(communityId: communityId);
+      },
+    ),
+    GoRoute(
+      path: '/invite/:token',
+      builder: (context, state) {
+        final token = state.pathParameters['token']!;
+        return InviteScreen(inviteToken: token);
       },
     ),
     GoRoute(
@@ -302,6 +363,49 @@ final GoRouter _router = GoRouter(
         }
 
         return EditPostScreen(post: post);
+      },
+    ),
+    GoRoute(
+      path: '/edit-post/:id',
+      builder: (context, state) {
+        final postId = state.pathParameters['id']!;
+
+        // PostModelが渡されている場合
+        if (state.extra != null && state.extra is PostModel) {
+          final post = state.extra as PostModel;
+          return EditPostScreen(post: post);
+        }
+
+        // PostModelが渡されていない場合はCreateEndPostScreenに遷移
+        return FutureBuilder<PostModel?>(
+          future: context.read<PostProvider>().getPostById(postId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (snapshot.hasError || snapshot.data == null) {
+              return const Scaffold(
+                body: Center(child: Text('投稿が見つかりません')),
+              );
+            }
+
+            final post = snapshot.data!;
+
+            // END投稿が未完了の場合はCreateEndPostScreenに遷移
+            if (!post.isCompleted) {
+              return CreateEndPostScreen(
+                startPostId: post.id,
+                startPost: post,
+              );
+            } else {
+              // 完了済みの場合は編集画面
+              return EditPostScreen(post: post);
+            }
+          },
+        );
       },
     ),
     GoRoute(

@@ -44,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   late TabController _tabController;
   bool _isGridView = true;
   bool _hasLoadedPosts = false;
+  bool _isLoadingProfile = false; // プロフィール読み込み中フラグを追加
   UserModel? _profileUser; // 表示するユーザー情報
   TimePeriod _selectedPeriod = TimePeriod.day;
   bool _showCommunityPosts = true; // コミュニティ投稿を表示するかどうか
@@ -149,7 +150,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _loadProfileData() async {
-    if (_hasLoadedPosts) return;
+    if (_hasLoadedPosts || _isLoadingProfile) return;
+
+    setState(() {
+      _isLoadingProfile = true;
+    });
 
     final userProvider = context.read<UserProvider>();
     final postProvider = context.read<PostProvider>();
@@ -170,11 +175,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       } else {
         // 他のユーザーのプロフィールの場合
         if (widget.userId != null) {
-          // 他のユーザーのプロフィールでは、まず_profileUserをnullにしてから読み込む
-          setState(() {
-            _profileUser = null;
-          });
-
           _profileUser = await userProvider.getUser(widget.userId!);
           if (_profileUser != null) {
             if (kDebugMode) {
@@ -188,9 +188,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
       }
 
-      setState(() {
-        _hasLoadedPosts = true;
-      });
+      if (mounted) {
+        setState(() {
+          _hasLoadedPosts = true;
+        });
+      }
 
       if (kDebugMode) {
         print('プロフィールデータの読み込み完了');
@@ -198,6 +200,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (e) {
       if (kDebugMode) {
         print('プロフィールデータの読み込みエラー: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
       }
     }
   }
@@ -223,14 +231,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       } else {
         // 他のユーザーのプロフィールの場合
         if (widget.userId != null) {
-          if (mounted) {
+          // _profileUserをnullにしないで、直接更新
+          final updatedUser = await userProvider.getUser(widget.userId!);
+          if (updatedUser != null && mounted) {
             setState(() {
-              _profileUser = null;
+              _profileUser = updatedUser;
             });
-          }
 
-          _profileUser = await userProvider.getUser(widget.userId!);
-          if (_profileUser != null && mounted) {
             if (kDebugMode) {
               print('他のユーザーのプロフィール: 投稿を再読み込み開始 - ${_profileUser!.id}');
             }
@@ -757,7 +764,35 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
-          final user = _profileUser ?? userProvider.currentUser;
+          // 他のユーザーのプロフィールの場合
+          if (!widget.isOwnProfile) {
+            // _profileUserが読み込まれるまで、または読み込み中の場合はローディング表示
+            if (_profileUser == null || _isLoadingProfile) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    WaveLoadingWidget(
+                      size: 80,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '読み込み中...',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          // 自分のプロフィールの場合は現在のユーザーを使用
+          final user =
+              widget.isOwnProfile ? userProvider.currentUser : _profileUser;
 
           if (user == null) {
             return const Center(
@@ -880,51 +915,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                               onPressed: () async {
                                 try {
                                   if (isFollowing) {
-                                    // アンフォロー
-                                    final success = await userProvider
-                                        .unfollowUser(user.id);
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('フォローを解除しました')),
-                                      );
-                                      // プロフィールユーザー情報を更新
-                                      final updatedUser =
-                                          await userProvider.getUser(user.id);
-                                      if (updatedUser != null) {
-                                        setState(() {
-                                          _profileUser = updatedUser;
-                                        });
-                                      }
-                                    }
+                                    await userProvider.unfollowUser(user.id);
                                   } else {
-                                    // フォロー
-                                    final success =
-                                        await userProvider.followUser(user.id);
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('フォローしました')),
-                                      );
-                                      // プロフィールユーザー情報を更新
-                                      final updatedUser =
-                                          await userProvider.getUser(user.id);
-                                      if (updatedUser != null) {
-                                        setState(() {
-                                          _profileUser = updatedUser;
-                                        });
-                                      }
-                                    }
+                                    await userProvider.followUser(user.id);
                                   }
 
-                                  // 現在のユーザー情報を再読み込み
-                                  await userProvider.refreshCurrentUser();
+                                  // フォロー状態変更後にプロフィールを再読み込み
+                                  await _refreshProfileData();
                                 } catch (e) {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('エラーが発生しました: $e')),
+                                      SnackBar(
+                                        content: Text(
+                                          isFollowing
+                                              ? 'フォロー解除に失敗しました'
+                                              : 'フォローに失敗しました',
+                                        ),
+                                      ),
                                     );
                                   }
                                 }
@@ -1020,92 +1027,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const SizedBox(height: 16),
 
                     // フォローボタン（他のユーザーのプロフィールの場合）
-                    if (!widget.isOwnProfile) ...[
-                      const SizedBox(height: 16),
-                      Consumer<UserProvider>(
-                        builder: (context, userProvider, child) {
-                          final currentUser = userProvider.currentUser;
-
-                          // 自分自身のプロフィールの場合はフォローボタンを表示しない
-                          if (currentUser == null ||
-                              currentUser.id == user.id) {
-                            return const SizedBox.shrink();
-                          }
-
-                          final isFollowing =
-                              currentUser.followingIds.contains(user.id);
-
-                          return SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                try {
-                                  if (isFollowing) {
-                                    // アンフォロー
-                                    final success = await userProvider
-                                        .unfollowUser(user.id);
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('フォローを解除しました')),
-                                      );
-                                      // プロフィールユーザー情報を更新
-                                      final updatedUser =
-                                          await userProvider.getUser(user.id);
-                                      if (updatedUser != null) {
-                                        setState(() {
-                                          _profileUser = updatedUser;
-                                        });
-                                      }
-                                    }
-                                  } else {
-                                    // フォロー
-                                    final success =
-                                        await userProvider.followUser(user.id);
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('フォローしました')),
-                                      );
-                                      // プロフィールユーザー情報を更新
-                                      final updatedUser =
-                                          await userProvider.getUser(user.id);
-                                      if (updatedUser != null) {
-                                        setState(() {
-                                          _profileUser = updatedUser;
-                                        });
-                                      }
-                                    }
-                                  }
-
-                                  // 現在のユーザー情報を再読み込み
-                                  await userProvider.refreshCurrentUser();
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('エラーが発生しました: $e')),
-                                    );
-                                  }
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isFollowing
-                                    ? AppColors.surfaceVariant
-                                    : AppColors.primary,
-                                foregroundColor: isFollowing
-                                    ? AppColors.textPrimary
-                                    : AppColors.textOnPrimary,
-                              ),
-                              child: Text(isFollowing ? 'フォロー中' : 'フォロー'),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-
-                    // 統計情報
+                    // 統計情報（1行に配置）
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -1262,12 +1184,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _buildPostSection(BuildContext context, String category) {
     return Consumer2<PostProvider, UserProvider>(
       builder: (context, postProvider, userProvider, child) {
-        // プロフィールデータが読み込まれていない場合は読み込む
-        if (!_hasLoadedPosts && _profileUser != null) {
-          SchedulerBinding.instance.addPostFrameCallback((_) {
-            _loadProfileData();
-          });
-        }
+        // 不要な_loadProfileData()呼び出しを削除
+        // if (!_hasLoadedPosts && _profileUser != null) {
+        //   SchedulerBinding.instance.addPostFrameCallback((_) {
+        //     _loadProfileData();
+        //   });
+        // }
 
         List<PostModel> posts;
 
@@ -1289,7 +1211,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               // 他のユーザーのコミュニティ投稿表示設定を確認
               if (_profileUser != null &&
-                  !_profileUser!.showCommunityPostsToOthers &&
+                  !(_profileUser!.showCommunityPostsToOthers) &&
                   post.communityIds.isNotEmpty) {
                 return false;
               }
@@ -1677,8 +1599,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                     : Container(
                         color: AppColors.surface,
                         child: const Center(
-                          child: Icon(Icons.flag,
-                              color: AppColors.completed, size: 32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_photo_alternate,
+                                  color: AppColors.textSecondary, size: 24),
+                              SizedBox(height: 4),
+                              Text('END',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 10)),
+                            ],
+                          ),
                         ),
                       ))
                 : Container(

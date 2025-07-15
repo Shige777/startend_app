@@ -606,4 +606,114 @@ class CommunityProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+
+  // 招待URL生成
+  Future<String?> generateInviteUrl(String communityId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // 招待トークンを生成
+      final token = _generateRandomToken();
+
+      // 招待情報をcommunity_invitesコレクションに保存
+      await _firestore.collection('community_invites').add({
+        'communityId': communityId,
+        'inviteToken': token,
+        'createdAt': FieldValue.serverTimestamp(),
+        'expiresAt':
+            Timestamp.fromDate(DateTime.now().add(const Duration(days: 7))),
+        'maxUses': 10,
+        'currentUses': 0,
+        'isUsed': false,
+      });
+
+      // 招待URLを生成
+      final inviteUrl = 'startend://invite/$token';
+
+      return inviteUrl;
+    } catch (e) {
+      _setError('招待URL生成に失敗しました');
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // 招待URLで参加
+  Future<bool> joinCommunityByInviteUrl(
+      String inviteToken, String userId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // 招待トークンを検索
+      final inviteSnapshot = await _firestore
+          .collection('community_invites')
+          .where('inviteToken', isEqualTo: inviteToken)
+          .where('isUsed', isEqualTo: false)
+          .limit(1)
+          .get();
+
+      if (inviteSnapshot.docs.isEmpty) {
+        _setError('無効な招待URLです');
+        return false;
+      }
+
+      final inviteDoc = inviteSnapshot.docs.first;
+      final inviteData = inviteDoc.data();
+      final communityId = inviteData['communityId'] as String;
+      final expiresAt = (inviteData['expiresAt'] as Timestamp).toDate();
+      final maxUses = inviteData['maxUses'] as int;
+      final currentUses = inviteData['currentUses'] as int;
+
+      // 有効期限チェック
+      if (DateTime.now().isAfter(expiresAt)) {
+        _setError('招待URLの有効期限が切れています');
+        return false;
+      }
+
+      // 使用回数チェック
+      if (currentUses >= maxUses) {
+        _setError('招待URLの使用回数が上限に達しています');
+        return false;
+      }
+
+      // コミュニティに参加
+      final success = await joinCommunity(communityId, userId: userId);
+      if (!success) {
+        return false;
+      }
+
+      // 招待URLの使用回数を更新
+      await _firestore
+          .collection('community_invites')
+          .doc(inviteDoc.id)
+          .update({
+        'currentUses': currentUses + 1,
+        'isUsed': currentUses + 1 >= maxUses,
+      });
+
+      return true;
+    } catch (e) {
+      _setError('招待URLでの参加に失敗しました');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ランダムトークン生成
+  String _generateRandomToken() {
+    const chars =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch;
+    String token = '';
+
+    for (int i = 0; i < 32; i++) {
+      token += chars[(random + i) % chars.length];
+    }
+
+    return token;
+  }
 }

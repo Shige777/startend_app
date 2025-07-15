@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -142,6 +143,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     final community = await communityProvider.getCommunity(widget.communityId);
     if (community != null) {
       final currentUser = userProvider.currentUser;
+
       setState(() {
         _community = community;
         _isJoined =
@@ -224,10 +226,20 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ),
         title: Text(_community!.name),
         actions: [
-          if (_isJoined)
+          if (_isJoined) ...[
+            // 招待ボタン（リーダーのみ）
+            if (_isLeader)
+              IconButton(
+                icon: const Icon(Icons.person_add),
+                onPressed: _showInviteDialog,
+                tooltip: '招待',
+              ),
             PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
+                  case 'invite':
+                    _showInviteDialog();
+                    break;
                   case 'progress':
                     context.push('/community/${widget.communityId}/progress');
                     break;
@@ -250,6 +262,17 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 }
               },
               itemBuilder: (context) => [
+                if (_isLeader)
+                  const PopupMenuItem(
+                    value: 'invite',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_add),
+                        SizedBox(width: 8),
+                        Text('招待'),
+                      ],
+                    ),
+                  ),
                 const PopupMenuItem(
                   value: 'progress',
                   child: Row(
@@ -285,6 +308,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 ],
               ],
             ),
+          ],
           if (!_isJoined)
             TextButton(
               onPressed:
@@ -603,12 +627,19 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   void _showMembersDialog() {
+    // _isLeaderの値を再計算
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isCurrentUserLeader = currentUser != null &&
+        _community != null &&
+        currentUser.id == _community!.leaderId;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Text('メンバー管理'),
+            const Text('メンバー一覧'),
             const Spacer(),
             Text(
               '${_community!.memberIds.length}/8',
@@ -621,91 +652,122 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ),
         content: SizedBox(
           width: double.maxFinite,
-          height: 400,
-          child: FutureBuilder<List<UserModel>>(
-            future: _loadMemberDetails(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(
-                  child: Text('メンバー情報を取得できませんでした'),
-                );
-              }
-
-              final members = snapshot.data!;
-              return ListView.builder(
-                itemCount: members.length,
-                itemBuilder: (context, index) {
-                  final member = members[index];
-                  final isLeader = member.id == _community!.leaderId;
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: member.profileImageUrl != null
-                            ? NetworkImage(member.profileImageUrl!)
-                            : null,
-                        child: member.profileImageUrl == null
-                            ? const Icon(Icons.person)
-                            : null,
-                      ),
-                      title: Text(
-                        member.displayName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(member.email),
-                          if (isLeader)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'リーダー',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: !isLeader && _isLeader
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.admin_panel_settings,
-                                      color: AppColors.primary),
-                                  onPressed: () =>
-                                      _transferLeadership(member.id),
-                                  tooltip: 'リーダーに任命',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle,
-                                      color: Colors.red),
-                                  onPressed: () => _removeMember(member.id),
-                                  tooltip: 'メンバーを削除',
-                                ),
-                              ],
-                            )
-                          : null,
+          height: 500,
+          child: Column(
+            children: [
+              // 招待ボタン（リーダーのみ表示）
+              if (isCurrentUserLeader) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context); // ダイアログを閉じる
+                      _showInviteDialog(); // 招待ダイアログを表示
+                    },
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('新しいメンバーを招待'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                  );
-                },
-              );
-            },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // メンバー一覧
+              Expanded(
+                child: FutureBuilder<List<UserModel>>(
+                  future: _loadMemberDetails(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text('メンバー情報を取得できませんでした'),
+                      );
+                    }
+
+                    final members = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: members.length,
+                      itemBuilder: (context, index) {
+                        final member = members[index];
+                        final isLeader = member.id == _community!.leaderId;
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage: member.profileImageUrl != null
+                                  ? NetworkImage(member.profileImageUrl!)
+                                  : null,
+                              child: member.profileImageUrl == null
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                            title: Text(
+                              member.displayName,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(member.email),
+                                if (isLeader)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'リーダー',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: !isLeader && isCurrentUserLeader
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                            Icons.admin_panel_settings,
+                                            color: AppColors.primary),
+                                        onPressed: () =>
+                                            _transferLeadership(member.id),
+                                        tooltip: 'リーダーに任命',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle,
+                                            color: Colors.red),
+                                        onPressed: () =>
+                                            _removeMember(member.id),
+                                        tooltip: 'メンバーを削除',
+                                      ),
+                                    ],
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -940,5 +1002,126 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         );
       }
     }
+  }
+
+  // 招待ダイアログを表示
+  void _showInviteDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('コミュニティに招待'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('URLを生成してコミュニティに招待しましょう'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                final communityProvider = context.read<CommunityProvider>();
+                final inviteUrl = await communityProvider
+                    .generateInviteUrl(widget.communityId);
+
+                if (inviteUrl != null) {
+                  Navigator.of(context).pop();
+                  _showInviteUrlDialog(inviteUrl);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('招待URL生成に失敗しました')),
+                  );
+                }
+              },
+              child: const Text('招待URLを生成'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 招待URLダイアログを表示
+  void _showInviteUrlDialog(String inviteUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('招待URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('以下のURLを共有してコミュニティに招待しましょう：'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: SelectableText(
+                inviteUrl,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: inviteUrl));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('URLをクリップボードにコピーしました')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('URLをコピー'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final shareText = 'コミュニティに参加しませんか？\n\n'
+                          'コミュニティ名: ${_community?.name ?? 'コミュニティ'}\n'
+                          '招待URL: $inviteUrl\n\n'
+                          'URLをタップしてアプリで開いてください！';
+
+                      await Clipboard.setData(ClipboardData(text: shareText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('招待内容をクリップボードにコピーしました')),
+                      );
+                    },
+                    icon: const Icon(Icons.share),
+                    label: const Text('招待内容をコピー'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '• 有効期限: 7日間\n'
+              '• 使用回数: 最大10回まで\n'
+              '• URLをタップするとアプリが開きます',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 }

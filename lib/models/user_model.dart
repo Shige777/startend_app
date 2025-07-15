@@ -47,7 +47,9 @@ class UserModel {
       postCount: data['postCount'] ?? 0,
       isPrivate: data['isPrivate'] ?? false,
       requiresApproval: data['requiresApproval'] ?? false,
-      showCommunityPostsToOthers: data['showCommunityPostsToOthers'] ?? true,
+      showCommunityPostsToOthers: data.containsKey('showCommunityPostsToOthers')
+          ? data['showCommunityPostsToOthers'] ?? true
+          : true, // 既存データ用のデフォルト値
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );

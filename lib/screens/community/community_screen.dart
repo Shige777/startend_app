@@ -79,20 +79,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ? const Center(child: WaveLoadingWidget())
           : _buildContent(),
       floatingActionButton: FloatingActionButton(
-        heroTag: "community_screen_fab",
-        onPressed: () {
-          print('コミュニティ作成ボタンがタップされました');
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const CreateCommunityScreen(),
-            ),
-          );
-        },
+        onPressed: _showCreateCommunityDialog,
         backgroundColor: AppColors.primary,
-        child: const Icon(
-          Icons.group_add,
-          color: AppColors.textOnPrimary,
-        ),
+        child: const Icon(Icons.group_add, color: Colors.white),
       ),
     );
   }
@@ -612,6 +601,135 @@ class _CommunityScreenState extends State<CommunityScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('脱退に失敗しました: $e')),
+        );
+      }
+    }
+  }
+
+  // コミュニティ作成ダイアログを表示
+  void _showCreateCommunityDialog() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('コミュニティを作成'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'コミュニティ名',
+                hintText: '例: プログラミングコミュニティ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: '説明',
+                hintText: 'コミュニティの説明を入力',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<bool>(
+                    value: true,
+                    groupValue: true, // デフォルトでオープンに設定
+                    onChanged: (value) {},
+                    title: const Text('オープン'),
+                    subtitle: const Text('誰でも参加可能'),
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<bool>(
+                    value: false,
+                    groupValue: true, // デフォルトでオープンに設定
+                    onChanged: (value) {},
+                    title: const Text('承認制'),
+                    subtitle: const Text('管理者の承認が必要'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _createCommunity(
+                nameController.text.trim(),
+                descriptionController.text.trim(),
+              );
+            },
+            child: const Text('作成'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // コミュニティを作成
+  Future<void> _createCommunity(String name, String description) async {
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('コミュニティ名を入力してください')),
+      );
+      return;
+    }
+
+    try {
+      final userProvider = context.read<UserProvider>();
+      final communityProvider = context.read<CommunityProvider>();
+      final currentUser = userProvider.currentUser;
+
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ログインしてください')),
+        );
+        return;
+      }
+
+      final success = await communityProvider.createCommunity(
+        name: name,
+        description: description,
+        userId: currentUser.id,
+        requiresApproval: false, // デフォルトでオープンに設定
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('コミュニティを作成しました！')),
+        );
+
+        // ユーザー情報を更新
+        await userProvider.refreshCurrentUser();
+
+        // ユーザーのコミュニティ一覧を更新
+        await communityProvider.getUserCommunities(currentUser.id);
+      } else if (mounted) {
+        final errorMessage =
+            communityProvider.errorMessage ?? 'コミュニティ作成に失敗しました';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラーが発生しました: $e')),
         );
       }
     }

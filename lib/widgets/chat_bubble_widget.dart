@@ -249,15 +249,27 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // 完了している場合は画像拡大、自分の投稿で未完了の場合はEND投稿画面へ
-                      if (_currentPost.isCompleted &&
-                          _currentPost.endImageUrl != null) {
-                        _showImageZoom(context, _currentPost.endImageUrl);
-                      } else if (widget.isOwnMessage &&
-                          !_currentPost.isCompleted) {
-                        context.go('/edit-post/${_currentPost.id}');
+                      // 自分の投稿の場合の処理
+                      if (widget.isOwnMessage) {
+                        if (_currentPost.isCompleted &&
+                            _currentPost.endImageUrl != null) {
+                          // 完了済みで画像がある場合は画像拡大
+                          _showImageZoom(context, _currentPost.endImageUrl);
+                        } else if (!_currentPost.isCompleted) {
+                          // 未完了の場合はEND投稿画面へ
+                          context.push('/edit-post/${_currentPost.id}');
+                        } else {
+                          // 完了済みだが画像がない場合（自動完了含む）もEND投稿画面へ
+                          context.push('/edit-post/${_currentPost.id}');
+                        }
+                      } else {
+                        // 他人の投稿の場合
+                        if (_currentPost.isCompleted &&
+                            _currentPost.endImageUrl != null) {
+                          // 画像がある場合のみ拡大表示
+                          _showImageZoom(context, _currentPost.endImageUrl);
+                        }
                       }
-                      // 他人の未完了投稿の場合は何もしない
                     },
                     child: Container(
                       width: double.infinity,
@@ -281,7 +293,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                   children: [
                     Icon(
                       _currentPost.isCompleted
-                          ? Icons.flag
+                          ? Icons.check_circle
                           : Icons.add_photo_alternate,
                       size: 12,
                       color: widget.isOwnMessage

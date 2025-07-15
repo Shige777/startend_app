@@ -46,9 +46,38 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	
+	<!-- ディープリンク設定 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>startend-app.com</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>https</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>startend</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>startend</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.example.startendapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.201575475230-5eg466psfpgd55kpmcafhlp3ok7a230i</string>
+			</array>
+		</dict>
+	</array>
+	
 	<!-- Google Sign-In configuration -->
 	<key>GIDClientID</key>
-	<string>201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l.apps.googleusercontent.com</string>
+	<string>201575475230-5eg466psfpgd55kpmcafhlp3ok7a230i.apps.googleusercontent.com</string>
 	
 	<!-- 通知とバックグラウンド処理のための設定 -->
 	<key>UIBackgroundModes</key>
@@ -69,17 +98,6 @@
 		<string>googleplus</string>
 		<string>googlechrome</string>
 		<string>googlechromes</string>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.example.startendapp</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l</string>
-			</array>
-		</dict>
 	</array>
 </dict>
 </plist>

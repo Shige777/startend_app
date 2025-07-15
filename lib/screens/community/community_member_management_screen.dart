@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/community_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/community_provider.dart';
 import '../../services/community_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
@@ -25,10 +26,9 @@ class CommunityMemberManagementScreen extends StatefulWidget {
 class _CommunityMemberManagementScreenState
     extends State<CommunityMemberManagementScreen> {
   final CommunityService _communityService = CommunityService();
+
   CommunityModel? _community;
   bool _isLoading = true;
-  String? _inviteCode;
-  bool _isGeneratingInvite = false;
 
   @override
   void initState() {
@@ -42,7 +42,6 @@ class _CommunityMemberManagementScreenState
           await _communityService.getCommunity(widget.communityId);
       setState(() {
         _community = community;
-        _inviteCode = community?.inviteCode;
         _isLoading = false;
       });
     } catch (e) {
@@ -55,38 +54,125 @@ class _CommunityMemberManagementScreenState
     }
   }
 
-  Future<void> _generateInviteCode() async {
-    setState(() {
-      _isGeneratingInvite = true;
-    });
+  // 招待URL生成と表示
+  void _showInviteDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('コミュニティに招待'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('URLを生成してコミュニティに招待しましょう'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                final communityProvider = context.read<CommunityProvider>();
+                final inviteUrl = await communityProvider
+                    .generateInviteUrl(widget.communityId);
 
-    try {
-      final code =
-          await _communityService.generateInviteCode(widget.communityId);
-      setState(() {
-        _inviteCode = code;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('招待コードを生成しました')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('招待コード生成に失敗しました: $e')),
-      );
-    } finally {
-      setState(() {
-        _isGeneratingInvite = false;
-      });
-    }
+                if (inviteUrl != null) {
+                  Navigator.of(context).pop();
+                  _showInviteUrlDialog(inviteUrl);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('招待URL生成に失敗しました')),
+                  );
+                }
+              },
+              child: const Text('招待URLを生成'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
   }
 
-  Future<void> _copyInviteCode() async {
-    if (_inviteCode != null) {
-      await Clipboard.setData(ClipboardData(text: _inviteCode!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('招待コードをコピーしました')),
-      );
-    }
+  // 招待URLダイアログを表示
+  void _showInviteUrlDialog(String inviteUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('招待URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('以下のURLを共有してコミュニティに招待しましょう：'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: SelectableText(
+                inviteUrl,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: inviteUrl));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('URLをクリップボードにコピーしました')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('URLをコピー'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final shareText = 'コミュニティに参加しませんか？\n\n'
+                          'コミュニティ名: ${_community?.name ?? 'コミュニティ'}\n'
+                          '招待URL: $inviteUrl\n\n'
+                          'URLをタップしてアプリで開いてください！';
+
+                      await Clipboard.setData(ClipboardData(text: shareText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('招待内容をクリップボードにコピーしました')),
+                      );
+                    },
+                    icon: const Icon(Icons.share),
+                    label: const Text('招待内容をコピー'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '• 有効期限: 7日間\n'
+              '• 使用回数: 最大10回まで\n'
+              '• URLをタップするとアプリが開きます',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _removeMember(String memberId) async {
@@ -216,100 +302,8 @@ class _CommunityMemberManagementScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 招待セクション
-            _buildInviteSection(),
-            const SizedBox(height: 24),
-
             // メンバー一覧
             _buildMembersList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInviteSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '招待管理',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (_inviteCode != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '現在の招待コード',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _inviteCode!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'monospace',
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _copyInviteCode,
-                      icon: const Icon(Icons.copy),
-                      tooltip: 'コピー',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isGeneratingInvite ? null : _generateInviteCode,
-                    icon: _isGeneratingInvite
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.add_link),
-                    label: Text(_inviteCode == null ? '招待コードを生成' : '新しいコードを生成'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '招待コードは7日間有効で、最大10回まで使用できます。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
           ],
         ),
       ),
@@ -341,6 +335,23 @@ class _CommunityMemberManagementScreenState
               ],
             ),
             const SizedBox(height: 16),
+
+            // 招待ボタン
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showInviteDialog,
+                icon: const Icon(Icons.person_add),
+                label: const Text('新しいメンバーを招待'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // memberIdsから全メンバーを表示（自分も含む）
             FutureBuilder<List<UserModel>>(
               future: _loadAllMembers(),
