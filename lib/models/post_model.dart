@@ -211,4 +211,77 @@ class PostModel {
     }
     return DateTime.now().difference(createdAt);
   }
+
+  // 使用時間を計算（進行時間 + 実際にかかった時間）
+  Duration? get totalUsageTime {
+    if (!isCompleted) return null;
+
+    // 実際にかかった時間
+    final actualTime = actualEndTime!.difference(createdAt);
+
+    // 予定時間（進行時間）
+    final scheduledTime = scheduledEndTime != null
+        ? scheduledEndTime!.difference(createdAt)
+        : Duration.zero;
+
+    // 実際の時間と予定時間の合計
+    return actualTime + scheduledTime;
+  }
+
+  // 進行時間のみを取得
+  Duration? get scheduledTime {
+    if (scheduledEndTime == null) return null;
+    return scheduledEndTime!.difference(createdAt);
+  }
+
+  // 実際にかかった時間のみを取得
+  Duration? get actualTime {
+    if (actualEndTime == null) return null;
+    return actualEndTime!.difference(createdAt);
+  }
+
+  // 使用時間を文字列で取得
+  String get totalUsageTimeString {
+    final totalTime = totalUsageTime;
+    if (totalTime == null) return '未完了';
+
+    final hours = totalTime.inHours;
+    final minutes = totalTime.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
+  }
+
+  // 進行時間を文字列で取得
+  String get scheduledTimeString {
+    final scheduledTime = this.scheduledTime;
+    if (scheduledTime == null) return '予定なし';
+
+    final hours = scheduledTime.inHours;
+    final minutes = scheduledTime.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
+  }
+
+  // 実際の時間を文字列で取得
+  String get actualTimeString {
+    final actualTime = this.actualTime;
+    if (actualTime == null) return '未完了';
+
+    final hours = actualTime.inHours;
+    final minutes = actualTime.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
+  }
 }

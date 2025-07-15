@@ -359,51 +359,84 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
   }
 
   Widget _buildMetaInfo(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          _currentPost.isCompleted ? Icons.check_circle : Icons.play_arrow,
-          size: 14,
-          color: widget.isOwnMessage
-              ? Colors.white.withOpacity(0.8)
-              : (_currentPost.isCompleted
-                  ? AppColors.completed
-                  : AppColors.inProgress),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          _currentPost.isCompleted ? '完了' : '進行中',
-          style: TextStyle(
-            fontSize: 12,
-            color: widget.isOwnMessage
-                ? Colors.white.withOpacity(0.8)
-                : (_currentPost.isCompleted
-                    ? AppColors.completed
-                    : AppColors.inProgress),
-          ),
-        ),
-        if (_currentPost.scheduledEndTime != null) ...[
-          const SizedBox(width: 8),
-          Icon(
-            Icons.schedule,
-            size: 12,
-            color: widget.isOwnMessage
-                ? Colors.white.withOpacity(0.6)
-                : AppColors.textSecondary,
-          ),
-          const SizedBox(width: 2),
-          Text(
-            _currentPost.isCompleted
-                ? DateTimeUtils.formatDateTime(_currentPost.actualEndTime ??
-                    _currentPost.scheduledEndTime!)
-                : DateTimeUtils.formatDateTime(_currentPost.scheduledEndTime!),
-            style: TextStyle(
-              fontSize: 10,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _currentPost.isCompleted ? Icons.check_circle : Icons.play_arrow,
+              size: 14,
               color: widget.isOwnMessage
-                  ? Colors.white.withOpacity(0.6)
-                  : AppColors.textSecondary,
+                  ? Colors.white.withOpacity(0.8)
+                  : (_currentPost.isCompleted
+                      ? AppColors.completed
+                      : AppColors.inProgress),
             ),
+            const SizedBox(width: 4),
+            Text(
+              _currentPost.isCompleted ? '完了' : '進行中',
+              style: TextStyle(
+                fontSize: 12,
+                color: widget.isOwnMessage
+                    ? Colors.white.withOpacity(0.8)
+                    : (_currentPost.isCompleted
+                        ? AppColors.completed
+                        : AppColors.inProgress),
+              ),
+            ),
+            if (_currentPost.scheduledEndTime != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.schedule,
+                size: 12,
+                color: widget.isOwnMessage
+                    ? Colors.white.withOpacity(0.6)
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 2),
+              Text(
+                _currentPost.isCompleted
+                    ? DateTimeUtils.formatDateTime(_currentPost.actualEndTime ??
+                        _currentPost.scheduledEndTime!)
+                    : DateTimeUtils.formatDateTime(
+                        _currentPost.scheduledEndTime!),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: widget.isOwnMessage
+                      ? Colors.white.withOpacity(0.6)
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+        // 使用時間を表示（完了した場合のみ）
+        if (_currentPost.isCompleted) ...[
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.timer,
+                size: 12,
+                color: widget.isOwnMessage
+                    ? Colors.white.withOpacity(0.7)
+                    : AppColors.accent,
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '使用時間: ${_currentPost.totalUsageTimeString}',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: widget.isOwnMessage
+                      ? Colors.white.withOpacity(0.7)
+                      : AppColors.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ],

@@ -746,6 +746,28 @@ class PostCardWidget extends StatelessWidget {
             ],
           ),
         ],
+
+        // 使用時間を表示（完了した場合のみ）
+        if (post.isCompleted) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                Icons.timer,
+                size: 16,
+                color: AppColors.accent,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '使用時間: ${post.totalUsageTimeString}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
