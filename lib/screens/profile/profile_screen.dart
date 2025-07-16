@@ -385,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return ((dayOfYear - 1) ~/ 7) + 1;
   }
 
-  // 期間別の実際にかかった時間を表示するWidget
+  // 期間別の進行期間と集中時間を表示するWidget
   Widget _buildPeriodTimeDisplay(List<PostModel> posts) {
     // 完了した投稿のみを対象とする
     final completedPosts = posts
@@ -399,11 +399,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     // 進行期間（予定時間）を合計
     Duration totalScheduledDuration = Duration.zero;
-    // 実際にかかった時間を合計
+    // 集中時間（実際にかかった時間）を合計
     Duration totalActualDuration = Duration.zero;
 
     for (final post in completedPosts) {
-      // 実際にかかった時間
+      // 集中時間（実際にかかった時間）
       final actualDuration = post.actualEndTime!.difference(post.createdAt);
       totalActualDuration += actualDuration;
 
@@ -437,7 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '進行期間: ${_formatDuration(totalScheduledDuration)}',
+                  '進行期間: ${_formatScheduledDuration(totalScheduledDuration)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w500,
@@ -449,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           const SizedBox(height: 8),
         ],
 
-        // 実際にかかった時間を表示
+        // 集中時間（実際にかかった時間）を表示
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -467,7 +467,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               const SizedBox(width: 6),
               Text(
-                '実際にかかった時間: ${_formatDuration(totalActualDuration)}',
+                '集中時間: ${_formatActualDuration(totalActualDuration)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.completed,
                       fontWeight: FontWeight.w500,
@@ -489,6 +489,32 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (days > 0) {
       return '${days}日${hours}時間${minutes}分';
     } else if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
+  }
+
+  // 進行期間を日単位で表示するヘルパーメソッド
+  String _formatScheduledDuration(Duration duration) {
+    final days = duration.inDays;
+    final hours = duration.inHours % 24;
+
+    if (days > 0) {
+      return '${days}日';
+    } else if (hours > 0) {
+      return '${hours}時間';
+    } else {
+      return '1日未満';
+    }
+  }
+
+  // 集中時間を時間分単位で表示するヘルパーメソッド
+  String _formatActualDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+
+    if (hours > 0) {
       return '${hours}時間${minutes}分';
     } else {
       return '${minutes}分';

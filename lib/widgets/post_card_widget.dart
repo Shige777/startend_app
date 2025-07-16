@@ -699,7 +699,7 @@ class PostCardWidget extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '進行期間: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
+                '進行期間: ${_formatScheduledDuration(post)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.primary,
                     ),
@@ -707,19 +707,19 @@ class PostCardWidget extends StatelessWidget {
             ],
           ),
 
-          // 実際にかかった時間を表示（完了した場合のみ）
+          // 集中時間（実際にかかった時間）を表示（完了した場合のみ）
           if (post.isCompleted && post.actualEndTime != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
                 Icon(
-                  Icons.check_circle,
+                  Icons.timer,
                   size: 16,
                   color: AppColors.completed,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '実際の完了: ${DateTimeUtils.formatDateTime(post.actualEndTime!)}',
+                  '集中時間: ${_formatActualDuration(post)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.completed,
                       ),
@@ -732,13 +732,13 @@ class PostCardWidget extends StatelessWidget {
           Row(
             children: [
               Icon(
-                Icons.check_circle,
+                Icons.timer,
                 size: 16,
                 color: AppColors.completed,
               ),
               const SizedBox(width: 4),
               Text(
-                '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime!)}',
+                '集中時間: ${_formatActualDuration(post)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.completed,
                     ),
@@ -873,6 +873,38 @@ class PostCardWidget extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('エラーが発生しました: $e')),
       );
+    }
+  }
+
+  // 進行期間を日単位で表示するヘルパーメソッド
+  String _formatScheduledDuration(PostModel post) {
+    if (post.scheduledEndTime == null) return '予定なし';
+
+    final duration = post.scheduledEndTime!.difference(post.createdAt);
+    final days = duration.inDays;
+    final hours = duration.inHours % 24;
+
+    if (days > 0) {
+      return '${days}日';
+    } else if (hours > 0) {
+      return '${hours}時間';
+    } else {
+      return '1日未満';
+    }
+  }
+
+  // 集中時間を時間分単位で表示するヘルパーメソッド
+  String _formatActualDuration(PostModel post) {
+    if (post.actualEndTime == null) return '未完了';
+
+    final duration = post.actualEndTime!.difference(post.createdAt);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
     }
   }
 }

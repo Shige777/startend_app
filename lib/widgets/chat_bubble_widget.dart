@@ -412,7 +412,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
             ],
           ],
         ),
-        // 使用時間を表示（完了した場合のみ）
+        // 集中時間を表示（完了した場合のみ）
         if (_currentPost.isCompleted) ...[
           const SizedBox(height: 2),
           Row(
@@ -427,7 +427,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
               ),
               const SizedBox(width: 2),
               Text(
-                '使用時間: ${_currentPost.totalUsageTimeString}',
+                '集中時間: ${_formatActualDuration(_currentPost)}',
                 style: TextStyle(
                   fontSize: 10,
                   color: widget.isOwnMessage
@@ -720,6 +720,21 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
   void _showDeleteOption() {
     if (widget.onDelete != null) {
       widget.onDelete!();
+    }
+  }
+
+  // 集中時間を時間分単位で表示するヘルパーメソッド
+  String _formatActualDuration(PostModel post) {
+    if (post.actualEndTime == null) return '未完了';
+
+    final duration = post.actualEndTime!.difference(post.createdAt);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
     }
   }
 }
