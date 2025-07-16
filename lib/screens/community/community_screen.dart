@@ -76,7 +76,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: WaveLoadingWidget())
+          ? const Center(child: WaveLoadingWidget(color: AppColors.primary))
           : _buildContent(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateCommunityDialog,
