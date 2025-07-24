@@ -1,0 +1,20 @@
+# Jekyll configuration for GitHub Pages
+title: StartEnd App
+description: 目標達成を仲間と一緒に
+url: "https://shige777.github.io"
+baseurl: "/startend_app"
+
+# Disable Jekyll processing
+plugins: []
+
+# Don't process HTML files
+include: []
+exclude: []
+
+# Set default layout to none for HTML files
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "none" 
