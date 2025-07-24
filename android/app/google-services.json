@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "201575475230",
+    "project_id": "startend-sns-app",
+    "storage_bucket": "startend-sns-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:201575475230:android:7d9684c6aff952801fa60f",
+        "android_client_info": {
+          "package_name": "com.startend.sns.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "201575475230-p7i18f8cvnt3l0ad53sdp4s4tvpp0vrp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.startend.sns.app",
+            "certificate_hash": "c324c3feecd2e9d729ddd0cd0f9e71df35b440c7"
+          }
+        },
+        {
+          "client_id": "201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpX1-HztSY1JSuhd1-VfuvKEFJBRMrXPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "201575475230-lsfr1s52m5csfnb7n6f03355tvp00b1l.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.startend.sns.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
