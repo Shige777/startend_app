@@ -34,7 +34,7 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
         width: widget.width ?? double.infinity,
         height: widget.height ?? 200,
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey[300]!),
         ),
@@ -102,6 +102,7 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('画像を選択'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -121,6 +122,9 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+            ),
             child: const Text('キャンセル'),
           ),
         ],

@@ -21,7 +21,6 @@ class InviteScreen extends StatefulWidget {
 class _InviteScreenState extends State<InviteScreen> {
   bool _isProcessing = false;
   String? _errorMessage;
-  String? _communityName;
 
   @override
   void initState() {
@@ -106,14 +105,14 @@ class _InviteScreenState extends State<InviteScreen> {
                 const Icon(
                   Icons.error_outline,
                   size: 64,
-                  color: Colors.red,
+                  color: Colors.black,
                 ),
                 const SizedBox(height: 24),
                 Text(
                   _errorMessage!,
                   style: const TextStyle(
                     fontSize: 16,
-                    color: Colors.red,
+                    color: Colors.black,
                   ),
                   textAlign: TextAlign.center,
                 ),

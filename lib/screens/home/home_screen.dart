@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:typed_data';
 
 import '../../providers/post_provider.dart';
 import '../../providers/community_provider.dart';
@@ -13,9 +12,11 @@ import '../../services/storage_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/custom_tab_bar.dart';
+import '../../widgets/native_ad_widget.dart';
 import '../community/community_screen.dart';
 import '../../widgets/platform_image_picker.dart';
 import '../profile/profile_screen.dart';
+import '../../widgets/leaf_loading_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _selectedIndex = 0; // 0: 投稿, 1: 軌跡
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -59,6 +61,13 @@ class _HomeScreenState extends State<HomeScreen>
         _tabController.index = 0;
       }
     });
+
+    // 初期化完了後にローディング状態をfalseに設定
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        _isLoading = false;
+      });
+    });
   }
 
   @override
@@ -71,8 +80,11 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: _buildCurrentScreen(),
+      backgroundColor: Colors.white,
+      body: _isLoading
+          ? const Center(
+              child: LeafLoadingWidget(color: AppColors.primary, size: 50))
+          : _buildContent(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -80,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen>
             _selectedIndex = index;
           });
         },
-        backgroundColor: AppColors.background, // 背景色を統一
+        backgroundColor: Colors.white, // 背景色を白に変更
         elevation: 0, // 影を削除
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: '投稿'),
@@ -91,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildCurrentScreen() {
+  Widget _buildContent() {
     switch (_selectedIndex) {
       case 0:
         return _buildPostScreen();
@@ -119,66 +131,7 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: AppColors.background, // 背景色を統一
         elevation: 0,
         scrolledUnderElevation: 0, // スクロール時の影も削除
-        actions: [
-          Consumer<UserProvider>(
-            builder: (context, userProvider, child) {
-              final currentUser = userProvider.currentUser;
-              if (currentUser == null) return const SizedBox.shrink();
-
-              return StreamBuilder<int>(
-                stream: NotificationService()
-                    .getUnreadNotificationCount(currentUser.id),
-                builder: (context, snapshot) {
-                  final unreadCount = snapshot.data ?? 0;
-
-                  return IconButton(
-                    icon: Stack(
-                      children: [
-                        const Icon(Icons.notifications),
-                        if (unreadCount > 0)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
-                              ),
-                              child: Text(
-                                unreadCount > 99
-                                    ? '99+'
-                                    : unreadCount.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    onPressed: () async {
-                      // 通知アイコンをタップした時に全て既読にする
-                      await NotificationService().markAllAsRead(currentUser.id);
-
-                      // 通知画面に遷移
-                      if (context.mounted) {
-                        context.push('/notifications');
-                      }
-                    },
-                  );
-                },
-              );
-            },
-          ),
-        ],
+        actions: [],
         bottom: CustomTabBar(
           controller: _tabController,
           tabs: const [
@@ -192,17 +145,21 @@ class _HomeScreenState extends State<HomeScreen>
           // 検索バー
           Container(
             padding: const EdgeInsets.all(16),
-            color: AppColors.background, // 背景色を明示的に指定
+            color: Colors.white, // 背景色を白に変更
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
                 hintText: _tabController.index == 0
                     ? '投稿・ユーザーを検索...'
                     : 'コミュニティを検索...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: const TextStyle(color: AppColors.textSecondary),
+                prefixIcon:
+                    const Icon(Icons.search, color: AppColors.textSecondary),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear,
+                            color: AppColors.textSecondary),
                         onPressed: () {
                           _searchController.clear();
                           _performSearch('');
@@ -213,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen>
                 focusedBorder: InputBorder.none, // フォーカス時の枠線も削除
                 enabledBorder: InputBorder.none, // 通常時の枠線も削除
                 filled: true,
-                fillColor: AppColors.background, // 検索バーの背景色も統一
+                fillColor: Colors.white, // 背景色を白に変更
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
@@ -262,18 +219,8 @@ class _HomeScreenState extends State<HomeScreen>
           return null;
         }
       case 1:
-        // 軌跡タブ：投稿作成
-        return FloatingActionButton(
-          heroTag: "home_track_fab",
-          onPressed: () {
-            context.push('/post/create');
-          },
-          backgroundColor: AppColors.primary,
-          child: const Icon(
-            Icons.add,
-            color: AppColors.textOnPrimary,
-          ),
-        );
+        // 軌跡タブ：FloatingActionButtonは不要
+        return null;
       default:
         return null;
     }

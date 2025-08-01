@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
 import '../../services/follow_service.dart';
 import '../../constants/app_colors.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 import '../../widgets/user_list_item.dart';
 
 class FollowListScreen extends StatefulWidget {
@@ -73,10 +73,10 @@ class _FollowListScreenState extends State<FollowListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: AppColors.background, // 背景色を統一
+        backgroundColor: Colors.white, // 背景色を統一
         elevation: 0, // 影を削除
         scrolledUnderElevation: 0, // スクロール時の影も削除
         leading: IconButton(
@@ -95,7 +95,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  WaveLoadingWidget(
+                  LeafLoadingWidget(
                     size: 80,
                     color: AppColors.primary,
                   ),

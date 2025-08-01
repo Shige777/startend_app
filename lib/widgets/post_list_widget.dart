@@ -9,7 +9,10 @@ import '../providers/user_provider.dart';
 import '../constants/app_colors.dart';
 import 'post_card_widget.dart';
 import 'user_list_item.dart';
-import 'wave_loading_widget.dart';
+import 'native_ad_widget.dart';
+import '../services/ad_service.dart';
+
+import 'leaf_loading_widget.dart';
 
 enum PostListType { following, community, user }
 
@@ -34,19 +37,23 @@ class PostListWidget extends StatefulWidget {
 }
 
 class _PostListWidgetState extends State<PostListWidget> {
+  bool _hasInitialized = false;
+
   @override
   void initState() {
     super.initState();
     // ビルド完了後に非同期処理を実行
     SchedulerBinding.instance.addPostFrameCallback((_) {
       // 既に投稿が渡されている場合は読み込みをスキップ
-      if (widget.posts == null) {
+      if (widget.posts == null && !_hasInitialized) {
         _loadPosts();
       }
     });
   }
 
   void _loadPosts() async {
+    if (_hasInitialized) return; // 既に初期化済みの場合はスキップ
+
     final postProvider = context.read<PostProvider>();
 
     // 期限切れ投稿を自動更新
@@ -93,6 +100,12 @@ class _PostListWidgetState extends State<PostListWidget> {
         }
         break;
     }
+
+    if (mounted) {
+      setState(() {
+        _hasInitialized = true;
+      });
+    }
   }
 
   @override
@@ -134,21 +147,21 @@ class _PostListWidgetState extends State<PostListWidget> {
           searchUsers = userProvider.searchResults;
         }
 
-        if (postProvider.isLoading) {
+        if (postProvider.isLoading && posts.isEmpty) {
           return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                WaveLoadingWidget(
-                  size: 80,
+                LeafLoadingWidget(
+                  size: 50,
                   color: AppColors.primary,
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 12),
                 Text(
                   '読み込み中...',
                   style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -176,11 +189,15 @@ class _PostListWidgetState extends State<PostListWidget> {
 
         return RefreshIndicator(
           onRefresh: _onRefresh,
+          color: Colors.black,
+          backgroundColor: Colors.transparent,
+          strokeWidth: 1.0,
+          displacement: 0,
           child: ListView.builder(
             padding: EdgeInsets.zero, // パディングを削除
             itemCount: searchUsers.length + posts.length,
             itemBuilder: (context, index) {
-              // ユーザー結果を先に表示
+              // 検索結果のユーザーを表示
               if (index < searchUsers.length) {
                 return Container(
                   margin:
@@ -196,18 +213,47 @@ class _PostListWidgetState extends State<PostListWidget> {
 
               // 投稿を表示
               final postIndex = index - searchUsers.length;
-              return PostCardWidget(
-                post: posts[postIndex],
-                onTap: widget.onPostTap != null
-                    ? () => widget.onPostTap!(posts[postIndex])
-                    : null,
-                onDelete: _canDeletePost(posts[postIndex])
-                    ? () => _showDeleteConfirmation(posts[postIndex])
-                    : null,
-                fromPage: widget.type == PostListType.following
-                    ? 'following'
-                    : 'posts', // フォロー中タブの場合は'following'、それ以外は'posts'
-              );
+
+              // 広告を表示するかチェック
+              if (AdService.shouldShowAd(postIndex)) {
+                debugPrint('投稿リスト: 広告を表示します (postIndex=$postIndex)');
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PostCardWidget(
+                      post: posts[postIndex],
+                      onTap: widget.onPostTap != null
+                          ? () => widget.onPostTap!(posts[postIndex])
+                          : null,
+                      onDelete: _canDeletePost(posts[postIndex])
+                          ? () => _showDeleteConfirmation(posts[postIndex])
+                          : null,
+                      fromPage: widget.type == PostListType.following
+                          ? 'following'
+                          : 'posts',
+                    ),
+                    // ネイティブ広告をより安全に表示
+                    const SizedBox(
+                      height: 78, // 広告の高さ + マージンを調整
+                      child: NativeAdWidget(),
+                    ),
+                  ],
+                );
+              } else {
+                debugPrint('投稿リスト: 広告を表示しません (postIndex=$postIndex)');
+                return PostCardWidget(
+                  post: posts[postIndex],
+                  onTap: widget.onPostTap != null
+                      ? () => widget.onPostTap!(posts[postIndex])
+                      : null,
+                  onDelete: _canDeletePost(posts[postIndex])
+                      ? () => _showDeleteConfirmation(posts[postIndex])
+                      : null,
+                  fromPage: widget.type == PostListType.following
+                      ? 'following'
+                      : 'posts',
+                );
+              }
             },
           ),
         );
@@ -284,8 +330,8 @@ class _PostListWidgetState extends State<PostListWidget> {
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: WaveLoadingWidget(
-          size: 60,
+        child: LeafLoadingWidget(
+          size: 50,
           color: AppColors.primary,
         ),
       ),

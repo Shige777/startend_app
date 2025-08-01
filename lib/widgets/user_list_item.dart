@@ -149,6 +149,14 @@ class _UserListItemState extends State<UserListItem> {
         setState(() {
           _isFollowing = !_isFollowing;
         });
+        // フォロー状態が変わったことを親に通知（検索画面で即時反映用）
+        if (widget.onTap != null) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              widget.onTap!();
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -171,7 +179,8 @@ class _UserListItemState extends State<UserListItem> {
     final currentUser = userProvider.currentUser;
     final isCurrentUser = currentUser?.id == widget.user.id;
 
-    return Card(
+    return Container(
+      color: Colors.white, // 背景色を白に設定
       margin: const EdgeInsets.symmetric(
         horizontal: AppConstants.smallPadding,
         vertical: AppConstants.smallPadding / 2,
@@ -215,18 +224,24 @@ class _UserListItemState extends State<UserListItem> {
             const SizedBox(height: 4),
             Row(
               children: [
-                Text(
-                  'フォロワー ${widget.user.followersCount}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                Flexible(
+                  child: Text(
+                    'フォロワー ${widget.user.followersCount}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  'フォロー中 ${widget.user.followingCount}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'フォロー中 ${widget.user.followingCount}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -235,13 +250,16 @@ class _UserListItemState extends State<UserListItem> {
         trailing: isCurrentUser
             ? null
             : SizedBox(
-                width: 100,
+                width: 80,
                 child: _isLoading
                     ? const Center(
                         child: SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         ),
                       )
                     : ElevatedButton(
@@ -254,8 +272,8 @@ class _UserListItemState extends State<UserListItem> {
                               ? AppColors.textPrimary
                               : AppColors.textOnPrimary,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                            horizontal: 8,
+                            vertical: 6,
                           ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -266,7 +284,8 @@ class _UserListItemState extends State<UserListItem> {
                               : widget.user.isPrivate
                                   ? 'リクエスト'
                                   : 'フォロー',
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
               ),

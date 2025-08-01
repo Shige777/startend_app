@@ -5,7 +5,8 @@ import '../models/community_model.dart';
 import '../providers/community_provider.dart';
 import '../constants/app_colors.dart';
 import '../providers/user_provider.dart';
-import '../widgets/wave_loading_widget.dart';
+import '../widgets/leaf_loading_widget.dart';
+import '../widgets/user_avatar.dart';
 
 class CommunityListWidget extends StatefulWidget {
   final List<CommunityModel>? communities;
@@ -73,21 +74,21 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
               final communities =
                   widget.communities ?? communityProvider.userCommunities;
 
-              if (communityProvider.isLoading) {
+              if (communityProvider.isLoading && communities.isEmpty) {
                 return const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      WaveLoadingWidget(
-                        size: 80,
+                      LeafLoadingWidget(
+                        size: 50,
                         color: AppColors.primary,
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(height: 12),
                       Text(
                         '読み込み中...',
                         style: TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 16,
+                          fontSize: 14,
                         ),
                       ),
                     ],
@@ -187,48 +188,56 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      community.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    Expanded(
+                      child: Text(
+                        community.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     if (community.description != null &&
                         community.description!.isNotEmpty) ...[
-                      Text(
-                        community.description!,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
+                      const SizedBox(height: 2),
+                      Expanded(
+                        child: Text(
+                          community.description!,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ] else ...[
                       const Spacer(),
                     ],
-                    const Spacer(),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Icon(
                           Icons.people,
-                          size: 14,
+                          size: 12,
                           color: AppColors.textSecondary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          '${community.memberIds.length}人',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
+                        Expanded(
+                          child: Text(
+                            '${community.memberIds.length}人',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -261,8 +270,8 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.exit_to_app, color: Colors.red),
-              title: const Text('脱退', style: TextStyle(color: Colors.red)),
+              leading: const Icon(Icons.exit_to_app, color: Colors.black),
+              title: const Text('脱退', style: TextStyle(color: Colors.black)),
               onTap: () {
                 Navigator.of(context).pop();
                 _showLeaveCommunityDialog(community);
@@ -337,7 +346,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
               await _leaveCommunity(community);
             },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: Colors.black,
             ),
             child: const Text('脱退'),
           ),

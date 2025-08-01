@@ -139,7 +139,10 @@ class PostGridWidget extends StatelessWidget {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  child: _buildImageWidget(post.imageUrl),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildImageWidget(post.imageUrl),
+                  ),
                 ),
               ),
               // 右側：END投稿画像 or プレースホルダー
@@ -147,44 +150,47 @@ class PostGridWidget extends StatelessWidget {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  child: post.isCompleted
-                      ? (post.endImageUrl != null
-                          ? _buildImageWidget(post.endImageUrl)
-                          : Container(
-                              color: AppColors.surfaceVariant,
-                              child: const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.add_photo_alternate,
-                                        color: AppColors.textSecondary,
-                                        size: 24),
-                                    SizedBox(height: 4),
-                                    Text('END',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 10)),
-                                  ],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: post.isCompleted
+                        ? (post.endImageUrl != null
+                            ? _buildImageWidget(post.endImageUrl)
+                            : Container(
+                                color: AppColors.surfaceVariant,
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_photo_alternate,
+                                          color: AppColors.textSecondary,
+                                          size: 24),
+                                      SizedBox(height: 4),
+                                      Text('END',
+                                          style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 10)),
+                                    ],
+                                  ),
                                 ),
+                              ))
+                        : Container(
+                            color: AppColors.surfaceVariant.withOpacity(0.8),
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate,
+                                      color: AppColors.textSecondary, size: 24),
+                                  SizedBox(height: 4),
+                                  Text('END',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 10)),
+                                ],
                               ),
-                            ))
-                      : Container(
-                          color: AppColors.surfaceVariant.withOpacity(0.8),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate,
-                                    color: AppColors.textSecondary, size: 24),
-                                SizedBox(height: 4),
-                                Text('END',
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 10)),
-                              ],
                             ),
                           ),
-                        ),
+                  ),
                 ),
               ),
             ],

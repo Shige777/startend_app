@@ -59,6 +59,28 @@ class PostModel {
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // タイムスタンプ処理を安全にする
+    DateTime? parseTimestamp(dynamic timestamp) {
+      if (timestamp == null) return null;
+      try {
+        if (timestamp is Timestamp) {
+          return timestamp.toDate();
+        } else if (timestamp is Map<String, dynamic>) {
+          // iOSの場合、TimestampがMapとして保存されることがある
+          final seconds = timestamp['_seconds'] as int?;
+          final nanoseconds = timestamp['_nanoseconds'] as int?;
+          if (seconds != null) {
+            return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+          }
+        }
+        return null;
+      } catch (e) {
+        print('タイムスタンプ解析エラー: $e');
+        return null;
+      }
+    }
+
     return PostModel(
       id: doc.id,
       userId: data['userId'] ?? '',
@@ -73,12 +95,8 @@ class PostModel {
       imageUrl: data['imageUrl'],
       endComment: data['endComment'],
       endImageUrl: data['endImageUrl'],
-      scheduledEndTime: data['scheduledEndTime'] != null
-          ? (data['scheduledEndTime'] as Timestamp).toDate()
-          : null,
-      actualEndTime: data['actualEndTime'] != null
-          ? (data['actualEndTime'] as Timestamp).toDate()
-          : null,
+      scheduledEndTime: parseTimestamp(data['scheduledEndTime']),
+      actualEndTime: parseTimestamp(data['actualEndTime']),
       privacyLevel: PrivacyLevel.values.firstWhere(
         (e) => e.toString() == 'PrivacyLevel.${data['privacyLevel']}',
         orElse: () => PrivacyLevel.public,
@@ -86,8 +104,8 @@ class PostModel {
       communityIds: List<String>.from(data['communityIds'] ?? []),
       likedByUserIds: List<String>.from(data['likedByUserIds'] ?? []),
       likeCount: data['likeCount'] ?? 0,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      createdAt: parseTimestamp(data['createdAt']) ?? DateTime.now(),
+      updatedAt: parseTimestamp(data['updatedAt']) ?? DateTime.now(),
     );
   }
 
@@ -209,23 +227,27 @@ class PostModel {
     if (actualEndTime != null) {
       return actualEndTime!.difference(createdAt);
     }
+
+    // 未完了の場合は、終了予定時刻を超えないように制限
+    if (scheduledEndTime != null) {
+      final now = DateTime.now();
+      final scheduledEnd = scheduledEndTime!;
+
+      // 現在時刻が終了予定時刻を超えている場合は、終了予定時刻までの時間を返す
+      if (now.isAfter(scheduledEnd)) {
+        return scheduledEnd.difference(createdAt);
+      }
+    }
+
     return DateTime.now().difference(createdAt);
   }
 
-  // 使用時間を計算（進行時間 + 実際にかかった時間）
+  // 使用時間を計算（実際にかかった時間のみ）
   Duration? get totalUsageTime {
     if (!isCompleted) return null;
 
-    // 実際にかかった時間
-    final actualTime = actualEndTime!.difference(createdAt);
-
-    // 予定時間（進行時間）
-    final scheduledTime = scheduledEndTime != null
-        ? scheduledEndTime!.difference(createdAt)
-        : Duration.zero;
-
-    // 実際の時間と予定時間の合計
-    return actualTime + scheduledTime;
+    // 実際にかかった時間のみを返す
+    return actualEndTime!.difference(createdAt);
   }
 
   // 進行時間のみを取得
@@ -277,6 +299,21 @@ class PostModel {
 
     final hours = actualTime.inHours;
     final minutes = actualTime.inMinutes % 60;
+
+    if (hours > 0) {
+      return '${hours}時間${minutes}分';
+    } else {
+      return '${minutes}分';
+    }
+  }
+
+  // 経過時間を文字列で取得
+  String get elapsedTimeString {
+    final elapsedTime = this.elapsedTime;
+    if (elapsedTime == null) return '計算中';
+
+    final hours = elapsedTime.inHours;
+    final minutes = elapsedTime.inMinutes % 60;
 
     if (hours > 0) {
       return '${hours}時間${minutes}分';

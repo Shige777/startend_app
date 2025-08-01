@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -13,7 +14,8 @@ import '../../models/post_model.dart';
 import '../../models/user_model.dart';
 
 import '../../widgets/post_card_widget.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
+import '../../services/notification_service.dart';
 import 'profile_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -85,6 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ? loadingProgress.cumulativeBytesLoaded /
                             loadingProgress.expectedTotalBytes!
                         : null,
+                    color: Colors.white,
                   ),
                 );
               },
@@ -99,10 +102,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         );
       } else {
-        // モバイル環境では従来通り
+        // モバイル環境ではCachedNetworkImageProviderを使用
         return CircleAvatar(
           radius: 40,
-          backgroundImage: NetworkImage(imageUrl),
+          backgroundImage: CachedNetworkImageProvider(imageUrl),
           onBackgroundImageError: (error, stackTrace) {
             print('プロフィール画像読み込みエラー: $error');
           },
@@ -161,29 +164,46 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     try {
       if (widget.isOwnProfile) {
-        // 自分のプロフィールの場合
+        // 自分のプロフィールの場合 - ユーザー情報を再取得
+        await userProvider.refreshCurrentUser();
         _profileUser = userProvider.currentUser;
         if (_profileUser != null) {
+          // UIを即座に更新
+          if (mounted) {
+            setState(() {});
+          }
+
           if (kDebugMode) {
             print('軌跡画面: 自分の投稿を読み込み開始 - ${_profileUser!.id}');
           }
-          // 期限切れ投稿を自動更新してから投稿を取得
-          await postProvider.updateExpiredPosts();
-          await postProvider.getUserPosts(_profileUser!.id,
-              currentUserId: userProvider.currentUser?.id);
+
+          // 投稿の読み込みを並行実行
+          await Future.wait([
+            postProvider.updateExpiredPosts(),
+            postProvider.getUserPosts(_profileUser!.id,
+                currentUserId: userProvider.currentUser?.id),
+          ]);
         }
       } else {
         // 他のユーザーのプロフィールの場合
         if (widget.userId != null) {
           _profileUser = await userProvider.getUser(widget.userId!);
           if (_profileUser != null) {
+            // UIを即座に更新
+            if (mounted) {
+              setState(() {});
+            }
+
             if (kDebugMode) {
               print('他のユーザーのプロフィール: 投稿を読み込み開始 - ${_profileUser!.id}');
             }
-            // 期限切れ投稿を自動更新してから投稿を取得
-            await postProvider.updateExpiredPosts();
-            await postProvider.getUserPosts(_profileUser!.id,
-                currentUserId: userProvider.currentUser?.id);
+
+            // 投稿の読み込みを並行実行
+            await Future.wait([
+              postProvider.updateExpiredPosts(),
+              postProvider.getUserPosts(_profileUser!.id,
+                  currentUserId: userProvider.currentUser?.id),
+            ]);
           }
         }
       }
@@ -433,13 +453,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Icon(
                   Icons.schedule,
                   size: 16,
-                  color: AppColors.primary,
+                  color: Colors.black,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   '進行期間: ${_formatScheduledDuration(totalScheduledDuration)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
+                        color: Colors.black,
                         fontWeight: FontWeight.w500,
                       ),
                 ),
@@ -450,31 +470,23 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
 
         // 集中時間（実際にかかった時間）を表示
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.completed.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.completed.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.timer,
-                size: 16,
-                color: AppColors.completed,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '集中時間: ${_formatActualDuration(totalActualDuration)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.completed,
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-            ],
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.timer,
+              size: 16,
+              color: Colors.black,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '集中時間: ${_formatActualDuration(totalActualDuration)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ],
         ),
       ],
     );
@@ -545,7 +557,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         // 軌跡画面（自分のプロフィール）では戻るボタンを表示しない
         automaticallyImplyLeading: !widget.isOwnProfile,
@@ -563,14 +575,73 @@ class _ProfileScreenState extends State<ProfileScreen>
                 },
               )
             : null,
-        title: Text(widget.isOwnProfile
-            ? '軌跡'
-            : (_profileUser?.displayName ?? 'プロフィール')),
-        backgroundColor: AppColors.background, // 背景色を統一
+        title: Text(
+            widget.isOwnProfile ? '' : (_profileUser?.displayName ?? 'プロフィール')),
+        backgroundColor: Colors.white, // 背景色を統一
         elevation: 0, // 影を削除
         scrolledUnderElevation: 0, // スクロール時の影も削除
         actions: widget.isOwnProfile
             ? [
+                // 通知アイコン
+                Consumer<UserProvider>(
+                  builder: (context, userProvider, child) {
+                    final currentUser = userProvider.currentUser;
+                    if (currentUser == null) return const SizedBox.shrink();
+
+                    return StreamBuilder<int>(
+                      stream: NotificationService()
+                          .getUnreadNotificationCount(currentUser.id),
+                      builder: (context, snapshot) {
+                        final unreadCount = snapshot.data ?? 0;
+
+                        return IconButton(
+                          icon: Stack(
+                            children: [
+                              const Icon(Icons.notifications),
+                              if (unreadCount > 0)
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.error,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 16,
+                                      minHeight: 16,
+                                    ),
+                                    child: Text(
+                                      unreadCount > 99
+                                          ? '99+'
+                                          : unreadCount.toString(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          onPressed: () async {
+                            // 通知アイコンをタップした時に全て既読にする
+                            await NotificationService()
+                                .markAllAsRead(currentUser.id);
+
+                            // 通知画面に遷移
+                            if (context.mounted) {
+                              context.push('/notifications');
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
                 // 投稿のソート選択
                 PopupMenuButton<PostSortType>(
                   icon: const Icon(Icons.sort),
@@ -648,6 +719,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
+                  color: Colors.white,
                   onSelected: (value) {
                     if (value == 'logout') {
                       _showLogoutDialog();
@@ -701,9 +773,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                       value: 'logout',
                       child: Row(
                         children: [
-                          Icon(Icons.logout, color: Colors.red),
+                          Icon(Icons.logout, color: Colors.black),
                           SizedBox(width: 8),
-                          Text('ログアウト', style: TextStyle(color: Colors.red)),
+                          Text('ログアウト', style: TextStyle(color: Colors.black)),
                         ],
                       ),
                     ),
@@ -790,15 +862,41 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
-          // 他のユーザーのプロフィールの場合
-          if (!widget.isOwnProfile) {
-            // _profileUserが読み込まれるまで、または読み込み中の場合はローディング表示
+          // 自分のプロフィールの場合は現在のユーザーを使用
+          final user =
+              widget.isOwnProfile ? userProvider.currentUser : _profileUser;
+
+          // 自分のプロフィールの場合は即座に表示、他のユーザーの場合はローディング表示
+          if (widget.isOwnProfile) {
+            if (user == null) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    LeafLoadingWidget(
+                      size: 80,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '読み込み中...',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          } else {
+            // 他のユーザーのプロフィールの場合
             if (_profileUser == null || _isLoadingProfile) {
               return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    WaveLoadingWidget(
+                    LeafLoadingWidget(
                       size: 80,
                       color: AppColors.primary,
                     ),
@@ -816,16 +914,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             }
           }
 
-          // 自分のプロフィールの場合は現在のユーザーを使用
-          final user =
-              widget.isOwnProfile ? userProvider.currentUser : _profileUser;
-
+          // ユーザーがnullの場合はローディング表示
           if (user == null) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  WaveLoadingWidget(
+                  LeafLoadingWidget(
                     size: 80,
                     color: AppColors.primary,
                   ),
@@ -885,8 +980,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8), // 16から8に削減
 
+                      // フォローボタン（他のユーザーのプロフィールの場合）
                       // 統計情報（1行に配置）
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -920,61 +1016,35 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ],
                       ),
 
-                      // フォローボタン（他のユーザーのプロフィールの場合）
-                      const SizedBox(height: 16),
-                      Consumer<UserProvider>(
-                        builder: (context, userProvider, child) {
-                          final currentUser = userProvider.currentUser;
-
-                          // 自分自身のプロフィールの場合はフォローボタンを表示しない
-                          if (currentUser == null ||
-                              currentUser.id == user.id) {
-                            return const SizedBox.shrink();
-                          }
-
-                          final isFollowing =
-                              currentUser.followingIds.contains(user.id);
-
-                          return SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                try {
-                                  if (isFollowing) {
-                                    await userProvider.unfollowUser(user.id);
-                                  } else {
-                                    await userProvider.followUser(user.id);
-                                  }
-
-                                  // フォロー状態変更後にプロフィールを再読み込み
-                                  await _refreshProfileData();
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          isFollowing
-                                              ? 'フォロー解除に失敗しました'
-                                              : 'フォローに失敗しました',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isFollowing
-                                    ? AppColors.surfaceVariant
-                                    : AppColors.primary,
-                                foregroundColor: isFollowing
-                                    ? AppColors.textPrimary
-                                    : AppColors.textOnPrimary,
-                              ),
-                              child: Text(isFollowing ? 'フォロー中' : 'フォロー'),
+                      // プロフィール編集ボタン（自分のプロフィールの場合）
+                      if (widget.isOwnProfile) ...[
+                        const SizedBox(height: 12), // 16から12に削減
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              print('プロフィール編集ボタンがタップされました');
+                              try {
+                                // GoRouterの代わりにNavigator.pushを使用
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ProfileSettingsScreen(),
+                                  ),
+                                );
+                                print('プロフィール設定画面への遷移を実行しました');
+                              } catch (e) {
+                                print('プロフィール設定画面への遷移でエラー: $e');
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primary),
+                              foregroundColor: AppColors.primary,
                             ),
-                          );
-                        },
-                      ),
+                            child: const Text('プロフィールを編集'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1179,6 +1249,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _buildStatItem(BuildContext context, String label, String value,
       {VoidCallback? onTap}) {
     Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
@@ -1187,12 +1258,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                 color: AppColors.primary,
               ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2), // 4から2に削減
         Text(
           label,
           style: Theme.of(
             context,
-          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 11, // フォントサイズを小さく
+              ),
         ),
       ],
     );
@@ -1251,7 +1325,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             }
 
             final status = post.status;
-            final now = DateTime.now();
 
             // 集中投稿は常に表示
             if (status == PostStatus.concentration) {
@@ -1400,6 +1473,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           return RefreshIndicator(
             onRefresh: _refreshProfileData,
+            color: Colors.black,
+            backgroundColor: Colors.transparent,
+            strokeWidth: 1.0,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
@@ -1471,6 +1547,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           // 過去の投稿を期間別に表示
           return RefreshIndicator(
             onRefresh: _refreshProfileData,
+            color: Colors.black,
+            backgroundColor: Colors.transparent,
+            strokeWidth: 1.0,
+            displacement: 0,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
@@ -1725,7 +1805,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 await _performLogout();
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+                foregroundColor: Colors.black,
               ),
               child: const Text('ログアウト'),
             ),
@@ -1751,7 +1831,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('ログアウトに失敗しました: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.black,
           ),
         );
       }
@@ -1763,6 +1843,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('プライバシー設定'),
         content: Consumer<UserProvider>(
           builder: (context, userProvider, child) {
@@ -1780,6 +1861,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     final updatedUser = currentUser.copyWith(isPrivate: value);
                     await userProvider.updateUser(updatedUser);
                   },
+                  activeColor: AppColors.primary,
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.grey.shade300,
                 ),
                 SwitchListTile(
                   title: const Text('フォロー申請の承認制'),
@@ -1790,6 +1874,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         currentUser.copyWith(requiresApproval: value);
                     await userProvider.updateUser(updatedUser);
                   },
+                  activeColor: AppColors.primary,
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.grey.shade300,
                 ),
                 SwitchListTile(
                   title: const Text('コミュニティ投稿を他のユーザーに表示'),
@@ -1800,6 +1887,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         currentUser.copyWith(showCommunityPostsToOthers: value);
                     await userProvider.updateUser(updatedUser);
                   },
+                  activeColor: AppColors.primary,
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.grey.shade300,
                 ),
               ],
             );
@@ -1879,8 +1969,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               content: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.local_fire_department,
-                      color: AppColors.flame),
+                  const Icon(Icons.eco, color: AppColors.flame),
                   const SizedBox(width: 8),
                   Text('${post.title}にリアクションしました'),
                 ],

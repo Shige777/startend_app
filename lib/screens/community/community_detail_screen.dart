@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/community_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/community_provider.dart';
@@ -13,7 +14,7 @@ import '../../providers/post_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/post_model.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 import '../../widgets/platform_image_picker_mobile.dart';
 import '../../utils/date_time_utils.dart';
 
@@ -34,6 +35,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   bool _isLoading = true;
   CommunityModel? _community;
   List<PostModel> _communityPosts = [];
+  int _postCount = 0; // 投稿数を追加
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
       setState(() {
         _communityPosts = posts;
+        _postCount = posts.length; // 投稿数を設定
         _isLoading = false;
       });
     } else {
@@ -100,7 +103,28 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     if (mounted) {
       setState(() {
         _communityPosts = posts;
+        _postCount = posts.length; // 投稿数を更新
       });
+
+      if (kDebugMode) {
+        print('CommunityDetailScreen: 投稿数更新 - $_postCount件');
+      }
+    }
+  }
+
+  // 投稿数をリアルタイムで更新
+  Future<void> _updatePostCount() async {
+    final postProvider = context.read<PostProvider>();
+    final posts = await postProvider.getCommunityPosts(widget.communityId);
+
+    if (mounted) {
+      setState(() {
+        _postCount = posts.length;
+      });
+
+      if (kDebugMode) {
+        print('CommunityDetailScreen: 投稿数リアルタイム更新 - $_postCount件');
+      }
     }
   }
 
@@ -122,7 +146,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       // ネットワーク画像
       return CircleAvatar(
         radius: radius,
-        backgroundImage: NetworkImage(imageUrl),
+        backgroundImage: CachedNetworkImageProvider(imageUrl),
       );
     } else {
       // ローカルファイル
@@ -161,16 +185,16 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              WaveLoadingWidget(
-                size: 80,
+              LeafLoadingWidget(
+                size: 50,
                 color: AppColors.primary,
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 12),
               Text(
                 'コミュニティを読み込み中...',
                 style: TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -192,9 +216,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.background, // 背景色を統一
+        backgroundColor: Colors.white, // 背景色を統一
         elevation: 0, // 影を削除
         scrolledUnderElevation: 0, // スクロール時の影も削除
         leading: IconButton(
@@ -218,6 +242,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               },
             ),
             PopupMenuButton<String>(
+              color: Colors.white,
               onSelected: (value) {
                 switch (value) {
                   case 'chat':
@@ -267,13 +292,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'progress',
                   child: Row(
                     children: [
-                      Icon(Icons.trending_up),
+                      Icon(Icons.analytics),
                       SizedBox(width: 8),
-                      Text('活動統計'),
+                      Text('投稿数 ($_postCount件)'),
                     ],
                   ),
                 ),
@@ -341,6 +366,16 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   color: AppColors.textSecondary,
                                 ),
                           ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '投稿数: $_postCount件',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
                         ],
                       ),
                     ),
@@ -399,7 +434,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         child: _communityPosts.isEmpty
                             ? const Center(
                                 child: Text(
-                                  'まだ投稿がありません\n最初の投稿をしてみましょう！',
+                                  'まだコミュニティ内で投稿がありません\n最初の投稿をしてみましょう！',
                                   textAlign: TextAlign.center,
                                 ),
                               )
@@ -425,10 +460,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       floatingActionButton: _isJoined
           ? FloatingActionButton(
               heroTag: "community_detail_fab",
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
               onPressed: () {
                 context.push('/post/create?communityId=${widget.communityId}');
               },
-              child: const Icon(Icons.add),
+              child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
     );
@@ -622,6 +659,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Row(
           children: [
             const Text('メンバー一覧'),
@@ -683,68 +721,75 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         final member = members[index];
                         final isLeader = member.id == _community!.leaderId;
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: member.profileImageUrl != null
-                                  ? NetworkImage(member.profileImageUrl!)
+                        return GestureDetector(
+                          onTap: () {
+                            // ユーザープロフィール画面に遷移
+                            context.go('/profile/${member.id}');
+                          },
+                          child: Card(
+                            color: Colors.white,
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: member.profileImageUrl != null
+                                    ? NetworkImage(member.profileImageUrl!)
+                                    : null,
+                                child: member.profileImageUrl == null
+                                    ? const Icon(Icons.person)
+                                    : null,
+                              ),
+                              title: Text(
+                                member.displayName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(member.email),
+                                  if (isLeader)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Text(
+                                        'リーダー',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: !isLeader && isCurrentUserLeader
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                              Icons.admin_panel_settings,
+                                              color: AppColors.primary),
+                                          onPressed: () =>
+                                              _transferLeadership(member.id),
+                                          tooltip: 'リーダーに任命',
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle,
+                                              color: Colors.black),
+                                          onPressed: () =>
+                                              _removeMember(member.id),
+                                          tooltip: 'メンバーを削除',
+                                        ),
+                                      ],
+                                    )
                                   : null,
-                              child: member.profileImageUrl == null
-                                  ? const Icon(Icons.person)
-                                  : null,
                             ),
-                            title: Text(
-                              member.displayName,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(member.email),
-                                if (isLeader)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Text(
-                                      'リーダー',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: !isLeader && isCurrentUserLeader
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(
-                                            Icons.admin_panel_settings,
-                                            color: AppColors.primary),
-                                        onPressed: () =>
-                                            _transferLeadership(member.id),
-                                        tooltip: 'リーダーに任命',
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle,
-                                            color: Colors.red),
-                                        onPressed: () =>
-                                            _removeMember(member.id),
-                                        tooltip: 'メンバーを削除',
-                                      ),
-                                    ],
-                                  )
-                                : null,
                           ),
                         );
                       },
@@ -944,6 +989,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     ),
                   ),
                   const Spacer(),
+                  // リアクションボタン
+                  _buildReactionButton(post),
+                  const SizedBox(width: 8),
                   Text(
                     DateTimeUtils.getRelativeTime(post.createdAt),
                     style: const TextStyle(
@@ -960,6 +1008,65 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     );
   }
 
+  Widget _buildReactionButton(PostModel post) {
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+    final isLiked = currentUser != null && post.isLikedBy(currentUser.id);
+
+    return IconButton(
+      icon: Icon(
+        isLiked ? Icons.favorite : Icons.favorite_border,
+        color: isLiked ? AppColors.primary : AppColors.textSecondary,
+      ),
+      onPressed: () async {
+        if (currentUser == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ログインが必要です')),
+          );
+          return;
+        }
+
+        print(
+            'コミュニティ詳細画面: リアクション開始 - 投稿ID=${post.id}, ユーザーID=${currentUser.id}'); // デバッグログ追加
+
+        final postProvider = context.read<PostProvider>();
+        bool success;
+        if (isLiked) {
+          print('コミュニティ詳細画面: いいね解除を実行'); // デバッグログ追加
+          success = await postProvider.unlikePost(post.id, currentUser.id);
+        } else {
+          print('コミュニティ詳細画面: いいね追加を実行'); // デバッグログ追加
+          success = await postProvider.likePost(post.id, currentUser.id);
+        }
+
+        print('コミュニティ詳細画面: サーバー更新結果: $success'); // デバッグログ追加
+
+        if (success && mounted) {
+          setState(() {
+            // 投稿のいいね状態を更新
+            final updatedPost = post.copyWith(
+              likeCount: isLiked ? post.likeCount - 1 : post.likeCount + 1,
+              likedByUserIds: isLiked
+                  ? post.likedByUserIds
+                      .where((id) => id != currentUser.id)
+                      .toList()
+                  : [...post.likedByUserIds, currentUser.id],
+            );
+            // 投稿リストを更新
+            final index = _communityPosts.indexWhere((p) => p.id == post.id);
+            if (index != -1) {
+              _communityPosts[index] = updatedPost;
+            }
+          });
+          print('コミュニティ詳細画面: リアクション成功'); // デバッグログ追加
+        } else {
+          print('コミュニティ詳細画面: リアクション失敗'); // デバッグログ追加
+        }
+      },
+      tooltip: isLiked ? 'いいねを解除' : 'いいねする',
+    );
+  }
+
   Future<void> _removeMember(String memberId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -973,7 +1080,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Colors.black),
             child: const Text('削除'),
           ),
         ],
@@ -1155,7 +1262,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.red,
+                  foregroundColor: Colors.black,
                 ),
                 child: const Text('脱退'),
               ),

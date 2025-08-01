@@ -5,16 +5,12 @@ import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:typed_data';
 import '../../providers/user_provider.dart';
 import '../../providers/auth_provider.dart' as auth;
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 
-import '../../models/post_model.dart';
-import '../../widgets/platform_image_picker_mobile.dart';
 import '../../services/storage_service.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
@@ -96,7 +92,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return const Center(
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
@@ -214,7 +212,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text('保存'),
               ),
@@ -414,6 +415,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       final success = await userProvider.updateUser(updatedUser);
 
       if (success) {
+        // ユーザー情報を再取得して投稿画面での表示を即座に更新
+        await userProvider.refreshCurrentUser();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('プロフィールを更新しました')),
@@ -466,7 +470,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.black,
             duration: const Duration(seconds: 5),
           ),
         );

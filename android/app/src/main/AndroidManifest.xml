@@ -6,11 +6,21 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- インターネット権限 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- AdMob用の権限 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
     <application
         android:label="startend_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
+        
+        <!-- AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"

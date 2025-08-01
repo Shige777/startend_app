@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/post_model.dart';
 
 class NotificationService {
@@ -188,14 +189,77 @@ class NotificationService {
     }
   }
 
-  /// 特定のユーザーに通知を送信
+  /// 通知設定を取得
+  Future<Map<String, bool>> _getNotificationSettings(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'push_notifications': prefs.getBool('push_notifications') ?? true,
+        'like_notifications': prefs.getBool('like_notifications') ?? true,
+        'follow_notifications': prefs.getBool('follow_notifications') ?? true,
+        'community_notifications':
+            prefs.getBool('community_notifications') ?? true,
+        'deadline_notifications':
+            prefs.getBool('deadline_notifications') ?? true,
+      };
+    } catch (e) {
+      print('通知設定取得エラー: $e');
+      return {
+        'push_notifications': true,
+        'like_notifications': true,
+        'follow_notifications': true,
+        'community_notifications': true,
+        'deadline_notifications': true,
+      };
+    }
+  }
+
+  /// 特定のユーザーに通知を送信（設定をチェック）
   Future<void> sendNotificationToUser({
     required String userId,
     required String title,
     required String body,
     Map<String, dynamic>? data,
+    String? notificationType,
   }) async {
     try {
+      // 通知設定を確認
+      final settings = await _getNotificationSettings(userId);
+
+      // プッシュ通知がOFFの場合は、すべての通知を無効にする
+      final pushNotificationsEnabled = settings['push_notifications'] ?? true;
+      if (!pushNotificationsEnabled) {
+        print('プッシュ通知がOFFのため、すべての通知を送信しません');
+        return;
+      }
+
+      // 通知タイプに応じて設定をチェック
+      bool shouldSend = true;
+      if (notificationType != null) {
+        switch (notificationType) {
+          case 'like':
+            shouldSend = settings['like_notifications'] ?? true;
+            break;
+          case 'follow':
+            shouldSend = settings['follow_notifications'] ?? true;
+            break;
+          case 'community':
+            shouldSend = settings['community_notifications'] ?? true;
+            break;
+          case 'deadline':
+            shouldSend = settings['deadline_notifications'] ?? true;
+            break;
+          default:
+            shouldSend = true; // プッシュ通知がONの場合はデフォルトで送信
+        }
+      }
+
+      // 設定がOFFの場合は通知を送信しない
+      if (!shouldSend) {
+        print('通知設定がOFFのため、通知を送信しません: $notificationType');
+        return;
+      }
+
       // TODO: Cloud Functionsを使用してプッシュ通知を送信
       // または、FCMトークンを使用して直接送信
       await _firestore.collection('notifications').add({
@@ -225,6 +289,7 @@ class NotificationService {
         'type': 'follow',
         'id': followerId,
       },
+      notificationType: 'follow',
     );
   }
 
@@ -243,6 +308,7 @@ class NotificationService {
         'type': 'post',
         'id': postId,
       },
+      notificationType: 'like',
     );
   }
 
@@ -261,7 +327,40 @@ class NotificationService {
         'type': 'post',
         'id': postId,
       },
+      notificationType: 'like',
     );
+  }
+
+  /// コミュニティ投稿通知の送信
+  Future<void> sendCommunityPostNotification({
+    required String communityId,
+    required String communityName,
+    required String postTitle,
+    required String posterName,
+    required List<String> memberIds,
+    required String postId,
+  }) async {
+    try {
+      // 投稿者以外のメンバーに通知を送信
+      for (final memberId in memberIds) {
+        if (memberId != postId) {
+          // 投稿者自身には通知しない
+          await sendNotificationToUser(
+            userId: memberId,
+            title: '$communityNameで新しい投稿',
+            body: '${posterName}さんが「$postTitle」を投稿しました',
+            data: {
+              'type': 'community_post',
+              'communityId': communityId,
+              'postId': postId,
+            },
+            notificationType: 'community',
+          );
+        }
+      }
+    } catch (e) {
+      print('コミュニティ投稿通知送信エラー: $e');
+    }
   }
 
   /// 予定時刻リマインダー通知の設定
@@ -269,21 +368,86 @@ class NotificationService {
     required String postId,
     required String title,
     required DateTime scheduledTime,
+    required String userId,
   }) async {
-    // 予定時刻の30分前に通知を設定
-    final reminderTime = scheduledTime.subtract(const Duration(minutes: 30));
+    // 通知設定を確認
+    final settings = await _getNotificationSettings(userId);
+    final deadlineNotificationsEnabled =
+        settings['deadline_notifications'] ?? true;
+
+    // 設定がOFFの場合は通知をスケジュールしない
+    if (!deadlineNotificationsEnabled) {
+      print('終了予定時刻通知がOFFのため、通知をスケジュールしません');
+      return;
+    }
+
+    // 予定時刻の5分前に通知を設定
+    final reminderTime = scheduledTime.subtract(const Duration(minutes: 5));
 
     if (reminderTime.isAfter(DateTime.now())) {
       // TODO: ローカル通知のスケジュール設定
       // または、Cloud Functionsでスケジュール通知を設定
       await _firestore.collection('scheduled_notifications').add({
         'postId': postId,
-        'title': 'リマインダー',
-        'body': '「$title」の予定時刻まで30分です',
+        'userId': userId,
+        'title': '終了予定時刻リマインダー',
+        'body': '「$title」の終了予定時刻まで5分です',
         'scheduledTime': Timestamp.fromDate(reminderTime),
-        'type': 'reminder',
+        'type': 'deadline',
         'processed': false,
       });
+
+      print('終了予定時刻通知をスケジュールしました: $reminderTime');
+    } else {
+      print('終了予定時刻が過去のため、通知をスケジュールしません');
+    }
+  }
+
+  /// 終了予定時刻通知のスケジュール
+  Future<void> scheduleDeadlineNotification({
+    required String postId,
+    required String title,
+    required DateTime scheduledTime,
+    required String userId,
+  }) async {
+    // 通知設定を確認
+    final settings = await _getNotificationSettings(userId);
+
+    // プッシュ通知がOFFの場合は、すべての通知を無効にする
+    final pushNotificationsEnabled = settings['push_notifications'] ?? true;
+    if (!pushNotificationsEnabled) {
+      print('プッシュ通知がOFFのため、終了予定時刻通知をスケジュールしません');
+      return;
+    }
+
+    final deadlineNotificationsEnabled =
+        settings['deadline_notifications'] ?? true;
+
+    // 設定がOFFの場合は通知をスケジュールしない
+    if (!deadlineNotificationsEnabled) {
+      print('終了予定時刻通知がOFFのため、通知をスケジュールしません');
+      return;
+    }
+
+    // 予定時刻の5分前に通知を設定
+    final reminderTime = scheduledTime.subtract(const Duration(minutes: 5));
+
+    if (reminderTime.isAfter(DateTime.now())) {
+      // TODO: ローカル通知のスケジュール設定
+      // または、Cloud Functionsでスケジュール通知を設定
+      await _firestore.collection('scheduled_notifications').add({
+        'postId': postId,
+        'userId': userId,
+        'title': '終了予定時刻リマインダー',
+        'body': '「$title」の終了予定時刻まで5分です',
+        'scheduledTime': Timestamp.fromDate(reminderTime),
+        'type': 'deadline',
+        'processed': false,
+      });
+
+      print('終了予定時刻通知をスケジュールしました: $reminderTime');
+    } else {
+      print('終了予定時刻が過去のため、通知をスケジュールしません');
     }
   }
 
@@ -407,6 +571,7 @@ class NotificationService {
       payload: 'concentration_${post.id}',
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
 
@@ -458,6 +623,7 @@ class NotificationService {
       payload: 'progress_${post.id}',
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
 

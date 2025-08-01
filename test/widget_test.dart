@@ -2,10 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:startend_app/main.dart';
-import 'package:startend_app/providers/auth_provider.dart';
-import 'package:startend_app/providers/user_provider.dart';
 
 // Firebase のモック設定
 void setupFirebaseAuthMocks() {

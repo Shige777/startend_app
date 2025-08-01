@@ -5,7 +5,7 @@ import '../../models/community_model.dart';
 import '../../providers/community_provider.dart';
 
 import '../../constants/app_colors.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 import '../../widgets/community_list_widget.dart';
 
 class CommunityListScreen extends StatefulWidget {
@@ -61,7 +61,7 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -74,7 +74,7 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
           },
         ),
         title: Text(widget.title),
-        backgroundColor: AppColors.background, // 背景色を統一
+        backgroundColor: Colors.white, // 背景色を統一
         elevation: 0, // 影を削除
         scrolledUnderElevation: 0, // スクロール時の影も削除
       ),
@@ -83,7 +83,7 @@ class _CommunityListScreenState extends State<CommunityListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  WaveLoadingWidget(
+                  LeafLoadingWidget(
                     size: 80,
                     color: AppColors.primary,
                   ),

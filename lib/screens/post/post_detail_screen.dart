@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/post_model.dart';
 import '../../providers/post_provider.dart';
@@ -27,20 +26,57 @@ class PostDetailScreen extends StatefulWidget {
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _PostDetailScreenState extends State<PostDetailScreen>
+    with SingleTickerProviderStateMixin {
   PostModel? _post;
   bool _isLoading = false;
   bool _isLiked = false;
+  late AnimationController _likeAnimationController;
+  late Animation<double> _likeAnimation;
+  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
-    _post = widget.post;
+    _post = widget.post; // 初期化を追加
+    _likeAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1200), // アニメーション時間を調整
+      vsync: this,
+    );
+
+    // 回転アニメーション
+    _rotationAnimation = Tween<double>(
+      begin: -0.2,
+      end: 0.0, // 終了位置を0に修正
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // スケールアニメーション
+    _likeAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.elasticOut,
+    ));
+
+    // 投稿詳細を読み込む
     _loadPostDetails();
   }
 
+  @override
+  void dispose() {
+    _likeAnimationController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadPostDetails() async {
+    print('_loadPostDetails called - widget.postId: ${widget.postId}');
+
     if (_post != null) {
+      print('_post already exists, skipping load');
       final userProvider = context.read<UserProvider>();
       final currentUser = userProvider.currentUser;
       if (currentUser != null) {
@@ -56,8 +92,27 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
 
     try {
-      // TODO: PostProviderに個別投稿取得メソッドを追加
-      // 現在は仮実装
+      final postProvider = context.read<PostProvider>();
+      final postId = widget.postId; // widget.postIdを使用
+      print('Loading post with ID: $postId');
+      final post = await postProvider.getPostById(postId);
+
+      if (post != null) {
+        setState(() {
+          _post = post;
+          final userProvider = context.read<UserProvider>();
+          final currentUser = userProvider.currentUser;
+          if (currentUser != null) {
+            _isLiked = post.isLikedBy(currentUser.id);
+          }
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('投稿が見つかりません')),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +237,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+        child: CircularProgressIndicator(
+          color: Colors.black,
+        ),
       ),
     );
 
@@ -216,9 +273,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // デバッグ情報を追加
+    print(
+        'PostDetailScreen build - _isLoading: $_isLoading, _post: ${_post?.id}');
+
     if (_isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Colors.black,
+          ),
+        ),
       );
     }
 
@@ -232,8 +297,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -248,14 +316,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         ),
         title: const Text('投稿詳細'),
         actions: [
-          // 投稿者本人の場合のみ編集・削除ボタンを表示
+          // 投稿者本人の場合のみ削除ボタンを表示
           if (_isPostOwner()) ...[
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                context.push('/edit-post', extra: _post);
-              },
-            ),
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed: _showDeleteConfirmation,
@@ -276,25 +338,96 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               enableImageZoom: true, // 画像拡大機能を有効化
             ),
 
+            // 実際にかかった時間の表示（完了投稿の場合）
+            if (_post!.isCompleted && _post!.actualEndTime != null) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.defaultPadding,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer, color: Colors.black, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getElapsedTime(),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // カスタムアクションボタン
             Padding(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.defaultPadding,
+                vertical: 8,
+              ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   // いいねボタン
                   InkWell(
-                    onTap: _toggleLike,
+                    onTap: () {
+                      final wasLiked = _isLiked;
+                      _toggleLike();
+                      if (!wasLiked) {
+                        // アニメーションコントローラーをリセットしてから開始
+                        _likeAnimationController.reset();
+                        _likeAnimationController.forward().then((_) {
+                          // アニメーション終了後はそのまま停止
+                        });
+                      }
+                    },
                     borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.local_fire_department,
-                            size: 24,
-                            color: _isLiked
-                                ? AppColors.flame
-                                : AppColors.textSecondary,
+                          AnimatedBuilder(
+                            animation: _likeAnimationController,
+                            builder: (context, child) {
+                              if (_likeAnimationController.status ==
+                                  AnimationStatus.dismissed) {
+                                // 通常時はそのまま
+                                return Icon(
+                                  Icons.eco,
+                                  size: 28,
+                                  color: _isLiked
+                                      ? AppColors.flame
+                                      : AppColors.textSecondary,
+                                );
+                              } else {
+                                // アニメーション中は上から落ちてくる
+                                return SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, -1.0),
+                                    end: const Offset(0, 0),
+                                  ).animate(CurvedAnimation(
+                                    parent: _likeAnimationController,
+                                    curve: Curves.easeOut,
+                                  )),
+                                  child: Transform.rotate(
+                                    angle: _rotationAnimation.value,
+                                    child: Transform.scale(
+                                      scale: _likeAnimation.value,
+                                      child: Icon(
+                                        Icons.eco,
+                                        size: 28,
+                                        color: _isLiked
+                                            ? AppColors.flame
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -322,6 +455,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  // 日時フォーマット関数
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.month}/${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
   // 実際にかかった時間を計算する関数
   String _getElapsedTime() {
     if (_post?.actualEndTime == null) return '';
@@ -342,7 +480,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   // 残り時間を計算する関数
   String _getRemainingTime() {
-    if (_post?.scheduledEndTime == null) return '';
+    if (_post?.scheduledEndTime == null) return '未定';
 
     final now = DateTime.now();
     final remaining = _post!.scheduledEndTime!.difference(now);

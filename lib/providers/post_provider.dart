@@ -3,13 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/post_model.dart';
 import '../services/notification_service.dart';
-import '../services/progress_service.dart';
+import '../providers/user_provider.dart';
 
 class PostProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final NotificationService _notificationService = NotificationService();
-  final ProgressService _progressService = ProgressService();
 
   List<PostModel> _posts = [];
   List<PostModel> _followingPosts = [];
@@ -18,6 +17,11 @@ class PostProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentUserId; // 現在読み込み中のユーザーID
+
+  // ユーザー投稿のキャッシュ
+  Map<String, List<PostModel>> _userPostsCache = {};
+  Map<String, DateTime> _userPostsCacheTime = {};
+  static const Duration _cacheExpiry = Duration(minutes: 5); // 5分間キャッシュ
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;
@@ -36,6 +40,12 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 読み込み状態をリセット（タブ切り替え時の不要な読み込みを防ぐため）
+  void resetLoadingState() {
+    _isLoading = false;
+    notifyListeners();
+  }
+
   // 投稿作成
   Future<String?> createPost(PostModel post) async {
     try {
@@ -45,9 +55,49 @@ class PostProvider extends ChangeNotifier {
       final docRef =
           await _firestore.collection('posts').add(post.toFirestore());
 
+      // ユーザーの投稿数を更新
+      await _firestore.collection('users').doc(post.userId).update({
+        'postCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
       // 作成された投稿に通知をスケジュール
       final createdPost = post.copyWith(id: docRef.id);
       await _notificationService.schedulePostNotifications(createdPost);
+
+      // コミュニティ投稿の場合は、コミュニティメンバーに通知を送信
+      if (createdPost.communityIds.isNotEmpty) {
+        for (final communityId in createdPost.communityIds) {
+          // コミュニティ情報を取得
+          final communityDoc =
+              await _firestore.collection('communities').doc(communityId).get();
+          if (communityDoc.exists) {
+            final communityData = communityDoc.data() as Map<String, dynamic>;
+            final communityName = communityData['name'] ?? 'コミュニティ';
+            final memberIds =
+                List<String>.from(communityData['memberIds'] ?? []);
+            // 投稿者情報を取得
+            final userDoc = await _firestore
+                .collection('users')
+                .doc(createdPost.userId)
+                .get();
+            final posterName = userDoc.exists
+                ? (userDoc.data() as Map<String, dynamic>)['displayName'] ??
+                    'ユーザー'
+                : 'ユーザー';
+
+            // コミュニティ通知を送信
+            await _notificationService.sendCommunityPostNotification(
+              communityId: communityId,
+              communityName: communityName,
+              postTitle: createdPost.title,
+              posterName: posterName,
+              memberIds: memberIds,
+              postId: docRef.id, // 投稿のID
+            );
+          }
+        }
+      }
 
       // ローカルの投稿リストに追加
       _userPosts.insert(0, createdPost);
@@ -57,11 +107,6 @@ class PostProvider extends ChangeNotifier {
         _communityPosts.insert(0, createdPost);
         if (kDebugMode) {
           print('コミュニティ投稿リストに追加: ${createdPost.title}');
-        }
-
-        // 各コミュニティの活動統計を更新
-        for (final communityId in createdPost.communityIds) {
-          _progressService.updateActivityStats(createdPost.userId, communityId);
         }
       }
 
@@ -77,28 +122,33 @@ class PostProvider extends ChangeNotifier {
   }
 
   // END投稿作成（START投稿を更新）
-  Future<bool> createEndPost(
-      String startPostId, String endComment, String? endImageUrl) async {
+  Future<bool> createEndPost(String startPostId, String endComment,
+      String? endImageUrl, DateTime? actualEndTime) async {
     try {
       _setLoading(true);
       _setError(null);
+
+      // 投稿に関連する通知をキャンセル（重複通知を防ぐため）
+      await _notificationService.cancelPostNotifications(startPostId);
 
       // START投稿にEND投稿の情報を追加
       await _firestore.collection('posts').doc(startPostId).update({
         'endComment': endComment,
         'endImageUrl': endImageUrl,
-        'actualEndTime': FieldValue.serverTimestamp(),
+        'actualEndTime': actualEndTime != null
+            ? Timestamp.fromDate(actualEndTime)
+            : FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       // ローカルの投稿リストも更新
-      final now = DateTime.now();
+      final endTime = actualEndTime ?? DateTime.now();
       final updatedPost =
           _userPosts.firstWhere((post) => post.id == startPostId).copyWith(
                 endComment: endComment,
                 endImageUrl: endImageUrl,
-                actualEndTime: now,
-                updatedAt: now,
+                actualEndTime: endTime,
+                updatedAt: endTime,
               );
 
       // 各リストから既存の投稿を削除
@@ -127,27 +177,10 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
-  // 投稿更新
-  Future<bool> updatePost(PostModel post) async {
-    try {
-      _setLoading(true);
-      _setError(null);
-
-      await _firestore
-          .collection('posts')
-          .doc(post.id)
-          .update(post.toFirestore());
-
-      // ローカルの投稿リストも更新
-      updatePostInLists(post);
-
-      return true;
-    } catch (e) {
-      _setError('投稿更新に失敗しました');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
+  // ユーザー投稿キャッシュをクリア
+  void _clearUserPostsCache(String userId) {
+    _userPostsCache.remove(userId);
+    _userPostsCacheTime.remove(userId);
   }
 
   // フォロー中の投稿取得
@@ -344,6 +377,19 @@ class PostProvider extends ChangeNotifier {
       _setError(null);
       _currentUserId = userId;
 
+      // キャッシュをチェック
+      if (_userPostsCache.containsKey(userId)) {
+        final cacheTime = _userPostsCacheTime[userId];
+        if (cacheTime != null &&
+            DateTime.now().difference(cacheTime) < _cacheExpiry) {
+          if (kDebugMode) {
+            print('ユーザー投稿をキャッシュから取得: $userId');
+          }
+          _userPosts = _userPostsCache[userId]!;
+          return _userPosts;
+        }
+      }
+
       if (kDebugMode) {
         print('ユーザー投稿取得開始: $userId');
       }
@@ -388,6 +434,10 @@ class PostProvider extends ChangeNotifier {
         return bTime.compareTo(aTime);
       });
 
+      // キャッシュに保存
+      _userPostsCache[userId] = _userPosts;
+      _userPostsCacheTime[userId] = DateTime.now();
+
       if (kDebugMode) {
         print('ユーザー投稿取得完了: ${_userPosts.length}件');
         for (final post in _userPosts) {
@@ -411,15 +461,21 @@ class PostProvider extends ChangeNotifier {
   // 投稿をIDで取得
   Future<PostModel?> getPostById(String postId) async {
     try {
+      print('PostProvider.getPostById called with ID: $postId');
       _setLoading(true);
       _setError(null);
 
       final doc = await _firestore.collection('posts').doc(postId).get();
+      print('Firestore query result - exists: ${doc.exists}');
       if (doc.exists) {
-        return PostModel.fromFirestore(doc);
+        final post = PostModel.fromFirestore(doc);
+        print('Post loaded successfully: ${post.id}');
+        return post;
       }
+      print('Post not found in Firestore');
       return null;
     } catch (e) {
+      print('Error loading post: $e');
       _setError('投稿取得に失敗しました');
       return null;
     } finally {
@@ -428,7 +484,8 @@ class PostProvider extends ChangeNotifier {
   }
 
   // 投稿検索
-  Future<List<PostModel>> searchPosts(String query) async {
+  Future<List<PostModel>> searchPosts(String query,
+      {String? currentUserId}) async {
     try {
       _setLoading(true);
       _setError(null);
@@ -437,27 +494,150 @@ class PostProvider extends ChangeNotifier {
         return [];
       }
 
-      // 部分一致検索のため、全投稿を取得してフィルタリング
-      final querySnapshot = await _firestore
+      print('投稿検索開始: $query'); // デバッグログ追加
+
+      // より包括的な検索のために複数のクエリを組み合わせる
+      List<PostModel> allPosts = [];
+
+      // 1. 最新の投稿を取得（件数を大幅増加）
+      final recentQuerySnapshot = await _firestore
           .collection('posts')
           .orderBy('createdAt', descending: true)
-          .limit(100) // パフォーマンスのため上限を設定
+          .limit(2000) // 1000から2000に大幅増加
           .get();
 
-      final posts = querySnapshot.docs
+      final recentPosts = recentQuerySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
+      allPosts.addAll(recentPosts);
+      print('最新投稿取得数: ${recentPosts.length}');
+
+      // 2. 人気の投稿（いいね数が多い投稿）も取得
+      final popularQuerySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('likeCount', descending: true)
+          .limit(1000) // 500から1000に増加
+          .get();
+
+      final popularPosts = popularQuerySnapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+      allPosts.addAll(popularPosts);
+      print('人気投稿取得数: ${popularPosts.length}');
+
+      // 3. 過去の投稿も含む（1ヶ月前までの投稿）
+      final oneMonthAgo = DateTime.now().subtract(const Duration(days: 30));
+      final pastPostsQuery = await _firestore
+          .collection('posts')
+          .where('createdAt', isGreaterThan: oneMonthAgo)
+          .orderBy('createdAt', descending: true)
+          .limit(1000) // 500から1000に増加
+          .get();
+
+      final pastPosts = pastPostsQuery.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+      allPosts.addAll(pastPosts);
+      print('過去投稿取得数: ${pastPosts.length}');
+
+      // 4. フォロー中のユーザーの投稿を優先的に取得（currentUserIdが提供された場合）
+      if (currentUserId != null) {
+        // 現在のユーザーのフォロー情報を取得
+        final userDoc =
+            await _firestore.collection('users').doc(currentUserId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final followingIds =
+              List<String>.from(userData['followingIds'] ?? []);
+
+          print('フォロー中のユーザー数: ${followingIds.length}');
+
+          if (followingIds.isNotEmpty) {
+            // フォロー中のユーザーの投稿を取得（件数を増加）
+            final followingPostsQuery = await _firestore
+                .collection('posts')
+                .where('userId', whereIn: followingIds)
+                .orderBy('createdAt', descending: true)
+                .limit(500) // 200から500に増加
+                .get();
+
+            final followingPosts = followingPostsQuery.docs
+                .map((doc) => PostModel.fromFirestore(doc))
+                .toList();
+            allPosts.addAll(followingPosts);
+            print('フォロー中ユーザーの投稿取得数: ${followingPosts.length}');
+
+            // フォロー中のユーザーの過去の投稿も取得（1ヶ月前まで）
+            final followingPastPostsQuery = await _firestore
+                .collection('posts')
+                .where('userId', whereIn: followingIds)
+                .where('createdAt', isGreaterThan: oneMonthAgo)
+                .orderBy('createdAt', descending: true)
+                .limit(500) // 300から500に増加
+                .get();
+
+            final followingPastPosts = followingPastPostsQuery.docs
+                .map((doc) => PostModel.fromFirestore(doc))
+                .toList();
+            allPosts.addAll(followingPastPosts);
+            print('フォロー中ユーザーの過去投稿取得数: ${followingPastPosts.length}');
+
+            // フォロー中のユーザーの投稿の詳細をログ出力
+            for (final post in followingPosts.take(5)) {
+              print(
+                  'フォロー中ユーザーの投稿例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
+            }
+          }
+        }
+      }
+
+      // 重複を除去（IDでユニークにする）
+      final uniquePosts = <String, PostModel>{};
+      for (final post in allPosts) {
+        uniquePosts[post.id] = post;
+      }
+
+      final posts = uniquePosts.values.toList();
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // 最新順にソート
+
+      print('取得した投稿数: ${posts.length}'); // デバッグログ追加
 
       // 部分一致でフィルタリング
       final searchQuery = query.toLowerCase();
+      print('検索クエリ: $searchQuery');
+
       final filteredPosts = posts.where((post) {
-        return post.title.toLowerCase().contains(searchQuery) ||
-            (post.comment?.toLowerCase().contains(searchQuery) ?? false) ||
-            (post.endComment?.toLowerCase().contains(searchQuery) ?? false);
+        // タイトル、コメント、ENDコメントで検索
+        final titleMatch = post.title.toLowerCase().contains(searchQuery);
+        final commentMatch =
+            post.comment?.toLowerCase().contains(searchQuery) ?? false;
+        final endCommentMatch =
+            post.endComment?.toLowerCase().contains(searchQuery) ?? false;
+
+        // デバッグログを追加
+        if (titleMatch || commentMatch || endCommentMatch) {
+          print(
+              '検索マッチ: 投稿ID=${post.id}, タイトル=${post.title}, コメント=${post.comment}, ENDコメント=${post.endComment}');
+        }
+
+        return titleMatch || commentMatch || endCommentMatch;
       }).toList();
 
-      return filteredPosts.take(20).toList(); // 結果を20件に制限
+      print('フィルタリング後の投稿数: ${filteredPosts.length}'); // デバッグログ追加
+
+      // 検索結果の詳細をログ出力
+      for (final post in filteredPosts.take(10)) {
+        print(
+            '検索結果例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
+      }
+
+      // 結果を200件に増加（100から200に変更）
+      final result = filteredPosts.take(200).toList();
+      print('最終結果の投稿数: ${result.length}'); // デバッグログ追加
+
+      return result;
     } catch (e) {
+      print('投稿検索エラー: $e'); // デバッグログ追加
       _setError('投稿検索に失敗しました');
       return [];
     } finally {
@@ -522,10 +702,27 @@ class PostProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      // 投稿情報を取得してユーザーIDを取得
+      final postDoc = await _firestore.collection('posts').doc(postId).get();
+      if (!postDoc.exists) {
+        _setError('投稿が見つかりません');
+        return false;
+      }
+
+      final postData = postDoc.data() as Map<String, dynamic>;
+      final userId = postData['userId'] as String;
+
       // 投稿に関連する通知をキャンセル
       await _notificationService.cancelPostNotifications(postId);
 
+      // 投稿を削除
       await _firestore.collection('posts').doc(postId).delete();
+
+      // ユーザーの投稿数を減らす
+      await _firestore.collection('users').doc(userId).update({
+        'postCount': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       // ローカルの投稿リストからも削除
       _userPosts.removeWhere((post) => post.id == postId);
@@ -613,6 +810,9 @@ class PostProvider extends ChangeNotifier {
             'endComment': '24時間経過により自動完了',
             'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          // 投稿に関連する通知をキャンセル（重複通知を防ぐため）
+          await _notificationService.cancelPostNotifications(post.id);
 
           // ローカルリスト更新用の投稿データを作成
           final updatedPost = post.copyWith(

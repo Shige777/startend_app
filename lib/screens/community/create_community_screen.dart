@@ -36,6 +36,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   Future<void> _handleImageSelection() async {
     try {
+      print('コミュニティアイコン選択開始');
       // 直接ギャラリーから画像を選択
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
@@ -46,13 +47,19 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       );
 
       if (pickedFile != null) {
+        print('画像が選択されました: ${pickedFile.name}');
         final bytes = await pickedFile.readAsBytes();
+        print('画像バイト数: ${bytes.length}');
         setState(() {
           _selectedImageBytes = bytes;
           _selectedImageFileName = pickedFile.name;
         });
+        print('画像が設定されました');
+      } else {
+        print('画像が選択されませんでした');
       }
     } catch (e) {
+      print('画像選択エラー: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('画像の選択に失敗しました: $e')),
@@ -149,198 +156,221 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   @override
   Widget build(BuildContext context) {
     print('CreateCommunityScreen build メソッドが実行されました');
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('コミュニティ作成'),
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home?tab=community');
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _handleSubmit,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('作成'),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppConstants.defaultPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // アイコン選択
-              Center(
-                child: Column(
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // タイトル
+                const Text(
+                  'コミュニティを作成',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // アイコン選択
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      onTap: _handleImageSelection,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: _selectedImageBytes != null
-                            ? ClipRRect(
+                    const Text(
+                      'コミュニティアイコン',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              print('アイコン選択ボタンがタップされました');
+                              await _handleImageSelection();
+                              print(
+                                  '_selectedImageBytes:  [32m [1m [4m${_selectedImageBytes?.length} [0m');
+                            },
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(50),
-                                child: Image.memory(
-                                  _selectedImageBytes!,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.add_a_photo,
-                                size: 40,
-                                color: AppColors.textSecondary,
+                                border: Border.all(
+                                    color: AppColors.divider, width: 2),
                               ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'アイコンを選択（任意）',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      '※ 大きな画像は自動的に圧縮されます',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textHint,
+                              child: _selectedImageBytes != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(50),
+                                      child: Image.memory(
+                                        _selectedImageBytes!,
+                                        fit: BoxFit.cover,
+                                        width: 100,
+                                        height: 100,
+                                      ),
+                                    )
+                                  : Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.image,
+                                          size: 40,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '画像を選択',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'アイコンを選択（任意）',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-              // コミュニティ名
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'コミュニティ名',
-                  hintText: '例: 朝活コミュニティ',
-                  border: OutlineInputBorder(),
+                // コミュニティ名
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'コミュニティ名',
+                    hintText: '例: 朝活コミュニティ',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLength: 50,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'コミュニティ名を入力してください';
+                    }
+                    return null;
+                  },
                 ),
-                maxLength: 50,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'コミュニティ名を入力してください';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // 説明
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: '説明（任意）',
-                  hintText: 'コミュニティの説明を入力してください',
-                  border: OutlineInputBorder(),
+                // 説明
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: '説明（任意）',
+                    hintText: 'コミュニティの説明を入力してください',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
                 ),
-                maxLines: 3,
-                maxLength: 200,
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // 設定
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '設定',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                // 設定
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'プライバシー設定',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('承認制'),
-                        subtitle: const Text('新しいメンバーの参加に承認が必要'),
-                        value: _requiresApproval,
-                        onChanged: (value) {
-                          setState(() {
-                            _requiresApproval = value;
-                          });
+                    ),
+                    const SizedBox(height: 12),
+                    RadioListTile<bool>(
+                      title: const Text('オープン'),
+                      subtitle: const Text('誰でも参加可能'),
+                      value: false,
+                      groupValue: _requiresApproval,
+                      activeColor: Colors.black,
+                      onChanged: (value) {
+                        setState(() {
+                          _requiresApproval = value ?? false;
+                        });
+                      },
+                    ),
+                    RadioListTile<bool>(
+                      title: const Text('承認制'),
+                      subtitle: const Text('コミュニティ管理者の承認が必要'),
+                      value: true,
+                      groupValue: _requiresApproval,
+                      activeColor: Colors.black,
+                      onChanged: (value) {
+                        print('承認制が選択されました: $value');
+                        setState(() {
+                          _requiresApproval = value ?? false;
+                        });
+                        print('_requiresApprovalが更新されました: $_requiresApproval');
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ボタン
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/home?tab=community');
+                          }
                         },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 注意事項
-              Card(
-                color: AppColors.surface,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '注意事項',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '• コミュニティ作成後、あなたがリーダーになります\n'
-                        '• 最大8名まで参加可能です\n'
-                        '• 承認制にすると、参加申請を承認する必要があります',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.black,
                         ),
+                        child: const Text('キャンセル'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('作成'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

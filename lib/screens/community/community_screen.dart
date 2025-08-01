@@ -5,7 +5,7 @@ import '../../models/community_model.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 import 'create_community_screen.dart'; // Added import for CreateCommunityScreen
 
 class CommunityScreen extends StatefulWidget {
@@ -19,12 +19,15 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   bool _isLoading = false;
+  bool _hasInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCommunities();
+      if (!_hasInitialized) {
+        _loadCommunities();
+      }
     });
   }
 
@@ -39,6 +42,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   Future<void> _loadCommunities() async {
+    if (_hasInitialized) return; // 既に初期化済みの場合はスキップ
+
     setState(() {
       _isLoading = true;
     });
@@ -61,6 +66,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasInitialized = true;
         });
       }
     }
@@ -74,12 +80,25 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: _isLoading
-          ? const Center(child: WaveLoadingWidget(color: AppColors.primary))
-          : _buildContent(),
+      backgroundColor: Colors.white,
+      body: Consumer<CommunityProvider>(
+        builder: (context, communityProvider, child) {
+          // データが既に存在する場合は読み込みアニメーションを表示しない
+          if (_isLoading && communityProvider.userCommunities.isEmpty) {
+            return const Center(
+                child: LeafLoadingWidget(color: AppColors.primary, size: 50));
+          }
+          return _buildContent();
+        },
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateCommunityDialog,
+        onPressed: () {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const CreateCommunityScreen(),
+          );
+        },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.group_add, color: Colors.white),
       ),
@@ -109,6 +128,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
         return RefreshIndicator(
           onRefresh: _loadCommunities,
+          color: Colors.black,
+          backgroundColor: Colors.transparent,
+          strokeWidth: 1.0,
+          displacement: 0,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
@@ -164,10 +187,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ElevatedButton(
               onPressed: () {
                 print('空の状態からコミュニティ作成ボタンがタップされました');
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const CreateCommunityScreen(),
-                  ),
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const CreateCommunityScreen(),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -186,15 +209,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   Widget _buildCommunityGrid(List<CommunityModel> communities) {
     return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 32),
+      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const ClampingScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           childAspectRatio: 0.8,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
         ),
         itemCount: communities.length,
         itemBuilder: (context, index) {
@@ -237,13 +260,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
             }
           },
           child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.divider.withOpacity(0.3),
-                width: 1,
-              ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
             child: Column(
               children: [
@@ -252,12 +271,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   flex: 3, // 2から3に変更
                   child: Container(
                     width: double.infinity,
-                    decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
-                    ),
                     child: ClipRRect(
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(12),
@@ -271,7 +284,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 Expanded(
                   flex: 2, // 3から2に変更
                   child: Padding(
-                    padding: const EdgeInsets.all(8), // 12から8に変更
+                    padding: const EdgeInsets.all(6), // 8から6に変更
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -284,7 +297,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2), // 4から2に変更
+                        const SizedBox(height: 1), // 2から1に変更
                         if (community.description != null &&
                             community.description!.isNotEmpty) ...[
                           Expanded(
@@ -293,7 +306,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 11, // 12から11に変更
-                                height: 1.2, // 1.3から1.2に変更
+                                height: 1.1, // 1.2から1.1に変更
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -302,20 +315,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         ] else ...[
                           const Expanded(child: SizedBox()),
                         ],
-                        const SizedBox(height: 2), // 4から2に変更
+                        const SizedBox(height: 1), // 2から1に変更
                         Row(
                           children: [
                             const Icon(
                               Icons.people,
-                              size: 14, // 16から14に変更
+                              size: 12, // 14から12に変更
                               color: AppColors.textSecondary,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3), // 4から3に変更
                             Text(
                               '${community.memberIds.length}人',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 11, // 12から11に変更
+                                fontSize: 10, // 11から10に変更
                               ),
                             ),
                             const Spacer(),
@@ -477,6 +490,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           title: Text(community.name),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -491,8 +505,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.exit_to_app, color: Colors.red),
-                title: const Text('脱退', style: TextStyle(color: Colors.red)),
+                leading: const Icon(Icons.exit_to_app, color: Colors.black),
+                title: const Text('脱退', style: TextStyle(color: Colors.black)),
                 onTap: () {
                   Navigator.of(context).pop();
                   _showLeaveCommunityDialog(community);
@@ -531,6 +545,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('コミュニティ脱退'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -568,7 +583,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               await _leaveCommunity(community);
             },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: Colors.black,
             ),
             child: const Text('脱退'),
           ),
@@ -614,6 +629,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('コミュニティを作成'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

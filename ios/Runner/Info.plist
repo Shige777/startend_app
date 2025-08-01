@@ -46,39 +46,17 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	
-	<!-- 統合されたURLスキーム設定 -->
+
+	
+	<!-- Google Sign-In URLスキーム設定 -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>startend-app.com</string>
+			<string>REVERSED_CLIENT_ID</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>https</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>startend</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>startend</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.example.startendapp</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.201575475230-5eg466psfpgd55kpmcafhlp3ok7a230i</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+				<string>com.googleusercontent.apps.201575475230-p7i18f8cvnt3l0ad53sdp4s4tvpp0vrp</string>
 			</array>
 		</dict>
 	</array>
@@ -87,11 +65,14 @@
 	<key>GIDClientID</key>
 	<string>201575475230-5eg466psfpgd55kpmcafhlp3ok7a230i.apps.googleusercontent.com</string>
 	
+	<!-- Google Sign-In additional configuration -->
+	<key>GIDServerClientID</key>
+	<string>201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com</string>
+	
 	<!-- 通知とバックグラウンド処理のための設定 -->
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>background-processing</string>
-		<string>background-fetch</string>
+		<string>remote-notification</string>
 	</array>
 	
 	<key>LSApplicationQueriesSchemes</key>
@@ -106,6 +87,16 @@
 		<string>googleplus</string>
 		<string>googlechrome</string>
 		<string>googlechromes</string>
+	</array>
+	<!-- AdMob設定 -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~3347511713</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
 	</array>
 </dict>
 </plist>

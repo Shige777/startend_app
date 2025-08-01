@@ -6,7 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../services/community_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 
 class CommunitySettingsScreen extends StatefulWidget {
   final String communityId;
@@ -190,8 +190,8 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
           title: const Text('コミュニティ設定'),
         ),
         body: const Center(
-          child: WaveLoadingWidget(
-            size: 80,
+          child: LeafLoadingWidget(
+            size: 50,
             color: AppColors.primary,
           ),
         ),
@@ -227,7 +227,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('コミュニティ設定'),
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.white,
         elevation: 0,
         actions: [
           TextButton(
@@ -242,7 +242,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
           ),
         ],
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -281,6 +281,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildBasicInfoSection() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -343,6 +344,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildPrivacySection() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -365,6 +367,9 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
                   _isPublic = value;
                 });
               },
+              activeColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade300,
             ),
           ],
         ),
@@ -374,6 +379,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildCategorySection() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -414,6 +420,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildNotificationSection() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -435,6 +442,9 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
                   _allowNewPostNotifications = value;
                 });
               },
+              activeColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade300,
             ),
             SwitchListTile(
               title: const Text('週次サマリー'),
@@ -445,6 +455,9 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
                   _allowWeeklySummary = value;
                 });
               },
+              activeColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade300,
             ),
             SwitchListTile(
               title: const Text('月次サマリー'),
@@ -455,6 +468,9 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
                   _allowMonthlySummary = value;
                 });
               },
+              activeColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade300,
             ),
           ],
         ),
@@ -464,6 +480,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildJoinSection() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -485,6 +502,9 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
                   _requireApproval = value;
                 });
               },
+              activeColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade300,
             ),
           ],
         ),
@@ -494,7 +514,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
 
   Widget _buildDangerSection() {
     return Card(
-      color: AppColors.error.withOpacity(0.05),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(

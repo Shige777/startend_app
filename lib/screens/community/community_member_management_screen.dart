@@ -8,7 +8,8 @@ import '../../providers/community_provider.dart';
 import '../../services/community_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
+import 'package:go_router/go_router.dart';
 
 class CommunityMemberManagementScreen extends StatefulWidget {
   final String communityId;
@@ -256,7 +257,7 @@ class _CommunityMemberManagementScreenState
           title: const Text('メンバー管理'),
         ),
         body: const Center(
-          child: WaveLoadingWidget(
+          child: LeafLoadingWidget(
             size: 80,
             color: AppColors.primary,
           ),
@@ -293,10 +294,10 @@ class _CommunityMemberManagementScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('メンバー管理'),
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -312,6 +313,7 @@ class _CommunityMemberManagementScreenState
 
   Widget _buildMembersList() {
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
@@ -474,193 +476,191 @@ class _CommunityMemberManagementScreenState
         _community!.isSuccessorCandidate(member.userId);
     final isCurrentUser = currentUser?.id == member.userId;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isLeader
-            ? AppColors.primary.withOpacity(0.1)
-            : isCurrentUser
-                ? AppColors.accent.withOpacity(0.1)
-                : AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isLeader
-              ? AppColors.primary
-              : isCurrentUser
-                  ? AppColors.accent
-                  : AppColors.divider,
-          width: isLeader || isCurrentUser ? 2 : 1,
+    return GestureDetector(
+      onTap: () {
+        // ユーザープロフィール画面に遷移
+        context.go('/profile/${user.id}');
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.divider,
+            width: 1,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          // アバター
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundImage: user.profileImageUrl != null
-                    ? NetworkImage(user.profileImageUrl!)
-                    : null,
-                child: user.profileImageUrl == null
-                    ? const Icon(Icons.person)
-                    : null,
-              ),
-              if (member.isOnline)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+        child: Row(
+          children: [
+            // アバター
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: user.profileImageUrl != null
+                      ? NetworkImage(user.profileImageUrl!)
+                      : null,
+                  child: user.profileImageUrl == null
+                      ? const Icon(Icons.person)
+                      : null,
+                ),
+                if (member.isOnline)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(width: 12),
 
-          // ユーザー情報
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        member.nickname ?? user.displayName,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                    ),
-                    if (isCurrentUser)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(12),
+            // ユーザー情報
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          member.nickname ?? user.displayName,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
-                        child: const Text(
-                          '自分',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      ),
+                      if (isCurrentUser)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            '自分',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    if (isLeader)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'リーダー',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      if (isLeader)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'リーダー',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    if (isSuccessorCandidate)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.completed,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          '後継者候補',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      if (isSuccessorCandidate)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.completed,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            '後継者候補',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '参加日: ${_formatDate(member.joinedAt)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                ),
-                if (member.bio != null && member.bio!.isNotEmpty) ...[
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(
-                    member.bio!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    '参加日: ${_formatDate(member.joinedAt)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  if (member.bio != null && member.bio!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      member.bio!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // アクションボタン（自分以外のメンバーに対してのみ表示）
+            if (!isLeader && !isCurrentUser) ...[
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'successor':
+                      _toggleSuccessorCandidate(
+                          member.userId, isSuccessorCandidate);
+                      break;
+                    case 'remove':
+                      _removeMember(member.userId);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'successor',
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSuccessorCandidate
+                              ? Icons.remove_circle
+                              : Icons.add_circle,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(isSuccessorCandidate ? '後継者候補から削除' : '後継者候補に追加'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: Row(
+                      children: [
+                        Icon(Icons.remove_circle_outline,
+                            size: 16, color: AppColors.error),
+                        SizedBox(width: 8),
+                        Text('削除', style: TextStyle(color: AppColors.error)),
+                      ],
+                    ),
                   ),
                 ],
-              ],
-            ),
-          ),
-
-          // アクションボタン（自分以外のメンバーに対してのみ表示）
-          if (!isLeader && !isCurrentUser) ...[
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'successor':
-                    _toggleSuccessorCandidate(
-                        member.userId, isSuccessorCandidate);
-                    break;
-                  case 'remove':
-                    _removeMember(member.userId);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'successor',
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSuccessorCandidate
-                            ? Icons.remove_circle
-                            : Icons.add_circle,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(isSuccessorCandidate ? '後継者候補から削除' : '後継者候補に追加'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'remove',
-                  child: Row(
-                    children: [
-                      Icon(Icons.remove_circle_outline,
-                          size: 16, color: AppColors.error),
-                      SizedBox(width: 8),
-                      Text('削除', style: TextStyle(color: AppColors.error)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

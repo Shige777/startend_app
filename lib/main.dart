@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
@@ -19,12 +22,12 @@ import 'screens/profile/profile_settings_screen.dart';
 import 'screens/post/create_post_screen.dart';
 import 'screens/post/create_end_post_screen.dart';
 import 'screens/post/post_detail_screen.dart';
-import 'screens/post/edit_post_screen.dart';
 
 import 'screens/community/community_chat_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/profile/follow_list_screen.dart';
 import 'screens/profile/community_list_screen.dart';
+import 'screens/settings/notification_settings_screen.dart';
 import 'models/post_model.dart';
 import 'models/community_model.dart';
 import 'services/community_service.dart';
@@ -34,7 +37,6 @@ import 'screens/community/community_member_management_screen.dart';
 import 'screens/community/community_settings_screen.dart';
 import 'screens/community/create_community_screen.dart';
 import 'screens/notifications/notification_screen.dart';
-import 'screens/settings/notification_settings_screen.dart';
 import 'screens/invite/invite_screen.dart';
 
 void main() async {
@@ -45,48 +47,43 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Firebase App Check初期化（有効化）
+  await FirebaseAppCheck.instance.activate(
+    // webRecaptchaSiteKey: '6LfXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // 実際のreCAPTCHAサイトキーに置き換える
+    androidProvider: AndroidProvider.debug,
+    appleProvider: AppleProvider.debug,
+  );
+
+  // AdMob初期化
+  await MobileAds.instance.initialize();
+
+  // ネイティブ広告ファクトリーを登録
+  MobileAds.instance.updateRequestConfiguration(
+    RequestConfiguration(
+      testDeviceIds: ['EMULATOR'],
+    ),
+  );
+
+  // SharedPreferences初期化
+  await SharedPreferences.getInstance();
+
   // 通知サービスの初期化
   await NotificationService().initialize();
 
-  // Google Sign-Inの事前初期化（新しいデバイスでの初回ログイン成功率を向上）
-  try {
-    if (!kIsWeb) {
-      // モバイル環境でのGoogle Sign-In事前初期化
-      final GoogleSignIn googleSignIn = GoogleSignIn(
+  // Google Sign-Inの初期化（簡素化版）
+  if (!kIsWeb) {
+    try {
+      GoogleSignIn(
         scopes: ['email', 'profile'],
-        forceCodeForRefreshToken: true, // 新しいデバイスでの認証成功率向上
       );
 
-      // 初期化の確認（複数回試行）
-      bool initSuccess = false;
-      for (int i = 0; i < 3; i++) {
-        try {
-          await googleSignIn.isSignedIn();
-          initSuccess = true;
-          break;
-        } catch (e) {
-          if (kDebugMode) {
-            print('Google Sign-In init attempt ${i + 1} failed: $e');
-          }
-          if (i < 2) {
-            await Future.delayed(Duration(milliseconds: 500 + (i * 300)));
-          }
-        }
+      if (kDebugMode) {
+        print('Google Sign-In initialized');
       }
-
-      if (initSuccess) {
-        if (kDebugMode) {
-          print('Google Sign-In pre-initialization successful');
-        }
-      } else {
-        if (kDebugMode) {
-          print('Google Sign-In pre-initialization failed after 3 attempts');
-        }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Google Sign-In initialization error: $e');
       }
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('Google Sign-In pre-initialization error (non-critical): $e');
     }
   }
 
@@ -119,6 +116,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp.router(
         title: 'StartEnd SNS',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: AppColors.primary,
@@ -352,59 +350,28 @@ final GoRouter _router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/edit-post',
+      path: '/post/create-end',
       builder: (context, state) {
-        final post = state.extra as PostModel?;
+        final communityId = state.uri.queryParameters['communityId'];
+        // コミュニティ内で直接END投稿を作成する場合は、ダミーのSTART投稿を作成
+        final dummyStartPost = PostModel(
+          id: 'dummy',
+          userId: 'dummy',
+          type: PostType.start,
+          title: 'コミュニティ投稿',
+          imageUrl: '',
+          privacyLevel: PrivacyLevel.public,
+          communityIds: communityId != null ? [communityId] : [],
+          likedByUserIds: [],
+          likeCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-        if (post == null) {
-          return const Scaffold(
-            body: Center(child: Text('エラー: 投稿情報が見つかりません')),
-          );
-        }
-
-        return EditPostScreen(post: post);
-      },
-    ),
-    GoRoute(
-      path: '/edit-post/:id',
-      builder: (context, state) {
-        final postId = state.pathParameters['id']!;
-
-        // PostModelが渡されている場合
-        if (state.extra != null && state.extra is PostModel) {
-          final post = state.extra as PostModel;
-          return EditPostScreen(post: post);
-        }
-
-        // PostModelが渡されていない場合はCreateEndPostScreenに遷移
-        return FutureBuilder<PostModel?>(
-          future: context.read<PostProvider>().getPostById(postId),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            if (snapshot.hasError || snapshot.data == null) {
-              return const Scaffold(
-                body: Center(child: Text('投稿が見つかりません')),
-              );
-            }
-
-            final post = snapshot.data!;
-
-            // END投稿が未完了の場合はCreateEndPostScreenに遷移
-            if (!post.isCompleted) {
-              return CreateEndPostScreen(
-                startPostId: post.id,
-                startPost: post,
-              );
-            } else {
-              // 完了済みの場合は編集画面
-              return EditPostScreen(post: post);
-            }
-          },
+        return CreateEndPostScreen(
+          startPostId: 'dummy',
+          startPost: dummyStartPost,
+          communityId: communityId, // コミュニティIDを追加
         );
       },
     ),

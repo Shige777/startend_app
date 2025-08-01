@@ -11,7 +11,7 @@ class CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.background, // 背景色を統一
+        color: Colors.white, // 背景色を白に変更
         // 境界線を削除してシームレスに
       ),
       child: TabBar(
@@ -21,6 +21,7 @@ class CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorWeight: 3,
+        dividerColor: Colors.transparent, // 境界線を透明に
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.normal,

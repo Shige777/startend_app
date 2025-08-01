@@ -12,7 +12,8 @@ import '../../models/user_model.dart';
 
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/user_list_item.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
+import '../../widgets/post_card_widget.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -97,11 +98,23 @@ class _SearchScreenState extends State<SearchScreen>
     try {
       // 投稿検索
       final postProvider = context.read<PostProvider>();
-      final posts = await postProvider.searchPosts(query);
+      final userProvider = context.read<UserProvider>();
+      final currentUser = userProvider.currentUser;
+      print('検索開始: $query, 現在のユーザーID: ${currentUser?.id}'); // デバッグログ追加
+
+      final posts =
+          await postProvider.searchPosts(query, currentUserId: currentUser?.id);
+      print('検索結果 - 投稿数: ${posts.length}'); // デバッグログ追加
+
+      // 検索結果の詳細をログ出力
+      for (final post in posts.take(5)) {
+        print(
+            '検索結果詳細: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
+      }
 
       // ユーザー検索
-      final userProvider = context.read<UserProvider>();
       final users = await userProvider.searchUsers(query);
+      print('検索結果 - ユーザー数: ${users.length}'); // デバッグログ追加
 
       setState(() {
         _searchResults = posts;
@@ -173,10 +186,10 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('検索'),
-        backgroundColor: AppColors.background, // 背景色を統一
+        backgroundColor: Colors.white, // 背景色を統一
         elevation: 0, // 影を削除
         scrolledUnderElevation: 0, // スクロール時の影も削除
         bottom: PreferredSize(
@@ -186,15 +199,19 @@ class _SearchScreenState extends State<SearchScreen>
               // 検索バー
               Container(
                 padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                color: AppColors.background, // 背景色を統一
+                color: Colors.white, // 背景色を白に変更
                 child: TextField(
                   controller: _searchController,
+                  style: const TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     hintText: '投稿やユーザーを検索...',
-                    prefixIcon: const Icon(Icons.search),
+                    hintStyle: const TextStyle(color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.search,
+                        color: AppColors.textSecondary),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear,
+                                color: AppColors.textSecondary),
                             onPressed: () {
                               _searchController.clear();
                               _performSearch('');
@@ -205,7 +222,7 @@ class _SearchScreenState extends State<SearchScreen>
                     focusedBorder: InputBorder.none, // フォーカス時の枠線も削除
                     enabledBorder: InputBorder.none, // 通常時の枠線も削除
                     filled: true,
-                    fillColor: AppColors.background, // 背景色を統一
+                    fillColor: Colors.white, // 背景色を白に変更
                   ),
                   onChanged: (value) {
                     if (value.length > 2 || value.isEmpty) {
@@ -217,7 +234,7 @@ class _SearchScreenState extends State<SearchScreen>
               ),
               // タブバー
               Container(
-                color: AppColors.background, // 背景色を統一
+                color: Colors.white, // 背景色を白に変更
                 child: TabBar(
                   controller: _tabController,
                   tabs: const [
@@ -239,7 +256,7 @@ class _SearchScreenState extends State<SearchScreen>
           if (_followingUsers.isNotEmpty && _searchQuery.isEmpty) ...[
             Container(
               padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              color: AppColors.background, // 背景色を統一
+              color: Colors.white, // 背景色を白に変更
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -287,22 +304,9 @@ class _SearchScreenState extends State<SearchScreen>
           Expanded(
             child: _isSearching
                 ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        WaveLoadingWidget(
-                          size: 60,
-                          color: AppColors.primary,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          '検索中...',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                    child: LeafLoadingWidget(
+                      size: 60,
+                      color: AppColors.primary,
                     ),
                   )
                 : TabBarView(
@@ -318,16 +322,51 @@ class _SearchScreenState extends State<SearchScreen>
                               ),
                             )
                           : _searchResults.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    '投稿が見つかりませんでした',
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary),
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '投稿はありません',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        '検索クエリ: $_searchQuery',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12),
+                                      ),
+                                    ],
                                   ),
                                 )
-                              : PostListWidget(
-                                  type: PostListType.following,
-                                  posts: _searchResults,
+                              : Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(
+                                        '検索結果: ${_searchResults.length}件 (クエリ: $_searchQuery)',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: ListView.builder(
+                                        itemCount: _searchResults.length,
+                                        itemBuilder: (context, index) {
+                                          final post = _searchResults[index];
+                                          return PostCardWidget(
+                                            post: post,
+                                            onTap: () {
+                                              context.push('/post/${post.id}');
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ),
 
                       // ユーザー検索結果
@@ -340,29 +379,57 @@ class _SearchScreenState extends State<SearchScreen>
                               ),
                             )
                           : _userSearchResults.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    'ユーザーが見つかりませんでした',
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary),
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'ユーザーはありません',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        '検索クエリ: $_searchQuery',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12),
+                                      ),
+                                    ],
                                   ),
                                 )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(8),
-                                  itemCount: _userSearchResults.length,
-                                  itemBuilder: (context, index) {
-                                    return UserListItem(
-                                      user: _userSearchResults[index],
-                                      onTap: () {
-                                        context.go(
-                                            '/profile/${_userSearchResults[index].id}',
-                                            extra: {
-                                              'fromPage': 'search',
-                                              'searchQuery': _searchQuery,
-                                            });
-                                      },
-                                    );
-                                  },
+                              : Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(
+                                        '検索結果: ${_userSearchResults.length}件 (クエリ: $_searchQuery)',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: ListView.builder(
+                                        padding: const EdgeInsets.all(8),
+                                        itemCount: _userSearchResults.length,
+                                        itemBuilder: (context, index) {
+                                          return UserListItem(
+                                            user: _userSearchResults[index],
+                                            onTap: () {
+                                              setState(() {}); // フォロー状態を即時反映
+                                              context.go(
+                                                  '/profile/${_userSearchResults[index].id}',
+                                                  extra: {
+                                                    'fromPage': 'search',
+                                                    'searchQuery': _searchQuery,
+                                                  });
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ),
                     ],
                   ),

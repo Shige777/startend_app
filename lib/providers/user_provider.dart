@@ -172,29 +172,38 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  // ユーザー取得
+  // ユーザー情報を取得
   Future<UserModel?> getUser(String userId) async {
     try {
-      _setLoading(true);
-      _setError(null);
-
       final doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         final user = UserModel.fromFirestore(doc);
-        if (userId == _currentUser?.id) {
-          _currentUser = user;
+
+        // 投稿数を取得して更新
+        final postsSnapshot = await _firestore
+            .collection('posts')
+            .where('userId', isEqualTo: userId)
+            .get();
+
+        final actualPostCount = postsSnapshot.docs.length;
+
+        // 投稿数が異なる場合は更新
+        if (user.postCount != actualPostCount) {
+          await _firestore.collection('users').doc(userId).update({
+            'postCount': actualPostCount,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // 更新されたユーザー情報を返す
+          return user.copyWith(postCount: actualPostCount);
         }
+
         return user;
       }
       return null;
     } catch (e) {
-      _setError('ユーザー取得に失敗しました');
+      print('ユーザー情報取得エラー: $e');
       return null;
-    } finally {
-      // ビルド中にsetStateが呼ばれないようにSchedulerBindingを使用
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        _setLoading(false);
-      });
     }
   }
 
@@ -233,9 +242,18 @@ class UserProvider extends ChangeNotifier {
           .collection('users')
           .doc(user.id)
           .update(user.toFirestore());
+
+      // 現在のユーザーを更新
       if (user.id == _currentUser?.id) {
         _currentUser = user;
       }
+
+      // キャッシュを更新
+      _userCache[user.id] = user;
+
+      // UIを即座に更新
+      notifyListeners();
+
       return true;
     } catch (e) {
       _setError('ユーザー更新に失敗しました');
@@ -257,6 +275,12 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     _userCache.clear();
     _searchResults.clear();
+    notifyListeners();
+  }
+
+  // 特定のユーザーのキャッシュをクリア
+  void clearUserCache(String userId) {
+    _userCache.remove(userId);
     notifyListeners();
   }
 
@@ -307,11 +331,6 @@ class UserProvider extends ChangeNotifier {
   }) {
     // 現在のユーザーを更新
     if (_currentUser?.id == userId) {
-      List<String> updatedFollowerIds =
-          List<String>.from(_currentUser!.followerIds);
-      List<String> updatedFollowingIds =
-          List<String>.from(_currentUser!.followingIds);
-
       if (followerCountDelta != null) {
         // フォロワー数の変更（実際のIDは後でFirestoreから同期）
         // ここでは数値のみを一時的に調整
@@ -349,16 +368,20 @@ class UserProvider extends ChangeNotifier {
         return _searchResults;
       }
 
-      // 部分一致検索のため、全ユーザーを取得してフィルタリング
+      print('ユーザー検索開始: $query'); // デバッグログ追加
+
+      // より多くのユーザーを取得して検索対象を広げる
       final querySnapshot = await _firestore
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .limit(100) // パフォーマンスのため上限を設定
+          .limit(300) // 100から300に増加
           .get();
 
       final users = querySnapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
+
+      print('取得したユーザー数: ${users.length}'); // デバッグログ追加
 
       // 部分一致でフィルタリング
       final searchQuery = query.toLowerCase();
@@ -367,8 +390,15 @@ class UserProvider extends ChangeNotifier {
             (user.email.toLowerCase().contains(searchQuery));
       }).toList();
 
-      return _searchResults.take(20).toList(); // 結果を20件に制限
+      print('フィルタリング後のユーザー数: ${_searchResults.length}'); // デバッグログ追加
+
+      // 結果を50件に増加（20から50に変更）
+      final result = _searchResults.take(50).toList();
+      print('最終結果のユーザー数: ${result.length}'); // デバッグログ追加
+
+      return result;
     } catch (e) {
+      print('ユーザー検索エラー: $e'); // デバッグログ追加
       _setError('ユーザー検索に失敗しました');
       _searchResults = [];
       return [];

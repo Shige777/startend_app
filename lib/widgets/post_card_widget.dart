@@ -12,7 +12,7 @@ import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
 import '../models/user_model.dart';
 
-class PostCardWidget extends StatelessWidget {
+class PostCardWidget extends StatefulWidget {
   final PostModel post;
   final VoidCallback? onTap;
   final bool showActions; // アクションボタンの表示制御
@@ -29,6 +29,60 @@ class PostCardWidget extends StatelessWidget {
     this.fromPage,
     this.enableImageZoom = false, // デフォルトは無効
   });
+
+  @override
+  State<PostCardWidget> createState() => _PostCardWidgetState();
+}
+
+class _PostCardWidgetState extends State<PostCardWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _likeAnimationController;
+  late Animation<double> _likeAnimation;
+  late Animation<Offset> _fallingAnimation;
+  late Animation<double> _rotationAnimation;
+  bool _isProcessingLike = false; // リアクション処理中フラグ
+
+  @override
+  void initState() {
+    super.initState();
+    _likeAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1200), // アニメーション時間を調整
+      vsync: this,
+    );
+
+    // 落下アニメーション
+    _fallingAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.0), // 開始位置を調整
+      end: const Offset(0, 0), // 終了位置を0に修正
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeOut,
+    ));
+
+    // 回転アニメーション
+    _rotationAnimation = Tween<double>(
+      begin: -0.2,
+      end: 0.0, // 終了位置を0に修正
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeOut,
+    ));
+
+    // スケールアニメーション
+    _likeAnimation = Tween<double>(
+      begin: 0.8, // 開始サイズを調整
+      end: 1.0, // 終了サイズを調整
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _likeAnimationController.dispose();
+    super.dispose();
+  }
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
@@ -101,30 +155,33 @@ class PostCardWidget extends StatelessWidget {
         );
       } else {
         // モバイル環境ではCachedNetworkImageを使用
-        imageWidget = Container(
-          width: double.infinity,
-          height: double.infinity,
-          child: CachedNetworkImage(
-            imageUrl: imageUrl,
-            fit: fit,
+        imageWidget = ClipRRect(
+          borderRadius: BorderRadius.circular(12), // 角を丸く
+          child: Container(
             width: double.infinity,
             height: double.infinity,
-            placeholder: (context, url) => Container(
-              color: AppColors.surfaceVariant,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: AppColors.surfaceVariant,
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image, color: AppColors.error, size: 32),
-                  SizedBox(height: 8),
-                  Text(
-                    '画像を読み込めません',
-                    style: TextStyle(color: AppColors.error, fontSize: 12),
-                  ),
-                ],
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: fit,
+              width: double.infinity,
+              height: double.infinity,
+              placeholder: (context, url) => Container(
+                color: AppColors.surfaceVariant,
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.surfaceVariant,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image, color: AppColors.error, size: 32),
+                    SizedBox(height: 8),
+                    Text(
+                      '画像を読み込めません',
+                      style: TextStyle(color: AppColors.error, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -143,26 +200,32 @@ class PostCardWidget extends StatelessWidget {
       } else {
         // モバイルの場合はFile.imageを使用
         try {
-          imageWidget = Container(
-            width: double.infinity,
-            height: double.infinity,
-            child: Image.file(
-              File(imageUrl),
-              fit: fit,
+          imageWidget = ClipRRect(
+            borderRadius: BorderRadius.circular(12), // 角を丸く
+            child: Container(
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: AppColors.surfaceVariant,
-                child: const Icon(Icons.error, color: AppColors.error),
+              child: Image.file(
+                File(imageUrl),
+                fit: fit,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: AppColors.surfaceVariant,
+                  child: const Icon(Icons.error, color: AppColors.error),
+                ),
               ),
             ),
           );
         } catch (e) {
-          imageWidget = Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: AppColors.surfaceVariant,
-            child: const Icon(Icons.error, color: AppColors.error),
+          imageWidget = ClipRRect(
+            borderRadius: BorderRadius.circular(12), // 角を丸く
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: AppColors.surfaceVariant,
+              child: const Icon(Icons.error, color: AppColors.error),
+            ),
           );
         }
       }
@@ -268,19 +331,20 @@ class PostCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
     final currentUser = userProvider.currentUser;
-    final isOwnPost = currentUser?.id == post.userId; // 自分の投稿かどうか判定
+    final isOwnPost = currentUser?.id == widget.post.userId; // 自分の投稿かどうか判定
 
     return Card(
       margin: EdgeInsets.zero, // 余白を削除
       elevation: 0, // 影を削除
-      color: (isOwnPost && fromPage != 'profile' && fromPage != 'following')
-          ? AppColors.primary.withOpacity(0.1) // 自分の投稿は青い背景（軌跡画面とフォロー中タブ以外）
-          : AppColors.background, // 他の投稿は通常の背景、軌跡画面とフォロー中タブでは背景色なし
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16), // 12から16に変更
+      ),
+      color: Colors.white, // 背景色を白に統一
       child: InkWell(
-        onTap: onTap ??
-            () => context.push('/post/${post.id}', extra: {
-                  'post': post,
-                  'fromPage': fromPage, // 軌跡画面から来たことを識別
+        onTap: widget.onTap ??
+            () => context.push('/post/${widget.post.id}', extra: {
+                  'post': widget.post,
+                  'fromPage': widget.fromPage, // 軌跡画面から来たことを識別
                 }),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,7 +353,7 @@ class PostCardWidget extends StatelessWidget {
             Consumer<UserProvider>(
               builder: (context, userProvider, _) {
                 return FutureBuilder<UserModel?>(
-                  future: userProvider.getUserById(post.userId),
+                  future: userProvider.getUserById(widget.post.userId),
                   builder: (context, snapshot) {
                     final user = snapshot.data;
                     return Padding(
@@ -334,7 +398,7 @@ class PostCardWidget extends StatelessWidget {
                                   ),
                                   Text(
                                     DateTimeUtils.getRelativeTime(
-                                        post.createdAt),
+                                        widget.post.createdAt),
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -368,9 +432,9 @@ class PostCardWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // START投稿のコメント
-                  if (post.comment != null) ...[
+                  if (widget.post.comment != null) ...[
                     Text(
-                      post.comment!,
+                      widget.post.comment!,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -379,7 +443,7 @@ class PostCardWidget extends StatelessWidget {
             ),
 
             // END投稿のコメント（完了している場合）- 画像の下に表示
-            if (post.isCompleted && post.endComment != null) ...[
+            if (widget.post.isCompleted && widget.post.endComment != null) ...[
               Padding(
                 padding: const EdgeInsets.only(
                   left: AppConstants.defaultPadding,
@@ -387,14 +451,14 @@ class PostCardWidget extends StatelessWidget {
                   bottom: 2, // 下部パディングも縮小
                 ),
                 child: Text(
-                  post.endComment!,
+                  widget.post.endComment!,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
             ],
 
             // アクションボタン
-            if (showActions) ...[
+            if (widget.showActions) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.defaultPadding),
@@ -405,30 +469,91 @@ class PostCardWidget extends StatelessWidget {
                       builder: (context, userProvider, child) {
                         final currentUser = userProvider.currentUser;
                         final isLiked = currentUser != null &&
-                            post.isLikedBy(currentUser.id);
+                            widget.post.isLikedBy(currentUser.id);
 
                         return InkWell(
-                          onTap: () => _toggleLike(context, currentUser),
+                          onTap: _isProcessingLike
+                              ? null
+                              : () async {
+                                  if (_isProcessingLike) return;
+
+                                  setState(() {
+                                    _isProcessingLike = true;
+                                  });
+
+                                  final wasLiked = isLiked;
+                                  _toggleLike(context, currentUser);
+
+                                  // いいねを追加した時のみアニメーションを実行
+                                  if (!wasLiked) {
+                                    // アニメーションコントローラーをリセットしてから開始
+                                    _likeAnimationController.reset();
+                                    _likeAnimationController
+                                        .forward()
+                                        .then((_) {
+                                      // アニメーション終了後はそのまま停止
+                                    });
+                                  }
+
+                                  if (mounted) {
+                                    setState(() {
+                                      _isProcessingLike = false;
+                                    });
+                                  }
+                                },
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
                             padding: const EdgeInsets.all(8),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.local_fire_department,
-                                  size: 20,
-                                  color: isLiked
-                                      ? AppColors.flame
-                                      : AppColors.textSecondary,
+                                AnimatedBuilder(
+                                  animation: _likeAnimationController,
+                                  builder: (context, child) {
+                                    // アニメーション中は特別な表示、それ以外は通常のアイコン
+                                    if (_likeAnimationController.status ==
+                                        AnimationStatus.forward) {
+                                      return SlideTransition(
+                                        position: _fallingAnimation,
+                                        child: Transform.rotate(
+                                          angle: _rotationAnimation.value,
+                                          child: Transform.scale(
+                                            scale: _likeAnimation.value,
+                                            child: Icon(
+                                              Icons.eco,
+                                              size: 20,
+                                              color: _isProcessingLike
+                                                  ? AppColors.textHint
+                                                  : isLiked
+                                                      ? AppColors.flame
+                                                      : AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      // 通常状態のアイコン
+                                      return Icon(
+                                        Icons.eco,
+                                        size: 20,
+                                        color: _isProcessingLike
+                                            ? AppColors.textHint
+                                            : isLiked
+                                                ? AppColors.flame
+                                                : AppColors.textSecondary,
+                                      );
+                                    }
+                                  },
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  post.likeCount.toString(),
+                                  widget.post.likeCount.toString(),
                                   style: TextStyle(
-                                    color: isLiked
-                                        ? AppColors.flame
-                                        : AppColors.textSecondary,
+                                    color: _isProcessingLike
+                                        ? AppColors.textHint
+                                        : isLiked
+                                            ? AppColors.flame
+                                            : AppColors.textSecondary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
@@ -444,11 +569,7 @@ class PostCardWidget extends StatelessWidget {
               ),
             ],
 
-            // 投稿間の軽い区切り
-            Container(
-              height: 8,
-              color: AppColors.background,
-            ),
+            // 投稿間の区切りを削除（シームレス化）
           ],
         ),
       ),
@@ -466,7 +587,7 @@ class PostCardWidget extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: AppColors.background, // 背景色を統一
             child: Text(
-              post.title,
+              widget.post.title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -484,8 +605,9 @@ class PostCardWidget extends StatelessWidget {
                       Expanded(
                         child: Container(
                           width: double.infinity,
-                          child: _buildImageWidget(post.imageUrl,
-                              fit: BoxFit.cover, enableZoom: enableImageZoom),
+                          child: _buildImageWidget(widget.post.imageUrl,
+                              fit: BoxFit.cover,
+                              enableZoom: widget.enableImageZoom),
                         ),
                       ),
                       // START画像の下にラベル
@@ -502,7 +624,7 @@ class PostCardWidget extends StatelessWidget {
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
-                                '開始: ${DateTimeUtils.formatDateTime(post.createdAt)}',
+                                '開始: ${DateTimeUtils.formatDateTime(widget.post.createdAt)}',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -530,50 +652,82 @@ class PostCardWidget extends StatelessWidget {
                         child: Builder(
                           builder: (context) => GestureDetector(
                             onTap: () {
-                              // 投稿者本人のみEND投稿可能
+                              // 投稿者本人またはコミュニティメンバーの場合のみEND投稿可能
                               final userProvider = context.read<UserProvider>();
                               final currentUser = userProvider.currentUser;
 
-                              if (currentUser == null ||
-                                  post.userId != currentUser.id) {
-                                // 他人の投稿の場合
-                                if (post.isCompleted &&
-                                    post.endImageUrl != null) {
+                              if (currentUser == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('ログインが必要です'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              // コミュニティ投稿かどうかを判定
+                              final isCommunityPost =
+                                  widget.post.communityIds.isNotEmpty;
+                              final isOwnPost =
+                                  widget.post.userId == currentUser.id;
+                              final isCommunityMember = isCommunityPost &&
+                                  currentUser.communityIds
+                                      .contains(widget.post.communityIds.first);
+
+                              // END投稿可能な条件をチェック
+                              final canCreateEndPost =
+                                  isOwnPost || isCommunityMember;
+
+                              if (!canCreateEndPost) {
+                                // 他人の投稿でコミュニティメンバーでもない場合
+                                if (widget.post.isCompleted &&
+                                    widget.post.endImageUrl != null) {
                                   // 完了済みで画像がある場合は画像拡大
                                   _showImageZoomDialog(
-                                      context, post.endImageUrl!);
+                                      context, widget.post.endImageUrl!);
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('自分の投稿のみEND投稿できます'),
+                                      content:
+                                          Text('自分の投稿またはコミュニティメンバーのみEND投稿できます'),
                                     ),
                                   );
                                 }
                                 return;
                               }
 
-                              // 自分の投稿の場合
-                              if (post.isCompleted &&
-                                  post.endImageUrl != null) {
+                              // 自分の投稿またはコミュニティメンバーの場合
+                              if (widget.post.isCompleted &&
+                                  widget.post.endImageUrl != null) {
                                 // 完了済みで画像がある場合は画像拡大
                                 _showImageZoomDialog(
-                                    context, post.endImageUrl!);
+                                    context, widget.post.endImageUrl!);
                               } else {
                                 // 未完了、または完了済みだが画像がない場合（自動完了含む）はEND投稿画面へ
-                                context.push('/create-end-post', extra: {
-                                  'startPostId': post.id,
-                                  'startPost': post,
-                                });
+                                // コミュニティ投稿の場合はコミュニティIDも渡す
+                                final extra = {
+                                  'startPostId': widget.post.id,
+                                  'startPost': widget.post,
+                                };
+
+                                // コミュニティ投稿の場合はコミュニティIDも追加
+                                if (widget.post.communityIds.isNotEmpty) {
+                                  extra['communityId'] =
+                                      widget.post.communityIds.first;
+                                }
+
+                                context.push('/create-end-post', extra: extra);
                               }
                             },
                             child: Container(
                               width: double.infinity,
                               color: AppColors.surfaceVariant,
-                              child: post.isCompleted
-                                  ? (post.endImageUrl != null
-                                      ? _buildImageWidget(post.endImageUrl,
+                              child: widget.post.isCompleted
+                                  ? (widget.post.endImageUrl != null
+                                      ? _buildImageWidget(
+                                          widget.post.endImageUrl,
                                           fit: BoxFit.cover,
-                                          enableZoom: enableImageZoom)
+                                          enableZoom: widget.enableImageZoom)
                                       : const Center(
                                           child: Column(
                                             mainAxisAlignment:
@@ -618,33 +772,33 @@ class PostCardWidget extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             vertical: 2, horizontal: 4),
                         color: AppColors.background, // 背景色を統一
-                        child: post.scheduledEndTime != null
+                        child: widget.post.scheduledEndTime != null
                             ? Row(
                                 children: [
                                   Icon(
-                                    post.isCompleted
+                                    widget.post.isCompleted
                                         ? Icons.check_circle
                                         : Icons.schedule,
                                     size: 12,
-                                    color: post.isOverdue
+                                    color: widget.post.isOverdue
                                         ? AppColors.error
-                                        : post.isCompleted
+                                        : widget.post.isCompleted
                                             ? AppColors.completed
                                             : AppColors.primary,
                                   ),
                                   const SizedBox(width: 2),
                                   Expanded(
                                     child: Text(
-                                      post.isCompleted
-                                          ? '完了: ${DateTimeUtils.formatDateTime(post.actualEndTime ?? post.scheduledEndTime!)}'
-                                          : '予定: ${DateTimeUtils.formatDateTime(post.scheduledEndTime!)}',
+                                      widget.post.isCompleted
+                                          ? '完了: ${DateTimeUtils.formatDateTime(widget.post.actualEndTime ?? widget.post.scheduledEndTime!)}'
+                                          : '予定: ${DateTimeUtils.formatDateTime(widget.post.scheduledEndTime!)}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            color: post.isOverdue
+                                            color: widget.post.isOverdue
                                                 ? AppColors.error
-                                                : post.isCompleted
+                                                : widget.post.isCompleted
                                                     ? AppColors.completed
                                                     : AppColors.primary,
                                             fontSize: 9,
@@ -679,7 +833,7 @@ class PostCardWidget extends StatelessWidget {
                 size: 16, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Text(
-              '開始: ${DateTimeUtils.formatDateTime(post.createdAt)}',
+              '開始: ${DateTimeUtils.formatDateTime(widget.post.createdAt)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -688,7 +842,7 @@ class PostCardWidget extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         // 完了予定時刻 or 完了時刻
-        if (post.scheduledEndTime != null) ...[
+        if (widget.post.scheduledEndTime != null) ...[
           // 進行期間（予定時間）を表示
           Row(
             children: [
@@ -699,7 +853,7 @@ class PostCardWidget extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '進行期間: ${_formatScheduledDuration(post)}',
+                '進行期間: ${_formatScheduledDuration(widget.post)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.primary,
                     ),
@@ -708,7 +862,7 @@ class PostCardWidget extends StatelessWidget {
           ),
 
           // 集中時間（実際にかかった時間）を表示（完了した場合のみ）
-          if (post.isCompleted && post.actualEndTime != null) ...[
+          if (widget.post.isCompleted && widget.post.actualEndTime != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
@@ -719,7 +873,7 @@ class PostCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '集中時間: ${_formatActualDuration(post)}',
+                  '集中時間: ${_formatActualDuration(widget.post)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.completed,
                       ),
@@ -727,7 +881,8 @@ class PostCardWidget extends StatelessWidget {
               ],
             ),
           ],
-        ] else if (post.isCompleted && post.actualEndTime != null) ...[
+        ] else if (widget.post.isCompleted &&
+            widget.post.actualEndTime != null) ...[
           // scheduledEndTimeがない場合でも、actualEndTimeがあれば表示
           Row(
             children: [
@@ -738,7 +893,7 @@ class PostCardWidget extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '集中時間: ${_formatActualDuration(post)}',
+                '集中時間: ${_formatActualDuration(widget.post)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.completed,
                     ),
@@ -748,7 +903,7 @@ class PostCardWidget extends StatelessWidget {
         ],
 
         // 使用時間を表示（完了した場合のみ）
-        if (post.isCompleted) ...[
+        if (widget.post.isCompleted) ...[
           const SizedBox(height: 4),
           Row(
             children: [
@@ -759,7 +914,7 @@ class PostCardWidget extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '使用時間: ${post.totalUsageTimeString}',
+                '使用時間: ${widget.post.totalUsageTimeString}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.accent,
                       fontWeight: FontWeight.bold,
@@ -776,7 +931,7 @@ class PostCardWidget extends StatelessWidget {
     Color chipColor;
     Widget chipContent;
 
-    switch (post.status) {
+    switch (widget.post.status) {
       case PostStatus.concentration:
         chipColor = AppColors.textPrimary;
         chipContent =
@@ -837,27 +992,31 @@ class PostCardWidget extends StatelessWidget {
     }
 
     final postProvider = context.read<PostProvider>();
-    final isLiked = post.isLikedBy(currentUser.id);
+    final isLiked = widget.post.isLikedBy(currentUser.id);
 
     try {
       bool success;
       if (isLiked) {
-        success = await postProvider.unlikePost(post.id, currentUser.id);
+        success = await postProvider.unlikePost(widget.post.id, currentUser.id);
       } else {
-        success = await postProvider.likePost(post.id, currentUser.id);
+        success = await postProvider.likePost(widget.post.id, currentUser.id);
       }
 
       if (success) {
         // 成功時にローカルの投稿データを安全に更新
         final newLikeCount = isLiked
-            ? (post.likeCount > 0 ? post.likeCount - 1 : 0) // マイナスにならないように制御
-            : post.likeCount + 1;
+            ? (widget.post.likeCount > 0
+                ? widget.post.likeCount - 1
+                : 0) // マイナスにならないように制御
+            : widget.post.likeCount + 1;
 
         final newLikedByUserIds = isLiked
-            ? post.likedByUserIds.where((id) => id != currentUser.id).toList()
-            : [...post.likedByUserIds, currentUser.id];
+            ? widget.post.likedByUserIds
+                .where((id) => id != currentUser.id)
+                .toList()
+            : [...widget.post.likedByUserIds, currentUser.id];
 
-        final updatedPost = post.copyWith(
+        final updatedPost = widget.post.copyWith(
           likeCount: newLikeCount,
           likedByUserIds: newLikedByUserIds,
         );

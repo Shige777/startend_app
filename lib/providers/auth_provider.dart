@@ -9,7 +9,7 @@ import '../models/user_model.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  late final GoogleSignIn _googleSignIn;
+  GoogleSignIn? _googleSignIn;
 
   User? _user;
   bool _isLoading = false;
@@ -51,7 +51,19 @@ class AuthProvider extends ChangeNotifier {
 
   // Google Sign-Inの初期化
   void _initializeGoogleSignIn() {
+    // すでに初期化済みの場合は何もしない
+    if (_googleSignIn != null) {
+      if (kDebugMode) {
+        print('Google Sign-In already initialized, skipping...');
+      }
+      return;
+    }
     try {
+      if (kDebugMode) {
+        print(
+            'Initializing Google Sign-In for ${kIsWeb ? 'Web' : 'Mobile'}...');
+      }
+
       if (kIsWeb) {
         // Web環境用の設定 - Firebase ConsoleのWeb Client IDを使用
         _googleSignIn = GoogleSignIn(
@@ -59,27 +71,29 @@ class AuthProvider extends ChangeNotifier {
               '201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com',
         );
       } else {
-        // モバイル環境用の設定
-        // Android: google-services.jsonから自動取得
-        // iOS: GoogleService-Info.plistから自動取得
+        // モバイル環境用の設定 - 自動設定を使用
         _googleSignIn = GoogleSignIn(
           scopes: ['email', 'profile'],
-          // 初回認証の成功率を向上させるための設定
           forceCodeForRefreshToken: true,
         );
       }
-
       if (kDebugMode) {
-        print('Google Sign-In initialized for ${kIsWeb ? 'Web' : 'Mobile'}');
-        print('Client ID: ${_googleSignIn.clientId ?? 'Auto-configured'}');
+        print(
+            'Google Sign-In initialized for  [32m${kIsWeb ? 'Web' : 'Mobile'} [0m');
+        print(
+            'Client ID:  [32m${_googleSignIn?.clientId ?? 'Auto-configured'} [0m');
+        print('Google Sign-In instance created successfully');
       }
     } catch (e) {
       if (kDebugMode) {
         print('Google Sign-In initialization error: $e');
+        print('Error type: ${e.runtimeType}');
       }
-
       // フォールバック：基本的な設定で再試行
       try {
+        if (kDebugMode) {
+          print('Attempting fallback Google Sign-In initialization...');
+        }
         _googleSignIn = GoogleSignIn(
           forceCodeForRefreshToken: true,
         );
@@ -91,6 +105,7 @@ class AuthProvider extends ChangeNotifier {
           print(
               'Google Sign-In fallback initialization failed: $fallbackError');
         }
+        _googleSignIn = null;
       }
     }
   }
@@ -292,10 +307,21 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      if (kDebugMode) {
+        print('Email Sign-In: Starting...');
+        print('Email: $email');
+      }
+
+      // Android環境でのreCAPTCHA問題を回避するための設定
       final UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      if (kDebugMode) {
+        print('Email Sign-In: Success!');
+        print('User ID: ${result.user?.uid}');
+      }
 
       _user = result.user;
       if (_user != null) {
@@ -306,6 +332,11 @@ class AuthProvider extends ChangeNotifier {
       }
       return true;
     } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        print(
+            'FirebaseAuthException in Email Sign-In: ${e.code} - ${e.message}');
+      }
+
       // アカウントが存在しない場合、Google認証でのアカウントがあるかチェック
       if (e.code == 'user-not-found') {
         final methods = await _auth.fetchSignInMethodsForEmail(email);
@@ -314,11 +345,26 @@ class AuthProvider extends ChangeNotifier {
         } else {
           _setError('このメールアドレスのアカウントが見つかりません。');
         }
+      } else if (e.code == 'invalid-credential') {
+        // 認証情報が無効な場合、Googleアカウントとの重複をチェック
+        final methods = await _auth.fetchSignInMethodsForEmail(email);
+        if (methods.contains('google.com')) {
+          _setError(
+              'このメールアドレスはGoogleアカウントで使用されています。Googleでサインインするか、アカウントをリンクしてください。');
+        } else {
+          _setError('メールアドレスまたはパスワードが間違っています。');
+        }
+      } else if (e.code == 'account-exists-with-different-credential') {
+        _setError('このメールアドレスは別の認証方法で使用されています。Googleでサインインするか、アカウントをリンクしてください。');
       } else {
         _setError(_getErrorMessage(e.code));
       }
       return false;
     } catch (e) {
+      if (kDebugMode) {
+        print('Unexpected error in Email Sign-In: $e');
+        print('Error type: ${e.runtimeType}');
+      }
       _setError('予期しないエラーが発生しました');
       return false;
     } finally {
@@ -326,354 +372,157 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Googleサインイン
+  // Googleサインイン（簡素化版）
   Future<bool> signInWithGoogle() async {
-    GoogleSignInAccount? googleUser;
-    int retryCount = 0;
-    const maxRetries = 3; // リトライ回数を増やす
+    try {
+      _setLoading(true);
+      _setError(null);
 
-    while (retryCount < maxRetries) {
-      try {
-        _setLoading(true);
-        _setError(null);
+      if (kDebugMode) {
+        print('Google Sign-In: Starting...');
+        print(
+            'Google Sign-In instance: ${_googleSignIn != null ? 'Initialized' : 'Not initialized'}');
+      }
 
+      // Google Sign-Inインスタンスが初期化されているかチェック
+      if (_googleSignIn == null) {
         if (kDebugMode) {
-          print(
-              '=== Google Sign-In Debug Info (Attempt ${retryCount + 1}/$maxRetries) ===');
-          print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
-          print('Current User: ${_googleSignIn.currentUser?.email ?? 'None'}');
-          print('Starting Google Sign-In...');
+          print('Google Sign-In not initialized, reinitializing...');
         }
+        _initializeGoogleSignIn();
 
-        // 最初のリトライでは、完全に新しいセッションを開始
-        if (retryCount > 0) {
+        // 再初期化後もnullの場合はエラー
+        if (_googleSignIn == null) {
           if (kDebugMode) {
-            print('Performing full reinitialization for retry...');
+            print('Google Sign-In initialization failed completely');
           }
-
-          // 完全に再初期化
-          _initializeGoogleSignIn();
-          await Future.delayed(const Duration(milliseconds: 800));
+          _setError('Google Sign-Inの初期化に失敗しました');
+          return false;
         }
+      }
 
-        // Google Sign-Inの初期化を確認
-        if (!kIsWeb) {
-          try {
-            // モバイルの場合、Google Sign-Inが正しく初期化されているか確認
-            final isAvailable = await _googleSignIn.isSignedIn().timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                if (kDebugMode) {
-                  print('Google Sign-In isSignedIn check timeout');
-                }
-                return false;
-              },
-            );
-            if (kDebugMode) {
-              print('Google Sign-In initialization check: $isAvailable');
-            }
+      if (kDebugMode) {
+        print('Google Sign-In: Attempting to sign in...');
+        print('Client ID: ${_googleSignIn?.clientId}');
+      }
 
-            // 新規デバイスの場合の追加チェック
-            if (!isAvailable && retryCount == 0) {
-              if (kDebugMode) {
-                print('新規デバイス検出 - 初期化を強化中...');
-              }
-
-              // 複数回初期化を試行
-              for (int i = 0; i < 3; i++) {
-                try {
-                  _initializeGoogleSignIn();
-                  await Future.delayed(Duration(milliseconds: 500 + (i * 200)));
-
-                  final recheck = await _googleSignIn.isSignedIn().timeout(
-                        const Duration(seconds: 5),
-                        onTimeout: () => false,
-                      );
-
-                  if (kDebugMode) {
-                    print('初期化チェック $i: $recheck');
-                  }
-
-                  if (recheck || i == 2) break; // 成功するか最後の試行まで
-                } catch (e) {
-                  if (kDebugMode) {
-                    print('初期化試行 $i でエラー: $e');
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            if (kDebugMode) {
-              print('Google Sign-In initialization error: $e');
-            }
-            // 初期化に失敗した場合、再初期化を試行
-            _initializeGoogleSignIn();
-            await Future.delayed(const Duration(milliseconds: 800));
-          }
-        }
-
-        // 既存のサインイン状態をクリア（より確実に）
+      // Web環境ではsignInSilentlyを試行
+      GoogleSignInAccount? googleUser;
+      if (kIsWeb) {
         try {
-          if (kDebugMode) {
-            print('Clearing existing sign-in state...');
-          }
-
-          // サインアウトとdisconnectを順次実行
-          if (_googleSignIn.currentUser != null || retryCount > 0) {
-            await _googleSignIn.signOut().timeout(
-              const Duration(seconds: 8), // タイムアウトを少し長くする
-              onTimeout: () {
-                if (kDebugMode) {
-                  print('Google Sign-Out timeout - proceeding anyway');
-                }
-                return Future.value();
-              },
-            );
-
-            // signOutの後に短い待機
-            await Future.delayed(const Duration(milliseconds: 300));
-          }
-
-          // disconnect処理（初回のみ、またはリトライ時）
-          if (retryCount == 0 || retryCount > 1) {
-            await _googleSignIn.disconnect().timeout(
-              const Duration(seconds: 5),
-              onTimeout: () {
-                if (kDebugMode) {
-                  print('Google disconnect timeout - proceeding anyway');
-                }
-                return Future.value();
-              },
-            ).catchError((e) {
-              if (kDebugMode) {
-                print('Google disconnect error (continuing): $e');
-              }
-            });
-
-            // disconnectの後に短い待機
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-
-          if (kDebugMode) {
-            print('Cleared existing sign-in state');
+          googleUser = await _googleSignIn?.signInSilently();
+          if (googleUser == null) {
+            // signInSilentlyが失敗した場合は通常のsignInを試行
+            googleUser = await _googleSignIn?.signIn();
           }
         } catch (e) {
           if (kDebugMode) {
-            print('Sign-out error (continuing): $e');
-          }
-        }
-
-        // 状態クリア後の待機時間（リトライ時は長めに）
-        final waitTime = retryCount > 0 ? 1000 : 500;
-        await Future.delayed(Duration(milliseconds: waitTime));
-
-        // Google Sign-Inを実行（リトライごとにタイムアウト時間を調整）
-        if (kDebugMode) {
-          print('Attempting Google Sign-In...');
-        }
-
-        final timeoutDuration =
-            Duration(seconds: 45 + (retryCount * 15)); // 段階的にタイムアウトを延長
-        googleUser = await _googleSignIn.signIn().timeout(
-          timeoutDuration,
-          onTimeout: () {
-            if (kDebugMode) {
-              print(
-                  'Google Sign-In timeout after ${timeoutDuration.inSeconds} seconds');
-            }
-            throw TimeoutException('Google Sign-In timeout', timeoutDuration);
-          },
-        );
-
-        if (googleUser == null) {
-          if (kDebugMode) {
-            print('Google Sign-In: User cancelled or failed');
-            print('Checking Google Sign-In configuration...');
-
-            // 設定の詳細チェック
-            final isSignedIn = await _googleSignIn.isSignedIn();
-            print('Is signed in: $isSignedIn');
             print(
-                'Client ID configured: ${_googleSignIn.clientId ?? 'Default'}');
+                'Web Google Sign-In silent failed, trying regular sign in: $e');
           }
-
-          // ユーザーがキャンセルした場合は即座に終了（リトライしない）
-          _setError('Google Sign-Inがキャンセルされました');
-          return false;
+          googleUser = await _googleSignIn?.signIn();
         }
-
-        if (kDebugMode) {
-          print('Google Sign-In: Success!');
-          print('  User ID: ${googleUser.id}');
-          print('  Email: ${googleUser.email}');
-          print('  Display Name: ${googleUser.displayName}');
-        }
-
-        // Google認証情報を取得（タイムアウト付き）
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication.timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            if (kDebugMode) {
-              print('Google authentication timeout');
-            }
-            throw TimeoutException(
-                'Google authentication timeout', const Duration(seconds: 10));
-          },
-        );
-
-        if (kDebugMode) {
-          print('Google Auth: Getting credentials...');
-          print(
-              '  Access Token: ${googleAuth.accessToken != null ? 'Available' : 'Null'}');
-          print(
-              '  ID Token: ${googleAuth.idToken != null ? 'Available' : 'Null'}');
-        }
-
-        // Firebase認証情報を作成
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        if (kDebugMode) {
-          print('Firebase: Signing in with credential...');
-        }
-
-        // Firebaseでサインイン（タイムアウト付き）
-        final UserCredential result =
-            await _auth.signInWithCredential(credential).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            if (kDebugMode) {
-              print('Firebase sign-in timeout');
-            }
-            throw TimeoutException(
-                'Firebase sign-in timeout', const Duration(seconds: 15));
-          },
-        );
-
-        if (kDebugMode) {
-          print('Firebase Sign-In: Success!');
-          print('  User ID: ${result.user?.uid}');
-          print('  Email: ${result.user?.email}');
-          print('  Display Name: ${result.user?.displayName}');
-          print('  Is New User: ${result.additionalUserInfo?.isNewUser}');
-        }
-
-        if (result.user != null) {
-          await _createOrUpdateUser(result.user!);
-
-          // 新規ユーザーの場合、追加の同期時間を設ける
-          if (result.additionalUserInfo?.isNewUser == true) {
-            if (kDebugMode) {
-              print('新規ユーザーの初期化完了を待機中...');
-            }
-            await Future.delayed(const Duration(milliseconds: 1000));
-          }
-        }
-
-        return true;
-      } on TimeoutException catch (e) {
-        if (kDebugMode) {
-          print('Google Sign-In Timeout: $e');
-        }
-
-        if (retryCount < maxRetries - 1) {
-          retryCount++;
-          if (kDebugMode) {
-            print('Retrying after timeout... (${retryCount}/$maxRetries)');
-          }
-          await Future.delayed(const Duration(milliseconds: 1500));
-          continue;
-        }
-
-        _setError('Google Sign-Inがタイムアウトしました。ネットワーク接続を確認してください。');
-        return false;
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'account-exists-with-different-credential') {
-          // 同じメールアドレスで別の認証方法のアカウントが存在する場合
-          final email = googleUser?.email;
-          if (email != null) {
-            final methods = await _auth.fetchSignInMethodsForEmail(email);
-            if (methods.contains('password')) {
-              _setError(
-                  'このメールアドレスは既にメール認証でアカウントが作成されています。メール認証でサインインするか、アカウントをリンクしてください。');
-            } else {
-              _setError('このメールアドレスは既に別の認証方法で使用されています。');
-            }
-          } else {
-            _setError('アカウントが既に存在しますが、異なる認証方法で作成されています。');
-          }
-        } else {
-          _setError(_getErrorMessage(e.code));
-        }
-        return false;
-      } catch (e, stackTrace) {
-        if (kDebugMode) {
-          print('Google Sign-In Error: $e');
-          print('Error Type: ${e.runtimeType}');
-          print('Stack Trace: $stackTrace');
-
-          // 特定のエラーを詳しく調査
-          if (e.toString().contains('PlatformException')) {
-            print('');
-            print('🔍 PlatformException Details:');
-            print('This usually indicates a configuration issue.');
-            print('Common causes:');
-            print('1. Bundle ID mismatch');
-            print('2. GoogleService-Info.plist not properly configured');
-            print('3. OAuth Client ID not properly set up');
-            print('4. App not properly signed');
-            print('');
-          }
-
-          if (e.toString().contains('sign_in_canceled')) {
-            print('');
-            print('ℹ️  User cancelled the sign-in process');
-            print('');
-          }
-
-          if (e.toString().contains('network_error')) {
-            print('');
-            print('🌐 Network error occurred');
-            print('Check internet connection');
-            print('');
-          }
-        }
-
-        // 特定のエラーでリトライを試行
-        if (retryCount < maxRetries - 1 &&
-            (e.toString().contains('network_error') ||
-                e.toString().contains('PlatformException'))) {
-          retryCount++;
-          if (kDebugMode) {
-            print('Retrying after error... (${retryCount}/$maxRetries)');
-          }
-          await Future.delayed(const Duration(milliseconds: 2000));
-          continue;
-        }
-
-        // ユーザーフレンドリーなエラーメッセージ
-        if (e.toString().contains('sign_in_canceled') ||
-            e.toString().contains('canceled') ||
-            e.toString().contains('cancelled')) {
-          _setError('Google Sign-Inがキャンセルされました');
-        } else if (e.toString().contains('network_error')) {
-          _setError('ネットワークエラーが発生しました。インターネット接続を確認してください。');
-        } else if (e.toString().contains('PlatformException')) {
-          _setError('Google Sign-Inの設定に問題があります。アプリの設定を確認してください。');
-        } else {
-          _setError('Google Sign-Inに失敗しました: ${e.toString()}');
-        }
-
-        return false;
-      } finally {
-        _setLoading(false);
+      } else {
+        // モバイル環境では通常のsignIn
+        googleUser = await _googleSignIn?.signIn();
       }
-    }
 
-    return false;
+      if (googleUser == null) {
+        if (kDebugMode) {
+          print('Google Sign-In: User cancelled or failed to get account');
+        }
+        _setError('Google Sign-Inがキャンセルされました');
+        return false;
+      }
+
+      if (kDebugMode) {
+        print('Google Sign-In: Success!');
+        print('  Email: ${googleUser.email}');
+        print('  Display Name: ${googleUser.displayName}');
+        print('  ID: ${googleUser.id}');
+      }
+
+      // Google認証情報を取得
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      if (kDebugMode) {
+        print(
+            'Google Auth: Access Token: ${googleAuth.accessToken != null ? 'Available' : 'Null'}');
+        print(
+            'Google Auth: ID Token: ${googleAuth.idToken != null ? 'Available' : 'Null'}');
+      }
+
+      // Firebase認証情報を作成
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      if (kDebugMode) {
+        print('Firebase: Creating credential...');
+      }
+
+      // Firebaseでサインイン
+      final UserCredential result =
+          await _auth.signInWithCredential(credential);
+
+      if (kDebugMode) {
+        print('Firebase Sign-In: Success!');
+        print('  User ID: ${result.user?.uid}');
+        print('  Is New User: ${result.additionalUserInfo?.isNewUser}');
+      }
+
+      if (result.user != null) {
+        await _createOrUpdateUser(result.user!);
+      }
+
+      return true;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        print('FirebaseAuthException: ${e.code} - ${e.message}');
+      }
+      if (e.code == 'account-exists-with-different-credential') {
+        _setError(
+            'このメールアドレスは既に別の認証方法で使用されています。メールアドレスでサインインするか、アカウントをリンクしてください。');
+      } else if (e.code == 'email-already-in-use') {
+        _setError('このメールアドレスは既に使用されています。別のメールアドレスを使用するか、既存のアカウントでサインインしてください。');
+      } else if (e.code == 'invalid-credential') {
+        _setError('認証情報が無効です。Googleアカウントの設定を確認してください。');
+      } else {
+        _setError(_getErrorMessage(e.code));
+      }
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Google Sign-In Error: $e');
+        print('Error Type: ${e.runtimeType}');
+        print('Error Details: ${e.toString()}');
+        print('Error Stack Trace: ${StackTrace.current}');
+      }
+
+      String errorMessage;
+
+      if (e.toString().contains('sign_in_canceled') ||
+          e.toString().contains('canceled') ||
+          e.toString().contains('cancelled')) {
+        errorMessage = 'Google Sign-Inがキャンセルされました';
+      } else if (e.toString().contains('network') ||
+          e.toString().contains('connection')) {
+        errorMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください';
+      } else if (e.toString().contains('popup_closed')) {
+        errorMessage = 'Google Sign-Inウィンドウが閉じられました';
+      } else if (e.toString().contains('popup_blocked')) {
+        errorMessage = 'ポップアップがブロックされました。ブラウザの設定を確認してください';
+      } else {
+        errorMessage = 'Google Sign-Inに失敗しました。しばらく待ってから再試行してください';
+      }
+
+      _setError(errorMessage);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 
   // アカウントリンク機能 - Googleアカウントをメール認証アカウントにリンク
@@ -682,17 +531,32 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      if (kDebugMode) {
+        print('Account Link: Starting...');
+        print('Email: $email');
+      }
+
       // まず、メール認証でサインイン
       final UserCredential emailResult = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
+      if (kDebugMode) {
+        print('Account Link: Email sign-in successful');
+        print('User ID: ${emailResult.user?.uid}');
+      }
+
       // Google Sign-Inを実行
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn?.signIn();
       if (googleUser == null) {
         _setError('Google Sign-Inがキャンセルされました');
         return false;
+      }
+
+      if (kDebugMode) {
+        print('Account Link: Google sign-in successful');
+        print('Google Email: ${googleUser.email}');
       }
 
       // Google認証情報を取得
@@ -707,20 +571,32 @@ class AuthProvider extends ChangeNotifier {
       await emailResult.user!.linkWithCredential(credential);
 
       if (kDebugMode) {
-        print('Google アカウントがリンクされました');
+        print('Account Link: Successfully linked Google account');
       }
 
       return true;
     } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        print(
+            'FirebaseAuthException in Account Link: ${e.code} - ${e.message}');
+      }
       if (e.code == 'provider-already-linked') {
         _setError('このGoogleアカウントは既にリンクされています');
       } else if (e.code == 'credential-already-in-use') {
         _setError('このGoogleアカウントは既に別のユーザーによって使用されています');
+      } else if (e.code == 'email-already-in-use') {
+        _setError('このメールアドレスは既に使用されています。別のメールアドレスを使用してください。');
+      } else if (e.code == 'invalid-credential') {
+        _setError('認証情報が無効です。メールアドレスとパスワードを確認してください。');
       } else {
         _setError(_getErrorMessage(e.code));
       }
       return false;
     } catch (e) {
+      if (kDebugMode) {
+        print('Unexpected error in Account Link: $e');
+        print('Error type: ${e.runtimeType}');
+      }
       _setError('アカウントリンクに失敗しました: ${e.toString()}');
       return false;
     } finally {
@@ -797,22 +673,18 @@ class AuthProvider extends ChangeNotifier {
       print('=== Google Sign-In Status Check ===');
       print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
       print(
-          'Google Sign-In Instance: ${_googleSignIn != null ? 'Created' : 'Not Created'}');
+          'Google Sign-In Instance: ${_googleSignIn != null ? 'Created' : 'Null'}');
 
-      try {
-        final isSignedIn = await _googleSignIn.isSignedIn();
-        print('Is Signed In: $isSignedIn');
-
-        final currentUser = _googleSignIn.currentUser;
-        if (currentUser != null) {
-          print('Current Google User: ${currentUser.email}');
-        } else {
-          print('Current Google User: None');
+      if (_googleSignIn != null) {
+        try {
+          final isSignedIn = await _googleSignIn!.isSignedIn();
+          final currentUser = await _googleSignIn!.currentUser;
+          print('Is Signed In: $isSignedIn');
+          print('Current Google User: ${currentUser?.email ?? 'None'}');
+        } catch (e) {
+          print('Error checking Google Sign-In status: $e');
         }
-      } catch (e) {
-        print('Error checking status: $e');
       }
-
       print('=== End Status Check ===');
     }
   }
@@ -1006,13 +878,70 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      if (kDebugMode) {
+        print('Password Reset: Starting...');
+        print('Email: $email');
+      }
+
+      // まず、このメールアドレスでアカウントが存在するかチェック
+      final methods = await _auth.fetchSignInMethodsForEmail(email);
+      if (kDebugMode) {
+        print('Password Reset: Available methods for $email: $methods');
+      }
+
+      if (methods.isEmpty) {
+        if (kDebugMode) {
+          print('Password Reset: No account found for $email');
+        }
+        _setError('このメールアドレスのアカウントが見つかりません。');
+        return false;
+      }
+
+      // Googleアカウントのみの場合は特別なメッセージ
+      if (methods.length == 1 && methods.contains('google.com')) {
+        if (kDebugMode) {
+          print('Password Reset: Google-only account for $email');
+        }
+        _setError('このメールアドレスはGoogleアカウントでサインインされています。Googleでサインインしてください。');
+        return false;
+      }
+
+      if (kDebugMode) {
+        print('Password Reset: Sending reset email to $email');
+      }
+
+      // パスワードリセットメールを送信
       await _auth.sendPasswordResetEmail(email: email);
+
+      if (kDebugMode) {
+        print('Password Reset: Email sent successfully to $email');
+      }
+
       return true;
     } on FirebaseAuthException catch (e) {
-      _setError(_getErrorMessage(e.code));
+      if (kDebugMode) {
+        print(
+            'FirebaseAuthException in Password Reset: ${e.code} - ${e.message}');
+      }
+
+      if (e.code == 'user-not-found') {
+        _setError('このメールアドレスのアカウントが見つかりません。');
+      } else if (e.code == 'invalid-email') {
+        _setError('有効なメールアドレスを入力してください。');
+      } else if (e.code == 'too-many-requests') {
+        _setError('リクエストが多すぎます。しばらく待ってから再試行してください。');
+      } else if (e.code == 'network-request-failed') {
+        _setError('ネットワークエラーが発生しました。インターネット接続を確認してください。');
+      } else {
+        _setError('パスワードリセットに失敗しました: ${e.message}');
+      }
       return false;
     } catch (e) {
-      _setError('予期しないエラーが発生しました');
+      if (kDebugMode) {
+        print('Unexpected error in Password Reset: $e');
+        print('Error type: ${e.runtimeType}');
+      }
+      _setError('パスワードリセットに失敗しました。しばらく待ってから再試行してください。');
       return false;
     } finally {
       _setLoading(false);
@@ -1025,7 +954,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
       await _auth.signOut();
-      await _googleSignIn.signOut();
+      await _googleSignIn?.signOut();
       _user = null;
     } catch (e) {
       _setError('サインアウトに失敗しました');
@@ -1036,15 +965,19 @@ class AuthProvider extends ChangeNotifier {
 
   // エラーメッセージの日本語化
   String _getErrorMessage(String errorCode) {
+    if (kDebugMode) {
+      print('Firebase Auth Error Code: $errorCode');
+    }
+
     switch (errorCode) {
       case 'weak-password':
-        return 'パスワードが弱すぎます';
+        return 'パスワードが弱すぎます（6文字以上で入力してください）';
       case 'email-already-in-use':
         return 'このメールアドレスは既に使用されています';
       case 'invalid-email':
-        return 'メールアドレスが無効です';
+        return 'メールアドレスの形式が正しくありません';
       case 'user-not-found':
-        return 'ユーザーが見つかりません';
+        return 'このメールアドレスのアカウントが見つかりません';
       case 'wrong-password':
         return 'パスワードが間違っています';
       case 'user-disabled':
@@ -1053,8 +986,14 @@ class AuthProvider extends ChangeNotifier {
         return 'リクエストが多すぎます。しばらく待ってから再試行してください';
       case 'operation-not-allowed':
         return 'この操作は許可されていません';
+      case 'network-request-failed':
+        return 'ネットワークエラーが発生しました。インターネット接続を確認してください';
+      case 'invalid-credential':
+        return '認証情報が無効です';
+      case 'account-exists-with-different-credential':
+        return 'このメールアドレスは別の認証方法で使用されています';
       default:
-        return '認証エラーが発生しました';
+        return '認証エラーが発生しました（エラーコード: $errorCode）';
     }
   }
 }

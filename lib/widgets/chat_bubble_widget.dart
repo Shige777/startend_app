@@ -28,14 +28,56 @@ class ChatBubbleWidget extends StatefulWidget {
   State<ChatBubbleWidget> createState() => _ChatBubbleWidgetState();
 }
 
-class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
+class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
+    with SingleTickerProviderStateMixin {
   late PostModel _currentPost;
   bool _isUpdating = false;
+  late AnimationController _likeAnimationController;
+  late Animation<double> _likeAnimation;
+  late Animation<Offset> _fallingAnimation;
+  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
     _currentPost = widget.post;
+    _likeAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1200), // アニメーション時間を調整
+      vsync: this,
+    );
+
+    // 落下アニメーション
+    _fallingAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.0), // 開始位置を調整
+      end: const Offset(0, 0), // 終了位置を0に修正
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // 回転アニメーション
+    _rotationAnimation = Tween<double>(
+      begin: -0.2,
+      end: 0.0, // 終了位置を0に修正
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // スケールアニメーション
+    _likeAnimation = Tween<double>(
+      begin: 0.8, // 開始サイズを調整
+      end: 1.0, // 終了サイズを調整
+    ).animate(CurvedAnimation(
+      parent: _likeAnimationController,
+      curve: Curves.elasticOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _likeAnimationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -168,11 +210,20 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
 
                   // タイムスタンプ
                   const SizedBox(height: 1),
-                  Text(
-                    DateTimeUtils.getRelativeTime(_currentPost.createdAt),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      DateTimeUtils.getRelativeTime(_currentPost.createdAt),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
@@ -249,21 +300,56 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // 自分の投稿の場合の処理
-                      if (widget.isOwnMessage) {
+                      // 投稿者本人またはコミュニティメンバーの場合のみEND投稿可能
+                      final userProvider = context.read<UserProvider>();
+                      final currentUser = userProvider.currentUser;
+
+                      if (currentUser == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('ログインが必要です'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // コミュニティ投稿かどうかを判定
+                      final isCommunityPost =
+                          _currentPost.communityIds.isNotEmpty;
+                      final isOwnPost = widget.isOwnMessage;
+                      final isCommunityMember = isCommunityPost &&
+                          currentUser.communityIds
+                              .contains(_currentPost.communityIds.first);
+
+                      // END投稿可能な条件をチェック
+                      final canCreateEndPost = isOwnPost || isCommunityMember;
+
+                      if (canCreateEndPost) {
+                        // 自分の投稿またはコミュニティメンバーの場合
                         if (_currentPost.isCompleted &&
                             _currentPost.endImageUrl != null) {
                           // 完了済みで画像がある場合は画像拡大
                           _showImageZoom(context, _currentPost.endImageUrl);
                         } else if (!_currentPost.isCompleted) {
                           // 未完了の場合はEND投稿画面へ
-                          context.push('/edit-post/${_currentPost.id}');
+                          // コミュニティ投稿の場合はコミュニティIDも渡す
+                          final extra = {
+                            'startPostId': _currentPost.id,
+                            'startPost': _currentPost,
+                          };
+
+                          // コミュニティ投稿の場合はコミュニティIDも追加
+                          if (_currentPost.communityIds.isNotEmpty) {
+                            extra['communityId'] =
+                                _currentPost.communityIds.first;
+                          }
+
+                          context.push('/create-end-post', extra: extra);
                         } else {
-                          // 完了済みだが画像がない場合（自動完了含む）もEND投稿画面へ
-                          context.push('/edit-post/${_currentPost.id}');
+                          // 完了済みだが画像がない場合は何もしない
                         }
                       } else {
-                        // 他人の投稿の場合
+                        // 他人の投稿でコミュニティメンバーでもない場合
                         if (_currentPost.isCompleted &&
                             _currentPost.endImageUrl != null) {
                           // 画像がある場合のみ拡大表示
@@ -386,30 +472,30 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                         : AppColors.inProgress),
               ),
             ),
-            if (_currentPost.scheduledEndTime != null) ...[
-              const SizedBox(width: 8),
-              Icon(
-                Icons.schedule,
-                size: 12,
+            const SizedBox(width: 8),
+            Icon(
+              Icons.schedule,
+              size: 12,
+              color: widget.isOwnMessage
+                  ? Colors.white.withOpacity(0.6)
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 2),
+            Text(
+              _currentPost.isCompleted
+                  ? DateTimeUtils.formatDateTime(_currentPost.actualEndTime ??
+                      _currentPost.scheduledEndTime!)
+                  : _currentPost.scheduledEndTime != null
+                      ? DateTimeUtils.formatDateTime(
+                          _currentPost.scheduledEndTime!)
+                      : '未定',
+              style: TextStyle(
+                fontSize: 10,
                 color: widget.isOwnMessage
                     ? Colors.white.withOpacity(0.6)
                     : AppColors.textSecondary,
               ),
-              const SizedBox(width: 2),
-              Text(
-                _currentPost.isCompleted
-                    ? DateTimeUtils.formatDateTime(_currentPost.actualEndTime ??
-                        _currentPost.scheduledEndTime!)
-                    : DateTimeUtils.formatDateTime(
-                        _currentPost.scheduledEndTime!),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: widget.isOwnMessage
-                      ? Colors.white.withOpacity(0.6)
-                      : AppColors.textSecondary,
-                ),
-              ),
-            ],
+            ),
           ],
         ),
         // 集中時間を表示（完了した場合のみ）
@@ -423,7 +509,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                 size: 12,
                 color: widget.isOwnMessage
                     ? Colors.white.withOpacity(0.7)
-                    : AppColors.accent,
+                    : Colors.black,
               ),
               const SizedBox(width: 2),
               Text(
@@ -432,7 +518,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
                   fontSize: 10,
                   color: widget.isOwnMessage
                       ? Colors.white.withOpacity(0.7)
-                      : AppColors.accent,
+                      : Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -453,21 +539,71 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
             currentUser != null && _currentPost.userId == currentUser.id;
 
         return InkWell(
-          onTap: (_isUpdating || isOwnPost)
+          onTap: _isUpdating
               ? null
-              : () => _toggleLike(context, currentUser),
+              : () {
+                  final wasLiked = isLiked;
+                  _toggleLike(context, currentUser);
+                  // いいねを追加した時のみアニメーションを実行
+                  if (!wasLiked) {
+                    // アニメーションコントローラーをリセットしてから開始
+                    _likeAnimationController.reset();
+                    _likeAnimationController.forward().then((_) {
+                      // アニメーション終了後はそのまま停止
+                    });
+                  }
+                },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              // 枠線を削除
+              // border: Border.all(
+              //   color: isLiked
+              //       ? AppColors.flame
+              //       : AppColors.textSecondary.withValues(alpha: 0.2),
+              //   width: 0.5,
+              // ),
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.local_fire_department,
-                  size: 16,
-                  color: isLiked ? AppColors.flame : AppColors.textSecondary,
+                AnimatedBuilder(
+                  animation: _likeAnimationController,
+                  builder: (context, child) {
+                    // アニメーション中は特別な表示、それ以外は通常のアイコン
+                    if (_likeAnimationController.status ==
+                            AnimationStatus.forward ||
+                        _likeAnimationController.status ==
+                            AnimationStatus.reverse) {
+                      return SlideTransition(
+                        position: _fallingAnimation,
+                        child: Transform.rotate(
+                          angle: _rotationAnimation.value,
+                          child: Transform.scale(
+                            scale: _likeAnimation.value,
+                            child: Icon(
+                              Icons.eco,
+                              size: 20,
+                              color: AppColors.flame,
+                            ),
+                          ),
+                        ),
+                      );
+                    } else {
+                      // 通常状態のアイコン
+                      return Icon(
+                        Icons.eco,
+                        size: 20,
+                        color:
+                            isLiked ? AppColors.flame : AppColors.textSecondary,
+                      );
+                    }
+                  },
                 ),
                 if (_currentPost.likeCount > 0) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   Text(
                     _currentPost.likeCount.toString(),
                     style: TextStyle(
@@ -496,12 +632,17 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
 
     if (_isUpdating) return;
 
+    print(
+        'リアクション開始: 投稿ID=${_currentPost.id}, ユーザーID=${currentUser.id}'); // デバッグログ追加
+
     setState(() {
       _isUpdating = true;
     });
 
     final postProvider = context.read<PostProvider>();
     final isLiked = _currentPost.isLikedBy(currentUser.id);
+
+    print('現在のいいね状態: $isLiked, いいね数: ${_currentPost.likeCount}'); // デバッグログ追加
 
     // 即座にローカル状態を更新（楽観的更新）
     final newLikeCount = isLiked
@@ -514,6 +655,9 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
             .toList()
         : [..._currentPost.likedByUserIds, currentUser.id];
 
+    print(
+        '新しいいいね数: $newLikeCount, いいねユーザー数: ${newLikedByUserIds.length}'); // デバッグログ追加
+
     // ローカル状態を即座に更新
     setState(() {
       _currentPost = _currentPost.copyWith(
@@ -525,21 +669,27 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
     try {
       bool success;
       if (isLiked) {
+        print('いいね解除を実行'); // デバッグログ追加
         success =
             await postProvider.unlikePost(_currentPost.id, currentUser.id);
       } else {
+        print('いいね追加を実行'); // デバッグログ追加
         success = await postProvider.likePost(_currentPost.id, currentUser.id);
       }
+
+      print('サーバー更新結果: $success'); // デバッグログ追加
 
       if (success) {
         // サーバー更新も成功した場合、PostProviderの各リストも更新
         postProvider.updatePostInLists(_currentPost);
+        print('リアクション成功'); // デバッグログ追加
       } else {
         // 失敗した場合は元の状態に戻す
         setState(() {
           _currentPost = widget.post;
         });
 
+        print('リアクション失敗: ${postProvider.errorMessage}'); // デバッグログ追加
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(postProvider.errorMessage ?? 'エラーが発生しました')),
         );
@@ -550,6 +700,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
         _currentPost = widget.post;
       });
 
+      print('リアクションエラー: $e'); // デバッグログ追加
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('エラーが発生しました: $e')),
       );
@@ -666,7 +817,11 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget> {
           color: widget.isOwnMessage
               ? Colors.white.withOpacity(0.2)
               : AppColors.surfaceVariant,
-          child: const Center(child: CircularProgressIndicator()),
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: Colors.white,
+            ),
+          ),
         ),
         errorWidget: (context, url, error) => Container(
           color: widget.isOwnMessage

@@ -28,6 +28,12 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 読み込み状態をリセット（タブ切り替え時の不要な読み込みを防ぐため）
+  void resetLoadingState() {
+    _isLoading = false;
+    notifyListeners();
+  }
+
   // コミュニティ作成
   Future<bool> createCommunity({
     required String name,

@@ -11,6 +11,7 @@ import '../../constants/app_constants.dart';
 import '../../models/post_model.dart';
 import '../../utils/date_time_utils.dart';
 import '../../services/storage_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/platform_image_picker.dart';
 
 class CreatePostScreen extends StatefulWidget {
@@ -44,8 +45,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -64,9 +68,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
                   )
-                : const Text('投稿'),
+                : const Text(
+                    '投稿',
+                    style: TextStyle(color: Colors.black),
+                  ),
           ),
         ],
       ),
@@ -94,37 +104,124 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(
-                  labelText: 'タイトル',
-                  hintText: '何を始めますか？',
+                  labelText: 'タイトル（任意）',
+                  hintText: '何を始めますか？（任意）',
                   prefixIcon: Icon(Icons.title),
                 ),
                 maxLength: AppConstants.maxTitleLength,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'タイトルを入力してください';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
 
               // 完了予定時刻選択
-              ListTile(
-                leading: const Icon(Icons.schedule),
-                title: const Text('完了予定時刻'),
-                subtitle: Text(
-                  _selectedDateTime != null
-                      ? DateTimeUtils.formatDateTime(_selectedDateTime!)
-                      : '設定してください',
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: _selectDateTime,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppConstants.borderRadius,
+              Card(
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule, color: Colors.black),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '完了予定時刻（任意）',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 現在の選択状態を表示
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedDateTime != null
+                                  ? DateTimeUtils.formatDateTime(
+                                      _selectedDateTime!)
+                                  : '未設定',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_selectedDateTime != null) ...[
+                              const SizedBox(height: 4),
+                              Builder(
+                                builder: (context) {
+                                  final now = DateTime.now();
+                                  final duration =
+                                      _selectedDateTime!.difference(now);
+
+                                  if (duration.isNegative) {
+                                    return const Text(
+                                      '⚠️ 過去の時刻です',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }
+
+                                  final hours = duration.inHours;
+                                  final minutes = duration.inMinutes % 60;
+                                  final durationText = hours > 0
+                                      ? '$hours時間${minutes > 0 ? '$minutes分' : ''}'
+                                      : '${minutes}分';
+
+                                  // 2時間を超える場合は警告表示
+                                  if (duration.inMinutes > 120) {
+                                    return Text(
+                                      '⚠️ 集中時間が長すぎます（$durationText）',
+                                      style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }
+
+                                  return Text(
+                                    '集中時間: $durationText',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 時刻設定ボタン
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _selectDateTime,
+                          icon: const Icon(Icons.schedule, size: 16),
+                          label: const Text('時刻を設定'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  side: const BorderSide(color: AppColors.divider),
                 ),
               ),
               const SizedBox(height: 16),
@@ -133,6 +230,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleSubmit,
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: _isLoading
@@ -184,8 +283,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
-
     // 画像が選択されているかチェック
     if (_selectedImageBytes == null) {
       ScaffoldMessenger.of(
@@ -194,11 +291,39 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
-    if (_selectedDateTime == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('完了予定時刻を設定してください')));
-      return;
+    // 完了予定時刻が設定されている場合のみバリデーション
+    if (_selectedDateTime != null) {
+      // 集中時間の制限チェック
+      final now = DateTime.now();
+      final duration = _selectedDateTime!.difference(now);
+
+      if (duration.isNegative) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('完了予定時刻は現在時刻より後に設定してください'),
+            backgroundColor: Colors.black,
+          ),
+        );
+        return;
+      }
+
+      // 最大集中時間を2時間（120分）に制限
+      const maxDurationMinutes = 120;
+      if (duration.inMinutes > maxDurationMinutes) {
+        final hours = maxDurationMinutes ~/ 60;
+        final minutes = maxDurationMinutes % 60;
+        final maxDurationText = hours > 0
+            ? '$hours時間${minutes > 0 ? '$minutes分' : ''}'
+            : '${minutes}分';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('集中時間は最大$maxDurationTextまでです'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -259,9 +384,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           print('投稿作成成功');
         }
 
+        // 終了予定時刻が設定されている場合は通知をスケジュール
+        if (_selectedDateTime != null) {
+          await NotificationService().scheduleReminderNotification(
+            postId: success,
+            title: post.title,
+            scheduledTime: _selectedDateTime!,
+            userId: userProvider.currentUser!.id,
+          );
+        }
+
         // 投稿作成後にユーザーの投稿一覧を更新
         await postProvider.getUserPosts(userProvider.currentUser!.id,
             currentUserId: userProvider.currentUser!.id);
+
+        // ユーザー情報を更新（投稿数を含む）
+        await userProvider.refreshCurrentUser();
 
         if (mounted) {
           if (widget.communityId != null) {

@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
-import '../../models/user_model.dart';
 import '../../constants/app_colors.dart';
 import '../../services/follow_service.dart';
 import '../../services/notification_service.dart';
-import '../../widgets/user_avatar.dart';
-import '../../widgets/wave_loading_widget.dart';
+import '../../widgets/leaf_loading_widget.dart';
 import '../../utils/date_time_utils.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -20,46 +15,109 @@ class NotificationScreen extends StatefulWidget {
   State<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class _NotificationScreenState extends State<NotificationScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _NotificationScreenState extends State<NotificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('通知'),
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'フォローリクエスト'),
-            Tab(text: '通知'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildFollowRequestsTab(),
-          _buildNotificationsTab(),
-        ],
-      ),
+      body: _buildCombinedNotifications(),
+    );
+  }
+
+  Widget _buildCombinedNotifications() {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final currentUser = userProvider.currentUser;
+        if (currentUser == null) {
+          return const Center(child: Text('ログインしてください'));
+        }
+
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: FollowService.getFollowRequests(currentUser.id),
+          builder: (context, followSnapshot) {
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream:
+                  NotificationService().getNotificationHistory(currentUser.id),
+              builder: (context, notificationSnapshot) {
+                if (followSnapshot.connectionState == ConnectionState.waiting ||
+                    notificationSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                  return const Center(child: LeafLoadingWidget());
+                }
+
+                if (followSnapshot.hasError || notificationSnapshot.hasError) {
+                  return Center(child: Text('エラーが発生しました'));
+                }
+
+                final requests = followSnapshot.data ?? [];
+                final notifications = notificationSnapshot.data ?? [];
+
+                if (requests.isEmpty && notifications.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.notifications_off,
+                          size: 64,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '通知はありません',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // フォローリクエスト
+                    if (requests.isNotEmpty) ...[
+                      const Text(
+                        'フォローリクエスト',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...requests
+                          .map((request) => _buildFollowRequestCard(request)),
+                      const SizedBox(height: 16),
+                    ],
+                    // 通知
+                    if (notifications.isNotEmpty) ...[
+                      const Text(
+                        '通知',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...notifications.map((notification) =>
+                          _buildNotificationCard(notification)),
+                    ],
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -75,7 +133,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           stream: FollowService.getFollowRequests(currentUser.id),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: WaveLoadingWidget());
+              return const Center(child: LeafLoadingWidget());
             }
 
             if (snapshot.hasError) {
@@ -129,6 +187,7 @@ class _NotificationScreenState extends State<NotificationScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -228,7 +287,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           stream: NotificationService().getNotificationHistory(currentUser.id),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: WaveLoadingWidget());
+              return const Center(child: LeafLoadingWidget());
             }
 
             if (snapshot.hasError) {
@@ -284,7 +343,7 @@ class _NotificationScreenState extends State<NotificationScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: isRead ? null : AppColors.primary.withOpacity(0.1),
+      color: Colors.white,
       child: ListTile(
         leading: _getNotificationIcon(type),
         title: Text(

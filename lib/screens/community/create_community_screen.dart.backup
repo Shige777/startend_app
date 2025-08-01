@@ -1,0 +1,393 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../providers/community_provider.dart';
+import '../../providers/user_provider.dart';
+import '../../services/storage_service.dart';
+import '../../constants/app_colors.dart';
+import '../../constants/app_constants.dart';
+import 'package:image_picker/image_picker.dart';
+
+class CreateCommunityScreen extends StatefulWidget {
+  const CreateCommunityScreen({super.key});
+
+  @override
+  State<CreateCommunityScreen> createState() => _CreateCommunityScreenState();
+}
+
+class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
+  bool _requiresApproval = false;
+  bool _isLoading = false;
+
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageFileName;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleImageSelection() async {
+    try {
+      print('コミュニティアイコン選択開始');
+      // 直接ギャラリーから画像を選択
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+
+      if (pickedFile != null) {
+        print('画像が選択されました: ${pickedFile.name}');
+        final bytes = await pickedFile.readAsBytes();
+        print('画像バイト数: ${bytes.length}');
+        setState(() {
+          _selectedImageBytes = bytes;
+          _selectedImageFileName = pickedFile.name;
+        });
+        print('画像が設定されました');
+      } else {
+        print('画像が選択されませんでした');
+      }
+    } catch (e) {
+      print('画像選択エラー: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('画像の選択に失敗しました: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userProvider = context.read<UserProvider>();
+      final communityProvider = context.read<CommunityProvider>();
+      final currentUser = userProvider.currentUser;
+
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ログインが必要です')),
+        );
+        return;
+      }
+
+      // 画像をアップロード
+      String? imageUrl;
+      if (_selectedImageBytes != null && _selectedImageFileName != null) {
+        try {
+          // 一時的なコミュニティIDを生成
+          final tempCommunityId =
+              DateTime.now().millisecondsSinceEpoch.toString();
+
+          imageUrl = await StorageService.uploadCommunityIconFromBytes(
+            bytes: _selectedImageBytes!,
+            userId: currentUser.id,
+            communityId: tempCommunityId,
+            fileName: _selectedImageFileName!,
+          );
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('アイコンのアップロードに失敗しました: $e')),
+            );
+          }
+          return;
+        }
+      }
+
+      final success = await communityProvider.createCommunity(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        userId: currentUser.id,
+        requiresApproval: _requiresApproval,
+        imageUrl: imageUrl,
+      );
+
+      if (success && mounted) {
+        // UserProviderのcurrentUserも更新
+        await userProvider.refreshCurrentUser();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('コミュニティを作成しました')),
+        );
+
+        // 成功時は前の画面に戻る
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home?tab=community');
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('コミュニティの作成に失敗しました')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラーが発生しました: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('CreateCommunityScreen build メソッドが実行されました');
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          child: Container(
+            margin: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // タイトル
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'コミュニティを作成',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/home?tab=community');
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // アイコン選択
+                  Center(
+                    child: Column(
+                      children: [
+                        Text('アイコン選択部分が表示されています',
+                            style: TextStyle(color: Colors.red)),
+                        GestureDetector(
+                          onTap: () {
+                            print('アイコン選択ボタンがタップされました');
+                            _handleImageSelection();
+                          },
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(40),
+                              border: Border.all(
+                                  color: AppColors.divider, width: 2),
+                            ),
+                            child: _selectedImageBytes != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(40),
+                                    child: Image.memory(
+                                      _selectedImageBytes!,
+                                      fit: BoxFit.cover,
+                                      width: 80,
+                                      height: 80,
+                                    ),
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.add_a_photo,
+                                        size: 30,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'タップして選択',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'アイコンを選択（任意）',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // コミュニティ名
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'コミュニティ名',
+                      hintText: '例: 朝活コミュニティ',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLength: 50,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'コミュニティ名を入力してください';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 説明
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: '説明（任意）',
+                      hintText: 'コミュニティの説明を入力してください',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    maxLength: 200,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 設定
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'プライバシー設定',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      RadioListTile<bool>(
+                        title: const Text('オープン'),
+                        subtitle: const Text('誰でも参加可能'),
+                        value: false,
+                        groupValue: _requiresApproval,
+                        onChanged: (value) {
+                          setState(() {
+                            _requiresApproval = value ?? false;
+                          });
+                        },
+                      ),
+                      RadioListTile<bool>(
+                        title: const Text('承認制'),
+                        subtitle: const Text('管理者の承認が必要'),
+                        value: true,
+                        groupValue: _requiresApproval,
+                        onChanged: (value) {
+                          print('承認制が選択されました: $value');
+                          setState(() {
+                            _requiresApproval = value ?? false;
+                          });
+                          print(
+                              '_requiresApprovalが更新されました: $_requiresApproval');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ボタン
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/home?tab=community');
+                            }
+                          },
+                          child: const Text('キャンセル'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleSubmit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('作成'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
