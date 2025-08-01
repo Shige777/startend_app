@@ -12,7 +12,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.2
   
-  # Firebase
+  # Firebase - 最新バージョンに更新
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.5.0
@@ -44,7 +44,7 @@ dependencies:
   
   # Navigation
   go_router: ^14.6.2
-  google_mobile_ads: ^4.0.0
+  # google_mobile_ads: ^4.0.0  # 配信後に再有効化予定
 
 dev_dependencies:
   flutter_test:
@@ -77,4 +77,4 @@ flutter_launcher_icons:
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/icons/startend_icon.png"  # 新しいアイコン画像に変更 
+    image_path: "assets/icons/startend_icon.png" 

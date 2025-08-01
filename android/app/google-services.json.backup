@@ -58,14 +58,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "201575475230-7n36rm6nv354gcla3gn6qr1pj58h047m.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.startend.sns.app",
-            "certificate_hash": "c324c3feecd2e9d729ddd0cd0f9e71df35b440c7"
-          }
-        },
-        {
           "client_id": "201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com",
           "client_type": 3
         }

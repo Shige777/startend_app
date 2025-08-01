@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -55,14 +55,14 @@ void main() async {
   );
 
   // AdMob初期化
-  await MobileAds.instance.initialize();
+  // await MobileAds.instance.initialize();
 
   // ネイティブ広告ファクトリーを登録
-  MobileAds.instance.updateRequestConfiguration(
-    RequestConfiguration(
-      testDeviceIds: ['EMULATOR'],
-    ),
-  );
+  // MobileAds.instance.updateRequestConfiguration(
+  //   RequestConfiguration(
+  //     testDeviceIds: ['EMULATOR'],
+  //   ),
+  // );
 
   // SharedPreferences初期化
   await SharedPreferences.getInstance();

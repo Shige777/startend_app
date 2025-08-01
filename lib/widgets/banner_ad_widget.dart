@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../constants/app_colors.dart';
 
 class BannerAdWidget extends StatefulWidget {
   const BannerAdWidget({super.key});
@@ -31,6 +30,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
           });
         },
         onAdFailedToLoad: (ad, error) {
+          print('バナー広告の読み込みに失敗しました: $error');
           ad.dispose();
         },
       ),
@@ -51,6 +51,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     }
 
     return Container(
+      alignment: Alignment.center,
       width: _bannerAd!.size.width.toDouble(),
       height: _bannerAd!.size.height.toDouble(),
       child: AdWidget(ad: _bannerAd!),

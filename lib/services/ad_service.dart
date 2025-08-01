@@ -1,85 +1,58 @@
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdService {
-  static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111'; // テスト用
-  static const String _interstitialAdUnitId =
-      'ca-app-pub-3940256099942544/1033173712'; // テスト用
-  static const String _nativeAdUnitId =
+  // テスト用のAdMob ID
+  static const String testNativeAdUnitId =
+      'ca-app-pub-3940256099942544/2247696110';
+  static const String testBannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
+  static const String testInterstitialAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712';
+
+  // 本番用のAdMob ID（実際のIDに置き換えてください）
+  static const String nativeAdUnitId =
       'ca-app-pub-3940256099942544/2247696110'; // テスト用
-
-  // バナー広告を作成
-  static BannerAd createBannerAd() {
-    return BannerAd(
-      adUnitId: _bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          debugPrint('バナー広告が読み込まれました');
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('バナー広告の読み込みに失敗しました: $error');
-          ad.dispose();
-        },
-      ),
-    );
-  }
-
-  // ネイティブ広告を作成
-  static NativeAd createNativeAd() {
-    return NativeAd(
-      adUnitId: _nativeAdUnitId,
-      factoryId: 'adFactoryExample', // ファクトリーIDを修正
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (ad) {
-          debugPrint('ネイティブ広告が読み込まれました');
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('ネイティブ広告の読み込みに失敗しました: $error');
-          ad.dispose();
-        },
-      ),
-    );
-  }
-
-  // インタースティシャル広告を作成
-  static InterstitialAd? _interstitialAd;
-
-  static Future<void> loadInterstitialAd() async {
-    await InterstitialAd.load(
-      adUnitId: _interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-          debugPrint('インタースティシャル広告が読み込まれました');
-        },
-        onAdFailedToLoad: (error) {
-          debugPrint('インタースティシャル広告の読み込みに失敗しました: $error');
-        },
-      ),
-    );
-  }
-
-  static Future<void> showInterstitialAd() async {
-    if (_interstitialAd != null) {
-      await _interstitialAd!.show();
-      _interstitialAd = null;
-      // 次の広告を読み込み
-      loadInterstitialAd();
-    }
-  }
+  static const String bannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111'; // テスト用
+  static const String interstitialAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712'; // テスト用
 
   // 投稿リストに広告を挿入する頻度を制御
   static bool shouldShowAd(int index) {
-    // 3件ごとにネイティブ広告を表示（より頻繁に表示）
-    // 5件ごとにネイティブ広告を表示（現在の設定）
-    // 6件ごとにネイティブ広告を表示（より控えめに表示）
-    final shouldShow = index > 0 && index % 5 == 0;
-    debugPrint('広告表示チェック: index=$index, shouldShow=$shouldShow');
-    return shouldShow;
+    // 配信後に広告機能を再有効化予定
+    return false;
+
+    // final shouldShow = index > 0 && index % 5 == 0;
+    // print('広告表示チェック: index=$index, shouldShow=$shouldShow');
+    // return shouldShow;
+  }
+
+  // 広告の初期化（配信後に再有効化予定）
+  static Future<void> initializeAds() async {
+    // await MobileAds.instance.initialize();
+    print('広告初期化: 配信後に再有効化予定');
+  }
+
+  // ネイティブ広告の読み込み（配信後に再有効化予定）
+  static Future<dynamic> loadNativeAd() async {
+    // try {
+    //   final nativeAd = NativeAd(
+    //     adUnitId: nativeAdUnitId,
+    //     factoryId: 'listTile',
+    //     request: const AdRequest(),
+    //     listener: NativeAdListener(
+    //       onAdLoaded: (ad) => print('ネイティブ広告が読み込まれました'),
+    //       onAdFailedToLoad: (ad, error) => print('ネイティブ広告の読み込みに失敗しました: $error'),
+    //     ),
+    //   );
+    //   await nativeAd.load();
+    //   return nativeAd;
+    // } catch (e) {
+    //   print('ネイティブ広告の読み込みエラー: $e');
+    //   return null;
+    // }
+    print('ネイティブ広告読み込み: 配信後に再有効化予定');
+    return null;
   }
 }
