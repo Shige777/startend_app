@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StartEnd App - 目標達成を仲間と一緒に</title>
     <meta name="description" content="START/END投稿を軸とした進捗共有SNSアプリ。目標設定から達成までを仲間と一緒に記録し、成長の軌跡を可視化します。">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -37,6 +39,7 @@
             top: 0;
             z-index: 1000;
             box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
         }
         
         .header-content {
@@ -47,11 +50,17 @@
         
         .logo {
             font-size: 1.8em;
-            font-weight: 800;
+            font-weight: 900;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .logo:hover {
+            transform: scale(1.05);
         }
         
         .nav-links {
@@ -95,6 +104,9 @@
             color: white;
             position: relative;
             overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
         }
         
         .hero::before {
@@ -108,6 +120,51 @@
             opacity: 0.3;
         }
         
+        .floating-elements {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .floating-element {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .floating-element:nth-child(1) {
+            width: 80px;
+            height: 80px;
+            top: 20%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        
+        .floating-element:nth-child(2) {
+            width: 120px;
+            height: 120px;
+            top: 60%;
+            right: 15%;
+            animation-delay: 2s;
+        }
+        
+        .floating-element:nth-child(3) {
+            width: 60px;
+            height: 60px;
+            top: 80%;
+            left: 20%;
+            animation-delay: 4s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
         .hero-content {
             position: relative;
             z-index: 2;
@@ -115,20 +172,19 @@
         
         .hero h1 {
             font-size: 4em;
+            font-weight: 900;
             margin-bottom: 20px;
-            font-weight: 800;
             line-height: 1.1;
-            letter-spacing: -0.02em;
+            opacity: 0;
+            transform: translateY(30px);
         }
         
         .hero p {
-            font-size: 1.4em;
-            margin-bottom: 50px;
-            opacity: 0.95;
-            font-weight: 400;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+            font-size: 1.3em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+            opacity: 0;
+            transform: translateY(30px);
         }
         
         .cta-buttons {
@@ -136,315 +192,238 @@
             gap: 20px;
             justify-content: center;
             flex-wrap: wrap;
+            opacity: 0;
+            transform: translateY(30px);
         }
         
-        .cta-btn {
-            padding: 18px 36px;
+        .cta-button {
+            padding: 15px 30px;
+            border: none;
             border-radius: 50px;
-            text-decoration: none;
-            font-weight: 600;
             font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            position: relative;
-            overflow: hidden;
+            text-decoration: none;
+            display: inline-block;
         }
         
-        .cta-btn.primary {
+        .cta-primary {
             background: white;
             color: #667eea;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
         
-        .cta-btn.secondary {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(10px);
-        }
-        
-        .cta-btn:hover {
+        .cta-primary:hover {
             transform: translateY(-3px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
         }
         
-        .cta-btn.primary:hover {
-            background: #f8f9fa;
+        .cta-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
         }
         
-        .cta-btn.secondary:hover {
-            background: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
+        .cta-secondary:hover {
+            background: white;
+            color: #667eea;
+            transform: translateY(-3px);
         }
         
         /* Features Section */
         .features {
             padding: 100px 0;
-            background: #fafafa;
+            background: #f8fafc;
         }
         
         .section-title {
             text-align: center;
-            font-size: 3em;
-            margin-bottom: 80px;
+            font-size: 2.5em;
+            font-weight: 800;
+            margin-bottom: 20px;
             color: #1a1a1a;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+        }
+        
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 60px;
         }
         
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 40px;
             margin-top: 60px;
         }
         
         .feature-card {
             background: white;
-            padding: 40px 30px;
-            border-radius: 24px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
-            transition: all 0.4s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(30px);
         }
         
         .feature-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 25px 60px rgba(0,0,0,0.12);
-        }
-        
-        .feature-card:hover::before {
-            transform: scaleX(1);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
         }
         
         .feature-icon {
-            font-size: 3.5em;
-            margin-bottom: 25px;
+            font-size: 3em;
+            margin-bottom: 20px;
             display: block;
         }
         
-        .feature-card h3 {
-            font-size: 1.6em;
+        .feature-title {
+            font-size: 1.5em;
+            font-weight: 700;
             margin-bottom: 15px;
             color: #1a1a1a;
-            font-weight: 600;
         }
         
-        .feature-card p {
+        .feature-description {
             color: #666;
-            line-height: 1.7;
-            font-size: 1.05em;
-        }
-        
-        /* Screenshots Section */
-        .screenshots {
-            padding: 100px 0;
-            background: white;
-        }
-        
-        .screenshots-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 40px;
-            margin-top: 60px;
-        }
-        
-        .screenshot {
-            background: white;
-            border-radius: 24px;
-            padding: 30px;
-            box-shadow: 0 15px 50px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: all 0.4s ease;
-            position: relative;
-        }
-        
-        .screenshot:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 25px 60px rgba(0,0,0,0.15);
-        }
-        
-        .screenshot img {
-            width: 100%;
-            max-width: 280px;
-            border-radius: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        
-        .screenshot h4 {
-            color: #1a1a1a;
-            margin-bottom: 10px;
-            font-weight: 600;
-            font-size: 1.2em;
-        }
-        
-        .screenshot p {
-            color: #666;
-            font-size: 0.95em;
             line-height: 1.6;
         }
         
-        /* How it works */
-        .how-it-works {
+        /* Interactive Demo */
+        .demo-section {
             padding: 100px 0;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
         }
         
-        .steps {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 50px;
-            margin-top: 60px;
+        .demo-container {
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            flex-wrap: wrap;
         }
         
-        .step {
-            text-align: center;
-            padding: 40px 20px;
+        .demo-content {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .demo-title {
+            font-size: 2.5em;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+        
+        .demo-description {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .demo-phone {
+            flex: 1;
+            min-width: 300px;
             position: relative;
         }
         
-        .step-number {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
+        .phone-mockup {
+            width: 280px;
+            height: 560px;
+            background: #1a1a1a;
+            border-radius: 30px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .phone-screen {
+            width: 100%;
+            height: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.8em;
-            font-weight: 700;
-            margin: 0 auto 25px;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-        }
-        
-        .step h3 {
-            margin-bottom: 15px;
-            color: #1a1a1a;
-            font-weight: 600;
-            font-size: 1.4em;
-        }
-        
-        .step p {
-            color: #666;
-            font-size: 1.05em;
-            line-height: 1.7;
-        }
-        
-        /* CTA Section */
-        .cta-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 100px 0;
-            text-align: center;
+            font-size: 2em;
             color: white;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .cta-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain2" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain2)"/></svg>');
-            opacity: 0.3;
-        }
-        
-        .cta-content {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .cta-section h2 {
-            font-size: 3em;
-            margin-bottom: 20px;
             font-weight: 700;
-            letter-spacing: -0.02em;
         }
         
-        .cta-section p {
-            font-size: 1.3em;
-            margin-bottom: 50px;
-            opacity: 0.95;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+        /* Stats Section */
+        .stats {
+            padding: 80px 0;
+            background: white;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            text-align: center;
+        }
+        
+        .stat-item {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        
+        .stat-number {
+            font-size: 3em;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            color: #666;
+            font-weight: 500;
         }
         
         /* Footer */
         footer {
             background: #1a1a1a;
             color: white;
-            padding: 60px 0 40px;
-            text-align: center;
+            padding: 60px 0 20px;
         }
         
-        .footer-links {
-            display: flex;
-            justify-content: center;
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 40px;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
         
-        .footer-links a {
-            color: rgba(255, 255, 255, 0.8);
+        .footer-section h3 {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        
+        .footer-section p, .footer-section a {
+            color: #ccc;
             text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
+            line-height: 1.8;
         }
         
-        .footer-links a:hover {
-            color: white;
-            transform: translateY(-2px);
+        .footer-section a:hover {
+            color: #667eea;
         }
         
-        .footer-copyright {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.9em;
-        }
-        
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .fade-in-up {
-            animation: fadeInUp 0.8s ease-out;
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+            color: #999;
         }
         
         /* Responsive */
         @media (max-width: 768px) {
             .hero h1 {
                 font-size: 2.5em;
-            }
-            
-            .hero p {
-                font-size: 1.2em;
             }
             
             .nav-links {
@@ -456,64 +435,82 @@
                 align-items: center;
             }
             
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .screenshots-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .steps {
-                grid-template-columns: 1fr;
-            }
-            
-            .section-title {
-                font-size: 2.2em;
-            }
-            
-            .cta-section h2 {
-                font-size: 2.2em;
+            .demo-container {
+                flex-direction: column;
+                text-align: center;
             }
         }
         
-        /* Smooth scrolling */
-        html {
-            scroll-behavior: smooth;
+        /* Loading Animation */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+
     <!-- Header -->
-    <header>
+    <header id="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">StartEnd</div>
+                <div class="logo" onclick="scrollToTop()">StartEnd</div>
                 <nav class="nav-links">
                     <a href="#features">機能</a>
-                    <a href="#screenshots">スクリーンショット</a>
-                    <a href="#how-it-works">使い方</a>
-                    <a href="docs/support/">サポート</a>
+                    <a href="#demo">デモ</a>
+                    <a href="#download">ダウンロード</a>
+                    <a href="#contact">お問い合わせ</a>
                 </nav>
             </div>
         </div>
     </header>
 
     <!-- Hero Section -->
-    <section class="hero">
+    <section class="hero" id="hero">
+        <div class="floating-elements">
+            <div class="floating-element"></div>
+            <div class="floating-element"></div>
+            <div class="floating-element"></div>
+        </div>
         <div class="container">
-            <div class="hero-content fade-in-up">
+            <div class="hero-content">
                 <h1>目標達成を<br>仲間と一緒に</h1>
-                <p>START/END投稿を軸とした進捗共有SNSアプリで、あなたの成長の軌跡を可視化しましょう</p>
+                <p>START/END投稿で進捗を記録し、コミュニティと共有。<br>あなたの成長の軌跡を可視化します。</p>
                 <div class="cta-buttons">
-                    <a href="#" class="cta-btn primary">
-                        <span>📱</span>
-                        App Store
-                    </a>
-                    <a href="#" class="cta-btn secondary">
-                        <span>📱</span>
-                        Google Play
-                    </a>
+                    <a href="#download" class="cta-button cta-primary">今すぐ始める</a>
+                    <a href="#demo" class="cta-button cta-secondary">デモを見る</a>
                 </div>
             </div>
         </div>
@@ -522,158 +519,269 @@
     <!-- Features Section -->
     <section class="features" id="features">
         <div class="container">
-            <h2 class="section-title fade-in-up">主な機能</h2>
+            <h2 class="section-title">主な機能</h2>
+            <p class="section-subtitle">目標達成をサポートする充実した機能</p>
             <div class="features-grid">
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">🎯</div>
-                    <h3>START投稿</h3>
-                    <p>目標やタスクの開始を宣言し、集中モードで進捗を記録します。明確な目標設定でモチベーションを維持。</p>
+                <div class="feature-card">
+                    <span class="feature-icon">📝</span>
+                    <h3 class="feature-title">START/END投稿</h3>
+                    <p class="feature-description">目標の開始と完了を記録。進捗を視覚的に共有できます。</p>
                 </div>
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">✅</div>
-                    <h3>END投稿</h3>
-                    <p>目標達成やタスク完了を記録し、実際にかかった時間を管理。達成感を仲間と共有できます。</p>
+                <div class="feature-card">
+                    <span class="feature-icon">👥</span>
+                    <h3 class="feature-title">コミュニティ機能</h3>
+                    <p class="feature-description">興味のあるコミュニティに参加し、仲間と交流。</p>
                 </div>
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">👥</div>
-                    <h3>コミュニティ機能</h3>
-                    <p>同じ目標を持つ仲間とコミュニティを作成。お互いの進捗を共有し、励まし合いながら成長。</p>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3 class="feature-title">進捗可視化</h3>
+                    <p class="feature-description">軌跡表示で自分の成長を時系列で確認。</p>
                 </div>
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">📊</div>
-                    <h3>進捗管理</h3>
-                    <p>目標達成までの道のりを可視化。過去の投稿を振り返り、成長の軌跡を確認できます。</p>
+                <div class="feature-card">
+                    <span class="feature-icon">🔔</span>
+                    <h3 class="feature-title">リアルタイム通知</h3>
+                    <p class="feature-description">仲間の投稿や進捗をリアルタイムで通知。</p>
                 </div>
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">❤️</div>
-                    <h3>フォロー機能</h3>
-                    <p>仲間の活動を応援し、いいねやコメントで励まし合い。モチベーションを高め合えます。</p>
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3 class="feature-title">検索機能</h3>
+                    <p class="feature-description">ユーザーやコミュニティを簡単に検索。</p>
                 </div>
-                <div class="feature-card fade-in-up">
-                    <div class="feature-icon">🔔</div>
-                    <h3>通知機能</h3>
-                    <p>集中時間のリマインダーや仲間の投稿通知。適切なタイミングでサポートを受けられます。</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Screenshots Section -->
-    <section class="screenshots" id="screenshots">
-        <div class="container">
-            <h2 class="section-title fade-in-up">アプリの様子</h2>
-            <div class="screenshots-grid">
-                <div class="screenshot fade-in-up">
-                    <img src="https://via.placeholder.com/300x600/667eea/ffffff?text=ホーム画面" alt="ホーム画面">
-                    <h4>ホーム画面</h4>
-                    <p>仲間の投稿をタイムラインで確認</p>
-                </div>
-                <div class="screenshot fade-in-up">
-                    <img src="https://via.placeholder.com/300x600/764ba2/ffffff?text=START投稿" alt="START投稿">
-                    <h4>START投稿</h4>
-                    <p>目標設定と集中時間の管理</p>
-                </div>
-                <div class="screenshot fade-in-up">
-                    <img src="https://via.placeholder.com/300x600/667eea/ffffff?text=END投稿" alt="END投稿">
-                    <h4>END投稿</h4>
-                    <p>達成記録と実際の時間管理</p>
-                </div>
-                <div class="screenshot fade-in-up">
-                    <img src="https://via.placeholder.com/300x600/764ba2/ffffff?text=コミュニティ" alt="コミュニティ">
-                    <h4>コミュニティ</h4>
-                    <p>同じ目標を持つ仲間との交流</p>
+                <div class="feature-card">
+                    <span class="feature-icon">🎨</span>
+                    <h3 class="feature-title">カスタマイズ</h3>
+                    <p class="feature-description">プロフィールやテーマを自由にカスタマイズ。</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- How it works -->
-    <section class="how-it-works" id="how-it-works">
+    <!-- Demo Section -->
+    <section class="demo-section" id="demo">
         <div class="container">
-            <h2 class="section-title fade-in-up">使い方</h2>
-            <div class="steps">
-                <div class="step fade-in-up">
-                    <div class="step-number">1</div>
-                    <h3>目標を設定</h3>
-                    <p>START投稿で目標やタスクを宣言し、集中時間を設定します。</p>
+            <div class="demo-container">
+                <div class="demo-content">
+                    <h2 class="demo-title">実際のアプリを体験</h2>
+                    <p class="demo-description">直感的で使いやすいインターフェースで、目標達成をサポートします。</p>
+                    <div class="cta-buttons">
+                        <a href="#download" class="cta-button cta-primary">ダウンロード</a>
+                    </div>
                 </div>
-                <div class="step fade-in-up">
-                    <div class="step-number">2</div>
-                    <h3>進捗を記録</h3>
-                    <p>作業中は集中モードで進捗を記録し、モチベーションを維持します。</p>
-                </div>
-                <div class="step fade-in-up">
-                    <div class="step-number">3</div>
-                    <h3>達成を共有</h3>
-                    <p>END投稿で達成を記録し、仲間と成果を共有します。</p>
-                </div>
-                <div class="step fade-in-up">
-                    <div class="step-number">4</div>
-                    <h3>成長を振り返る</h3>
-                    <p>過去の投稿を振り返り、成長の軌跡を確認できます。</p>
+                <div class="demo-phone">
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            StartEnd
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="cta-section">
+    <!-- Stats Section -->
+    <section class="stats" id="stats">
         <div class="container">
-            <div class="cta-content fade-in-up">
-                <h2>今すぐ始めよう</h2>
-                <p>目標達成の旅を、仲間と一緒に始めませんか？</p>
-                <div class="cta-buttons">
-                    <a href="#" class="cta-btn primary">
-                        <span>📱</span>
-                        App Store
-                    </a>
-                    <a href="#" class="cta-btn secondary">
-                        <span>📱</span>
-                        Google Play
-                    </a>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" data-target="1000">0</div>
+                    <div class="stat-label">アクティブユーザー</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" data-target="5000">0</div>
+                    <div class="stat-label">投稿数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" data-target="100">0</div>
+                    <div class="stat-label">コミュニティ</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" data-target="95">0</div>
+                    <div class="stat-label">満足度</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer>
+    <footer id="contact">
         <div class="container">
-            <div class="footer-links">
-                <a href="docs/support/">サポート</a>
-                <a href="docs/support/privacy-policy.html">プライバシーポリシー</a>
-                <a href="docs/support/terms-of-service.html">利用規約</a>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>StartEnd App</h3>
+                    <p>目標達成を仲間と一緒に。START/END投稿で進捗を記録し、成長の軌跡を可視化します。</p>
+                </div>
+                <div class="footer-section">
+                    <h3>リンク</h3>
+                    <p><a href="privacy-policy.html">プライバシーポリシー</a></p>
+                    <p><a href="terms-of-service.html">利用規約</a></p>
+                    <p><a href="support/">サポート</a></p>
+                </div>
+                <div class="footer-section">
+                    <h3>お問い合わせ</h3>
+                    <p>Email: agrie.japan@gmail.com</p>
+                    <p>開発者: 内山茂樹</p>
+                </div>
             </div>
-            <div class="footer-copyright">
-                <p>&copy; 2025 StartEnd App. All rights reserved.</p>
+            <div class="footer-bottom">
+                <p>&copy; 2024 StartEnd App. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
     <script>
-        // Intersection Observer for animations
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
+        // GSAP Animations
+        gsap.registerPlugin(ScrollTrigger);
+        
+        // Loading Animation
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+                
+                // Hero Animations
+                gsap.to('.hero h1', {
+                    opacity: 1,
+                    y: 0,
+                    duration: 1,
+                    delay: 0.5
+                });
+                
+                gsap.to('.hero p', {
+                    opacity: 1,
+                    y: 0,
+                    duration: 1,
+                    delay: 0.7
+                });
+                
+                gsap.to('.cta-buttons', {
+                    opacity: 1,
+                    y: 0,
+                    duration: 1,
+                    delay: 0.9
+                });
+            }, 1000);
+        });
+        
+        // Scroll Animations
+        gsap.utils.toArray('.feature-card').forEach((card, i) => {
+            gsap.fromTo(card, {
+                opacity: 0,
+                y: 50
+            }, {
+                opacity: 1,
+                y: 0,
+                duration: 0.8,
+                delay: i * 0.2,
+                scrollTrigger: {
+                    trigger: card,
+                    start: 'top 80%',
+                    end: 'bottom 20%',
+                    toggleActions: 'play none none reverse'
                 }
             });
-        }, observerOptions);
-
-        // Observe all fade-in-up elements
-        document.addEventListener('DOMContentLoaded', () => {
-            const fadeElements = document.querySelectorAll('.fade-in-up');
-            fadeElements.forEach(el => {
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(30px)';
-                el.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
-                observer.observe(el);
+        });
+        
+        gsap.utils.toArray('.stat-item').forEach((stat, i) => {
+            gsap.fromTo(stat, {
+                opacity: 0,
+                y: 30
+            }, {
+                opacity: 1,
+                y: 0,
+                duration: 0.8,
+                delay: i * 0.2,
+                scrollTrigger: {
+                    trigger: stat,
+                    start: 'top 80%',
+                    end: 'bottom 20%',
+                    toggleActions: 'play none none reverse'
+                }
+            });
+        });
+        
+        // Counter Animation
+        const counters = document.querySelectorAll('.stat-number');
+        counters.forEach(counter => {
+            const target = parseInt(counter.getAttribute('data-target'));
+            const increment = target / 100;
+            
+            ScrollTrigger.create({
+                trigger: counter,
+                start: 'top 80%',
+                onEnter: () => {
+                    let current = 0;
+                    const updateCounter = () => {
+                        if (current < target) {
+                            current += increment;
+                            counter.textContent = Math.ceil(current);
+                            requestAnimationFrame(updateCounter);
+                        } else {
+                            counter.textContent = target;
+                        }
+                    };
+                    updateCounter();
+                }
+            });
+        });
+        
+        // Header Scroll Effect
+        window.addEventListener('scroll', () => {
+            const header = document.getElementById('header');
+            if (window.scrollY > 100) {
+                header.style.background = 'rgba(255, 255, 255, 0.98)';
+                header.style.boxShadow = '0 2px 20px rgba(0,0,0,0.1)';
+            } else {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+                header.style.boxShadow = '0 1px 0 rgba(0,0,0,0.1)';
+            }
+        });
+        
+        // Smooth Scrolling
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+        
+        // Smooth scroll for all anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Interactive Elements
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                gsap.to(card, {
+                    scale: 1.05,
+                    duration: 0.3
+                });
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                gsap.to(card, {
+                    scale: 1,
+                    duration: 0.3
+                });
+            });
+        });
+        
+        // Parallax Effect for Floating Elements
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const parallax = document.querySelectorAll('.floating-element');
+            
+            parallax.forEach((element, index) => {
+                const speed = 0.5 + (index * 0.1);
+                element.style.transform = `translateY(${scrolled * speed}px)`;
             });
         });
     </script>
