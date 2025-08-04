@@ -1,1 +1,62 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"startend-sns-app","appId":"1:201575475230:android:0795b63e1c4e9f6a1fa60f","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"startend-sns-app","appId":"1:201575475230:ios:ff5ee7b30db94b101fa60f","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"startend-sns-app","appId":"1:201575475230:ios:fa3f7de4eb56c1131fa60f","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"startend-sns-app","configurations":{"android":"1:201575475230:android:0795b63e1c4e9f6a1fa60f","ios":"1:201575475230:ios:ff5ee7b30db94b101fa60f","macos":"1:201575475230:ios:fa3f7de4eb56c1131fa60f","web":"1:201575475230:web:a14716424cb840b51fa60f","windows":"1:201575475230:web:5c57fb4efc61fa5b1fa60f"}}}}},"firestore":{"rules":"firestore_simple.rules","indexes":"firestore.indexes.json"},"storage":{"rules":"storage.rules"},"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","destination":"/index.html"}]}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "startend-sns-app",
+          "appId": "1:201575475230:android:0795b63e1c4e9f6a1fa60f",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "startend-sns-app",
+          "appId": "1:201575475230:ios:ff5ee7b30db94b101fa60f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "startend-sns-app",
+          "appId": "1:201575475230:ios:fa3f7de4eb56c1131fa60f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "startend-sns-app",
+          "configurations": {
+            "android": "1:201575475230:android:0795b63e1c4e9f6a1fa60f",
+            "ios": "1:201575475230:ios:ff5ee7b30db94b101fa60f",
+            "macos": "1:201575475230:ios:fa3f7de4eb56c1131fa60f",
+            "web": "1:201575475230:web:a14716424cb840b51fa60f",
+            "windows": "1:201575475230:web:5c57fb4efc61fa5b1fa60f"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore_simple.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": "docs",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
