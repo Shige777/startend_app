@@ -41,7 +41,7 @@ class StorageService {
       }
 
       // 画像を圧縮（プロフィール画像の場合は専用の圧縮）
-      final compressedFile = folder == 'profiles' 
+      final compressedFile = folder == 'profiles'
           ? await _compressProfileImage(filePath)
           : await _compressImage(filePath);
       final compressedSize = await compressedFile.length();

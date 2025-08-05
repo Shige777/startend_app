@@ -409,6 +409,33 @@ class _SearchScreenState extends State<SearchScreen> {
                         : ListView(
                             padding: const EdgeInsets.all(8),
                             children: [
+                              // デバッグ情報を表示
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                margin: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.yellow.withOpacity(0.2),
+                                  border: Border.all(color: Colors.orange),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('🐛 デバッグ情報:'),
+                                    Text('検索クエリ: "$_searchQuery"'),
+                                    Text('投稿結果数: ${_searchResults.length}'),
+                                    Text('ユーザー結果数: ${_userSearchResults.length}'),
+                                    Text('検索中: $_isSearching'),
+                                    if (_userSearchResults.isNotEmpty) ...[
+                                      Text('ユーザー詳細:'),
+                                      ..._userSearchResults.take(3).map((user) => 
+                                        Text('  - ${user.displayName} (${user.email})')
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              
                               // 投稿検索結果
                               if (_searchResults.isNotEmpty) ...[
                                 Padding(
@@ -460,6 +487,19 @@ class _SearchScreenState extends State<SearchScreen> {
                                     },
                                   );
                                 }).toList(),
+                              ],
+                              
+                              // 検索結果がない場合のメッセージ
+                              if (_searchResults.isEmpty && _userSearchResults.isEmpty && _searchQuery.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Center(
+                                    child: Text(
+                                      '「$_searchQuery」の検索結果がありません',
+                                      style: TextStyle(color: AppColors.textSecondary),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ],
                           ),
