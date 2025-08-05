@@ -39,29 +39,15 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    print('SearchScreen initState - 開始');
-
-    // 前回の検索状態を復元
+          // 前回の検索状態を復元
     if (_lastSearchQuery.isNotEmpty) {
       _searchController.text = _lastSearchQuery;
       _searchQuery = _lastSearchQuery;
-      _searchResults = List.from(_lastSearchResults); // 新しいリストを作成
-      _userSearchResults = List.from(_lastUserSearchResults); // 新しいリストを作成
-
-      // デバッグログを追加
-      print('SearchScreen initState - 状態復元:');
-      print('- _lastSearchQuery: $_lastSearchQuery');
-      print('- _lastSearchResults.length: ${_lastSearchResults.length}');
-      print(
-          '- _lastUserSearchResults.length: ${_lastUserSearchResults.length}');
-      print('- _searchResults.length: ${_searchResults.length}');
-      print('- _userSearchResults.length: ${_userSearchResults.length}');
-    } else {
-      print('SearchScreen initState - 状態復元なし');
+      _searchResults = List.from(_lastSearchResults);
+      _userSearchResults = List.from(_lastUserSearchResults);
     }
 
     _loadFollowingUsers();
-    print('SearchScreen initState - 完了');
   }
 
   @override
@@ -73,12 +59,6 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // デバッグログを追加
-    print('SearchScreen didChangeDependencies:');
-    print('- _searchQuery: $_searchQuery');
-    print('- _searchResults.length: ${_searchResults.length}');
-    print('- _userSearchResults.length: ${_userSearchResults.length}');
-    print('- _isSearching: $_isSearching');
   }
 
   Future<void> _loadFollowingUsers() async {
@@ -280,32 +260,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
-    // デバッグログを追加
-    print('SearchScreen build: 開始');
-    print('- _searchQuery: $_searchQuery');
-    print('- _searchResults.length: ${_searchResults.length}');
-    print('- _userSearchResults.length: ${_userSearchResults.length}');
-    print('- _isSearching: $_isSearching');
-    print('- _searchController.text: ${_searchController.text}');
-    print('- _searchResults.isEmpty: ${_searchResults.isEmpty}');
-    print('- _userSearchResults.isEmpty: ${_userSearchResults.isEmpty}');
-    print('- mounted: $mounted');
-    print('- context.mounted: ${context.mounted}');
-    print('- hashCode: ${hashCode}');
-    print('- runtimeType: ${runtimeType}');
-
-    // 検索結果の詳細を出力
-    if (_searchResults.isNotEmpty) {
-      print('検索結果の詳細:');
-      for (final post in _searchResults.take(3)) {
-        print(
-            '  - 投稿ID: ${post.id}, タイトル: "${post.title}", ENDコメント: "${post.endComment}"');
-      }
-    }
-
-    print('SearchScreen build: 完了');
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(

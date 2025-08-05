@@ -12,9 +12,11 @@ class StorageService {
   static const int maxFileSizeBytes = 5 * 1024 * 1024;
 
   // 圧縮設定
-  static const int compressionQuality = 85; // 画質（0-100）
-  static const int maxWidth = 1920; // 最大幅
-  static const int maxHeight = 1080; // 最大高さ
+  static const int compressionQuality = 80; // 画質（0-100）サイズ削減のため85→80
+  static const int maxWidth = 1080; // 最大幅 1920→1080
+  static const int maxHeight = 1080; // 最大高さ 1080→1080
+  static const int profileMaxWidth = 512; // プロフィール画像専用
+  static const int profileMaxHeight = 512;
 
   /// 画像をFirebase Storageにアップロード（自動圧縮付き）
   static Future<String?> uploadImage({
@@ -209,6 +211,38 @@ class StorageService {
     } catch (e) {
       print('画像圧縮エラー: $e');
       // 圧縮に失敗した場合は元のファイルを返す
+      return File(filePath);
+    }
+  }
+
+  /// プロフィール画像用の圧縮
+  static Future<File> _compressProfileImage(String filePath) async {
+    try {
+      final file = File(filePath);
+      final fileSize = await file.length();
+
+      // 圧縮不要の場合
+      if (fileSize <= 512 * 1024) {
+        return file;
+      }
+
+      // プロフィール画像専用の圧縮実行
+      final compressedXFile = await FlutterImageCompress.compressAndGetFile(
+        filePath,
+        '${filePath}_compressed_profile.jpg',
+        quality: 75, // プロフィール用により高い圧縮
+        maxWidth: profileMaxWidth,
+        maxHeight: profileMaxHeight,
+        format: CompressFormat.jpeg,
+      );
+
+      if (compressedXFile == null) {
+        throw Exception('プロフィール画像の圧縮に失敗しました');
+      }
+
+      return File(compressedXFile.path);
+    } catch (e) {
+      print('プロフィール画像圧縮エラー: $e');
       return File(filePath);
     }
   }

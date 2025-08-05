@@ -31,6 +31,18 @@ class PostCardWidget extends StatefulWidget {
   });
 
   @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is PostCardWidget &&
+        other.post.id == post.id &&
+        other.post.updatedAt == post.updatedAt &&
+        other.showActions == showActions;
+  }
+
+  @override
+  int get hashCode => Object.hash(post.id, post.updatedAt, showActions);
+
+  @override
   State<PostCardWidget> createState() => _PostCardWidgetState();
 }
 
