@@ -104,7 +104,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => PostProvider()),
         ChangeNotifierProvider(create: (context) => CommunityProvider()),
       ],
-      child: MaterialApp.router(
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, _) {
+          return MaterialApp.router(
         title: 'StartEnd SNS',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -156,7 +158,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        routerConfig: _router,
+        routerConfig: _createRouter(authProvider),
         builder: (context, child) {
           return GestureDetector(
             onPanUpdate: (details) {
@@ -179,14 +181,18 @@ class MyApp extends StatelessWidget {
             child: child,
           );
         },
+          );
+        },
       ),
     );
   }
 }
 
-final GoRouter _router = GoRouter(
-  initialLocation: '/',
-  redirect: (context, state) {
+GoRouter _createRouter(AuthProvider authProvider) {
+  return GoRouter(
+    initialLocation: '/',
+    refreshListenable: authProvider, // AuthProviderの状態変化を監視
+    redirect: (context, state) {
     final authProvider = context.read<AuthProvider>();
     final isAuthenticated = authProvider.isAuthenticated;
     final isOnLoginScreen = state.matchedLocation == '/';
@@ -476,4 +482,5 @@ final GoRouter _router = GoRouter(
       },
     ),
   ],
-);
+  );
+}
