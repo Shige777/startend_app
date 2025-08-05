@@ -14,6 +14,7 @@ class PostProvider extends ChangeNotifier {
   List<PostModel> _followingPosts = [];
   List<PostModel> _communityPosts = [];
   List<PostModel> _userPosts = [];
+  List<PostModel> _searchResults = []; // 検索結果を保存
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentUserId; // 現在読み込み中のユーザーID
@@ -27,6 +28,7 @@ class PostProvider extends ChangeNotifier {
   List<PostModel> get followingPosts => _followingPosts;
   List<PostModel> get communityPosts => _communityPosts;
   List<PostModel> get userPosts => _userPosts;
+  List<PostModel> get searchResults => _searchResults; // 検索結果のgetter
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -51,6 +53,30 @@ class PostProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
+
+      // 1日10投稿制限をチェック（クライアント側でフィルタリング）
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      // 既存のインデックスを使用（createdAt降順）
+      final todayPostsSnapshot = await _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: post.userId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final todayPosts = todayPostsSnapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .where((post) =>
+              post.createdAt.isAfter(startOfDay) &&
+              post.createdAt.isBefore(endOfDay))
+          .toList();
+
+      if (todayPosts.length >= 10) {
+        _setError('1日の投稿制限（10件）に達しました。明日また投稿してください。');
+        return null;
+      }
 
       final docRef =
           await _firestore.collection('posts').add(post.toFirestore());
@@ -114,7 +140,11 @@ class PostProvider extends ChangeNotifier {
 
       return docRef.id;
     } catch (e) {
-      _setError('投稿の作成に失敗しました');
+      _setError('投稿の作成に失敗しました: ${e.toString()}');
+      if (kDebugMode) {
+        print('投稿作成エラー: $e');
+        print('投稿データ: ${post.toFirestore()}');
+      }
       return null;
     } finally {
       _setLoading(false);
@@ -494,113 +524,20 @@ class PostProvider extends ChangeNotifier {
         return [];
       }
 
-      print('投稿検索開始: $query'); // デバッグログ追加
+      print('投稿検索開始: $query');
 
-      // より包括的な検索のために複数のクエリを組み合わせる
-      List<PostModel> allPosts = [];
-
-      // 1. 最新の投稿を取得（件数を大幅増加）
-      final recentQuerySnapshot = await _firestore
+      // シンプルな検索：最新の投稿から検索
+      final querySnapshot = await _firestore
           .collection('posts')
-          .orderBy('createdAt', descending: true)
-          .limit(2000) // 1000から2000に大幅増加
-          .get();
-
-      final recentPosts = recentQuerySnapshot.docs
-          .map((doc) => PostModel.fromFirestore(doc))
-          .toList();
-      allPosts.addAll(recentPosts);
-      print('最新投稿取得数: ${recentPosts.length}');
-
-      // 2. 人気の投稿（いいね数が多い投稿）も取得
-      final popularQuerySnapshot = await _firestore
-          .collection('posts')
-          .orderBy('likeCount', descending: true)
-          .limit(1000) // 500から1000に増加
-          .get();
-
-      final popularPosts = popularQuerySnapshot.docs
-          .map((doc) => PostModel.fromFirestore(doc))
-          .toList();
-      allPosts.addAll(popularPosts);
-      print('人気投稿取得数: ${popularPosts.length}');
-
-      // 3. 過去の投稿も含む（1ヶ月前までの投稿）
-      final oneMonthAgo = DateTime.now().subtract(const Duration(days: 30));
-      final pastPostsQuery = await _firestore
-          .collection('posts')
-          .where('createdAt', isGreaterThan: oneMonthAgo)
           .orderBy('createdAt', descending: true)
           .limit(1000) // 500から1000に増加
           .get();
 
-      final pastPosts = pastPostsQuery.docs
+      final posts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
-      allPosts.addAll(pastPosts);
-      print('過去投稿取得数: ${pastPosts.length}');
 
-      // 4. フォロー中のユーザーの投稿を優先的に取得（currentUserIdが提供された場合）
-      if (currentUserId != null) {
-        // 現在のユーザーのフォロー情報を取得
-        final userDoc =
-            await _firestore.collection('users').doc(currentUserId).get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final followingIds =
-              List<String>.from(userData['followingIds'] ?? []);
-
-          print('フォロー中のユーザー数: ${followingIds.length}');
-
-          if (followingIds.isNotEmpty) {
-            // フォロー中のユーザーの投稿を取得（件数を増加）
-            final followingPostsQuery = await _firestore
-                .collection('posts')
-                .where('userId', whereIn: followingIds)
-                .orderBy('createdAt', descending: true)
-                .limit(500) // 200から500に増加
-                .get();
-
-            final followingPosts = followingPostsQuery.docs
-                .map((doc) => PostModel.fromFirestore(doc))
-                .toList();
-            allPosts.addAll(followingPosts);
-            print('フォロー中ユーザーの投稿取得数: ${followingPosts.length}');
-
-            // フォロー中のユーザーの過去の投稿も取得（1ヶ月前まで）
-            final followingPastPostsQuery = await _firestore
-                .collection('posts')
-                .where('userId', whereIn: followingIds)
-                .where('createdAt', isGreaterThan: oneMonthAgo)
-                .orderBy('createdAt', descending: true)
-                .limit(500) // 300から500に増加
-                .get();
-
-            final followingPastPosts = followingPastPostsQuery.docs
-                .map((doc) => PostModel.fromFirestore(doc))
-                .toList();
-            allPosts.addAll(followingPastPosts);
-            print('フォロー中ユーザーの過去投稿取得数: ${followingPastPosts.length}');
-
-            // フォロー中のユーザーの投稿の詳細をログ出力
-            for (final post in followingPosts.take(5)) {
-              print(
-                  'フォロー中ユーザーの投稿例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
-            }
-          }
-        }
-      }
-
-      // 重複を除去（IDでユニークにする）
-      final uniquePosts = <String, PostModel>{};
-      for (final post in allPosts) {
-        uniquePosts[post.id] = post;
-      }
-
-      final posts = uniquePosts.values.toList();
-      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // 最新順にソート
-
-      print('取得した投稿数: ${posts.length}'); // デバッグログ追加
+      print('取得した投稿数: ${posts.length}');
 
       // 部分一致でフィルタリング
       final searchQuery = query.toLowerCase();
@@ -623,7 +560,7 @@ class PostProvider extends ChangeNotifier {
         return titleMatch || commentMatch || endCommentMatch;
       }).toList();
 
-      print('フィルタリング後の投稿数: ${filteredPosts.length}'); // デバッグログ追加
+      print('フィルタリング後の投稿数: ${filteredPosts.length}');
 
       // 検索結果の詳細をログ出力
       for (final post in filteredPosts.take(10)) {
@@ -631,13 +568,17 @@ class PostProvider extends ChangeNotifier {
             '検索結果例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
       }
 
-      // 結果を200件に増加（100から200に変更）
-      final result = filteredPosts.take(200).toList();
-      print('最終結果の投稿数: ${result.length}'); // デバッグログ追加
+      // デバッグ用：全投稿のタイトルをログ出力
+      print('=== 全投稿のタイトル ===');
+      for (final post in posts.take(10)) {
+        print('投稿: ${post.title}');
+      }
+      print('=====================');
 
-      return result;
+      _searchResults = filteredPosts; // 検索結果をキャッシュ
+      return filteredPosts;
     } catch (e) {
-      print('投稿検索エラー: $e'); // デバッグログ追加
+      print('投稿検索エラー: $e');
       _setError('投稿検索に失敗しました');
       return [];
     } finally {
@@ -750,18 +691,12 @@ class PostProvider extends ChangeNotifier {
       return false;
     }
 
-    // 24時間経過により自動完了された投稿も表示する（修正）
-
-    // 完了している場合、END投稿（actualEndTime）から24時間以内なら表示
+    // 完了している場合のみ、END投稿（actualEndTime）から24時間以内なら表示
     if (post.isCompleted && post.actualEndTime != null) {
       return now.difference(post.actualEndTime!).inHours <= 24;
     }
 
-    // 完了予定時刻から24時間経過したら非表示
-    if (post.scheduledEndTime != null) {
-      return now.difference(post.scheduledEndTime!).inHours <= 24;
-    }
-
+    // 未完了投稿と予定なし投稿は常に表示
     return true;
   }
 
@@ -898,6 +833,74 @@ class PostProvider extends ChangeNotifier {
     final index = list.indexWhere((post) => post.id == updatedPost.id);
     if (index != -1) {
       list[index] = updatedPost;
+    }
+  }
+
+  // START投稿を削除（END投稿作成後に呼び出し）
+  Future<void> deleteStartPost(String startPostId) async {
+    try {
+      // START投稿のユーザーIDを取得（複数のリストから検索）
+      PostModel? startPost;
+      String? userId;
+
+      // 各リストから投稿を検索
+      try {
+        startPost = _posts.firstWhere((post) => post.id == startPostId);
+      } catch (e) {
+        try {
+          startPost = _userPosts.firstWhere((post) => post.id == startPostId);
+        } catch (e) {
+          try {
+            startPost =
+                _followingPosts.firstWhere((post) => post.id == startPostId);
+          } catch (e) {
+            try {
+              startPost =
+                  _communityPosts.firstWhere((post) => post.id == startPostId);
+            } catch (e) {
+              startPost = null;
+            }
+          }
+        }
+      }
+
+      // 投稿が見つからない場合は、Firestoreから直接取得
+      if (startPost == null) {
+        final doc = await _firestore.collection('posts').doc(startPostId).get();
+        if (!doc.exists) {
+          if (kDebugMode) {
+            print('START投稿が見つかりません: $startPostId');
+          }
+          return; // 投稿が存在しない場合は何もしない
+        }
+        userId = doc.data()?['userId'] as String?;
+      } else {
+        userId = startPost.userId;
+      }
+
+      // FirestoreでSTART投稿を削除
+      await _firestore.collection('posts').doc(startPostId).delete();
+
+      // ユーザーの投稿数を減らす（START投稿を削除したため）
+      if (userId != null) {
+        await _firestore.collection('users').doc(userId).update({
+          'postCount': FieldValue.increment(-1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // ローカルの投稿リストから削除
+      _posts.removeWhere((post) => post.id == startPostId);
+      _userPosts.removeWhere((post) => post.id == startPostId);
+      _followingPosts.removeWhere((post) => post.id == startPostId);
+      _communityPosts.removeWhere((post) => post.id == startPostId);
+
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('START投稿削除エラー: $e');
+      }
+      // エラーが発生しても処理を継続
     }
   }
 }

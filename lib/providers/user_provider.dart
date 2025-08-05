@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -45,102 +44,46 @@ class UserProvider extends ChangeNotifier {
         _setLoading(true);
         _setError(null);
 
-        if (kDebugMode) {
-          print('ユーザー取得/作成開始 (試行 ${retryCount + 1}/$maxRetries): $userId');
-        }
+        final userDoc = await _firestore.collection('users').doc(userId).get();
 
-        final doc =
-            await _firestore.collection('users').doc(userId).get().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw TimeoutException(
-                'Firestore get timeout', const Duration(seconds: 10));
-          },
-        );
-
-        if (doc.exists) {
-          _currentUser = UserModel.fromFirestore(doc);
-          if (kDebugMode) {
-            print('既存ユーザー取得成功: ${_currentUser?.displayName}');
-          }
+        if (userDoc.exists) {
+          _currentUser = UserModel.fromFirestore(userDoc);
+          notifyListeners();
+          return;
         } else {
-          // ユーザーが存在しない場合は新規作成
-          final authUser = _authProvider?.user;
-          if (authUser != null) {
-            _currentUser = UserModel(
-              id: userId,
-              displayName: authUser.displayName ?? 'ユーザー',
-              email: authUser.email ?? '',
-              profileImageUrl: authUser.photoURL,
-              bio: '',
-              isPrivate: false,
-              requiresApproval: false,
-              followerIds: [],
-              followingIds: [],
-              communityIds: [],
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            );
+          // 新規ユーザー作成
+          final newUser = UserModel(
+            id: userId,
+            displayName: 'ユーザー',
+            email: '',
+            bio: '',
+            profileImageUrl: '',
+            followerIds: [],
+            followingIds: [],
+            communityIds: [],
+            postCount: 0,
+            isPrivate: false,
+            requiresApproval: false,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
 
-            // Firestoreに保存（タイムアウト付き）
-            await _firestore
-                .collection('users')
-                .doc(userId)
-                .set(_currentUser!.toFirestore())
-                .timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                throw TimeoutException(
-                    'Firestore set timeout', const Duration(seconds: 15));
-              },
-            );
-
-            if (kDebugMode) {
-              print('新規ユーザー作成成功: ${_currentUser?.displayName}');
-            }
-
-            // 作成後の短い待機時間
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-        }
-
-        // 成功した場合はリターン
-        return;
-      } on TimeoutException catch (e) {
-        retryCount++;
-        if (kDebugMode) {
-          print(
-              'UserProvider Firestore操作タイムアウト (試行 $retryCount/$maxRetries): $e');
-        }
-
-        if (retryCount >= maxRetries) {
-          _setError('ネットワーク接続が不安定です。しばらく待ってからもう一度お試しください。');
+          await _firestore
+              .collection('users')
+              .doc(userId)
+              .set(newUser.toFirestore());
+          _currentUser = newUser;
+          notifyListeners();
           return;
         }
-
-        await Future.delayed(Duration(milliseconds: 1000 * retryCount));
       } catch (e) {
         retryCount++;
-        if (kDebugMode) {
-          print('UserProvider エラー (試行 $retryCount/$maxRetries): $e');
-        }
-
         if (retryCount >= maxRetries) {
-          _setError('ユーザー情報の取得に失敗しました: ${e.toString()}');
+          // 最大試行回数に達した場合
           return;
         }
-
-        // ネットワーク関連のエラーの場合は長めに待機
-        if (e.toString().contains('network') ||
-            e.toString().contains('connection')) {
-          await Future.delayed(Duration(milliseconds: 2000 * retryCount));
-        } else {
-          await Future.delayed(Duration(milliseconds: 1000 * retryCount));
-        }
-      } finally {
-        if (retryCount >= maxRetries || _currentUser != null) {
-          _setLoading(false);
-        }
+        // 少し待ってから再試行
+        await Future.delayed(Duration(seconds: retryCount));
       }
     }
   }
@@ -179,7 +122,7 @@ class UserProvider extends ChangeNotifier {
       if (doc.exists) {
         final user = UserModel.fromFirestore(doc);
 
-        // 投稿数を取得して更新
+        // 投稿数を取得して更新（名前やプロフィール画像は更新しない）
         final postsSnapshot = await _firestore
             .collection('posts')
             .where('userId', isEqualTo: userId)
@@ -187,7 +130,7 @@ class UserProvider extends ChangeNotifier {
 
         final actualPostCount = postsSnapshot.docs.length;
 
-        // 投稿数が異なる場合は更新
+        // 投稿数が異なる場合のみ更新
         if (user.postCount != actualPostCount) {
           await _firestore.collection('users').doc(userId).update({
             'postCount': actualPostCount,
@@ -266,7 +209,13 @@ class UserProvider extends ChangeNotifier {
   // 現在のユーザー情報を再読み込み
   Future<void> refreshCurrentUser() async {
     if (_currentUser?.id != null) {
-      await getUser(_currentUser!.id);
+      final updatedUser = await getUser(_currentUser!.id);
+      if (updatedUser != null) {
+        _currentUser = updatedUser;
+        // キャッシュも更新
+        _userCache[_currentUser!.id] = updatedUser;
+        notifyListeners();
+      }
     }
   }
 
@@ -368,37 +317,47 @@ class UserProvider extends ChangeNotifier {
         return _searchResults;
       }
 
-      print('ユーザー検索開始: $query'); // デバッグログ追加
+      print('ユーザー検索開始: $query');
 
-      // より多くのユーザーを取得して検索対象を広げる
+      // シンプルな検索：全ユーザーを取得
       final querySnapshot = await _firestore
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .limit(300) // 100から300に増加
+          .limit(200) // 100から200に増加
           .get();
 
       final users = querySnapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
 
-      print('取得したユーザー数: ${users.length}'); // デバッグログ追加
+      print('取得したユーザー数: ${users.length}');
 
       // 部分一致でフィルタリング
       final searchQuery = query.toLowerCase();
       _searchResults = users.where((user) {
-        return user.displayName.toLowerCase().contains(searchQuery) ||
-            (user.email.toLowerCase().contains(searchQuery));
+        final nameMatch = user.displayName.toLowerCase().contains(searchQuery);
+        final emailMatch = user.email.toLowerCase().contains(searchQuery);
+
+        // デバッグログを追加
+        if (nameMatch || emailMatch) {
+          print(
+              'ユーザー検索マッチ: ID=${user.id}, 名前=${user.displayName}, メール=${user.email}');
+        }
+
+        return nameMatch || emailMatch;
       }).toList();
 
-      print('フィルタリング後のユーザー数: ${_searchResults.length}'); // デバッグログ追加
+      print('フィルタリング後のユーザー数: ${_searchResults.length}');
 
-      // 結果を50件に増加（20から50に変更）
-      final result = _searchResults.take(50).toList();
-      print('最終結果のユーザー数: ${result.length}'); // デバッグログ追加
+      // 検索結果の詳細をログ出力
+      for (final user in _searchResults.take(10)) {
+        print(
+            'ユーザー検索結果例: ID=${user.id}, 名前=${user.displayName}, メール=${user.email}');
+      }
 
-      return result;
+      return _searchResults;
     } catch (e) {
-      print('ユーザー検索エラー: $e'); // デバッグログ追加
+      print('ユーザー検索エラー: $e');
       _setError('ユーザー検索に失敗しました');
       _searchResults = [];
       return [];

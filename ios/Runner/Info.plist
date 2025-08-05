@@ -48,7 +48,7 @@
 	
 
 	
-	<!-- Google Sign-In URLスキーム設定 -->
+	<!-- Google Sign-In and Apple Sign-In URLスキーム設定 -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -56,7 +56,15 @@
 			<string>REVERSED_CLIENT_ID</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.201575475230-p7i18f8cvnt3l0ad53sdp4s4tvpp0vrp</string>
+				<string>com.googleusercontent.apps.201575475230-svv1pj7cc7n95t122lu1imp65iqhrp55</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Apple Sign-In</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
 	</array>
@@ -68,6 +76,8 @@
 	<!-- Google Sign-In additional configuration -->
 	<key>GIDServerClientID</key>
 	<string>201575475230-b626ctmas0d2rocgpkr1hdnbtmpmnh0r.apps.googleusercontent.com</string>
+	
+	<!-- Apple Sign-In configuration -->
 	
 	<!-- 通知とバックグラウンド処理のための設定 -->
 	<key>UIBackgroundModes</key>
@@ -98,5 +108,9 @@
 			<string>cstr6suwn9.skadnetwork</string>
 		</dict>
 	</array>
+	
+	<!-- 暗号化使用の明記 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

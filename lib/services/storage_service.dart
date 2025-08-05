@@ -42,9 +42,6 @@ class StorageService {
       final compressedFile = await _compressImage(filePath);
       final compressedSize = await compressedFile.length();
 
-      print(
-          '画像圧縮: ${(originalSize / 1024 / 1024).toStringAsFixed(2)}MB → ${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB');
-
       // 圧縮後のファイルサイズをチェック
       if (compressedSize > maxFileSizeBytes) {
         throw Exception('圧縮後もファイルサイズが大きすぎます。より小さい画像を選択してください。');
@@ -52,7 +49,6 @@ class StorageService {
 
       // ファイルをバイトデータとして読み込み
       final bytes = await compressedFile.readAsBytes();
-      print('バイトデータ読み込み完了: ${bytes.length}bytes');
 
       // より短いファイル名を生成
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -61,7 +57,6 @@ class StorageService {
 
       // より短いStorage参照を作成
       final storagePath = '$folder/$fileName';
-      print('Storage path: $storagePath');
 
       final ref = _storage.ref().child(storagePath);
 
@@ -70,18 +65,14 @@ class StorageService {
         contentType: 'image/jpeg',
       );
 
-      print('アップロード開始: バイトデータから');
-
       // バイトデータから直接アップロード
       final uploadTask = ref.putData(bytes, metadata);
 
       // アップロード完了を待機
       final snapshot = await uploadTask;
-      print('アップロード完了');
 
       // ダウンロードURLを取得
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      print('ダウンロードURL取得完了: ${downloadUrl.length}文字');
 
       // 一時ファイルを削除
       try {
@@ -89,19 +80,13 @@ class StorageService {
           await compressedFile.delete();
         }
       } catch (e) {
-        print('一時ファイル削除エラー: $e');
+        // エラーハンドリング
       }
 
       return downloadUrl;
     } on FirebaseException catch (e) {
-      print('Firebase Storage エラー詳細:');
-      print('  Code: ${e.code}');
-      print('  Message: ${e.message}');
-      print('  Plugin: ${e.plugin}');
-      print('  StackTrace: ${e.stackTrace}');
       return _handleFirebaseStorageError(e);
     } catch (e) {
-      print('画像アップロードエラー: $e');
       rethrow;
     }
   }

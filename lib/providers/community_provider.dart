@@ -34,6 +34,11 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _lastCreatedCommunityId;
+
+  // 最後に作成したコミュニティIDを取得
+  String? get lastCreatedCommunityId => _lastCreatedCommunityId;
+
   // コミュニティ作成
   Future<bool> createCommunity({
     required String name,
@@ -45,6 +50,28 @@ class CommunityProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
+
+      // 1日5コミュニティ制限をチェック（クライアント側でフィルタリング）
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final todayCommunitiesSnapshot = await _firestore
+          .collection('communities')
+          .where('leaderId', isEqualTo: userId)
+          .get();
+
+      final todayCommunities = todayCommunitiesSnapshot.docs
+          .map((doc) => CommunityModel.fromFirestore(doc))
+          .where((community) => 
+              community.createdAt.isAfter(startOfDay) && 
+              community.createdAt.isBefore(endOfDay))
+          .toList();
+
+      if (todayCommunities.length >= 5) {
+        _setError('1日のコミュニティ作成制限（5個）に達しました。明日また作成してください。');
+        return false;
+      }
 
       final community = CommunityModel(
         id: '',
@@ -65,11 +92,24 @@ class CommunityProvider extends ChangeNotifier {
           .collection('communities')
           .add(community.toFirestore());
 
+      // 作成したコミュニティIDを保存
+      _lastCreatedCommunityId = docRef.id;
+
       // ユーザーのコミュニティリストにも追加
       await _firestore.collection('users').doc(userId).update({
         'communityIds': FieldValue.arrayUnion([docRef.id]),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // 作成したコミュニティの完全な情報を取得
+      final createdCommunity =
+          await _firestore.collection('communities').doc(docRef.id).get();
+
+      if (createdCommunity.exists) {
+        final community = CommunityModel.fromFirestore(createdCommunity);
+        _communities.add(community);
+        _userCommunities.add(community);
+      }
 
       // コミュニティ一覧を更新
       await searchCommunities();

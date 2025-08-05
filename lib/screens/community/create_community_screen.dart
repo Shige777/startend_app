@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/community_provider.dart';
@@ -7,6 +8,7 @@ import '../../providers/user_provider.dart';
 import '../../services/storage_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
+import '../../models/community_model.dart';
 import 'package:image_picker/image_picker.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
@@ -32,6 +34,36 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  // 今日のコミュニティ作成数を取得
+  Future<int> _getTodayCommunityCount() async {
+    try {
+      final userProvider = context.read<UserProvider>();
+      final currentUser = userProvider.currentUser;
+      if (currentUser == null) return 0;
+
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final firestore = FirebaseFirestore.instance;
+      final todayCommunitiesSnapshot = await firestore
+          .collection('communities')
+          .where('leaderId', isEqualTo: currentUser.id)
+          .get();
+
+      final todayCommunities = todayCommunitiesSnapshot.docs
+          .map((doc) => CommunityModel.fromFirestore(doc))
+          .where((community) => 
+              community.createdAt.isAfter(startOfDay) && 
+              community.createdAt.isBefore(endOfDay))
+          .toList();
+
+      return todayCommunities.length;
+    } catch (e) {
+      return 0;
+    }
   }
 
   Future<void> _handleImageSelection() async {
@@ -127,15 +159,24 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
           const SnackBar(content: Text('コミュニティを作成しました')),
         );
 
-        // 成功時は前の画面に戻る
-        if (context.canPop()) {
-          context.pop();
+        // 作成したコミュニティの詳細画面に直接遷移
+        final communityId = communityProvider.lastCreatedCommunityId;
+        if (communityId != null) {
+          context.go('/community/$communityId');
         } else {
-          context.go('/home?tab=community');
+          // 成功時は前の画面に戻る
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/home?tab=community');
+          }
         }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('コミュニティの作成に失敗しました')),
+          SnackBar(
+            content: Text(communityProvider.errorMessage ?? 'コミュニティの作成に失敗しました'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -177,6 +218,51 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // 今日のコミュニティ作成数表示
+                Consumer<CommunityProvider>(
+                  builder: (context, communityProvider, child) {
+                    return FutureBuilder<int>(
+                      future: _getTodayCommunityCount(),
+                      builder: (context, snapshot) {
+                        final todayCount = snapshot.data ?? 0;
+                        if (todayCount >= 5) {
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.red[200]!,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning,
+                                  color: Colors.red[600],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '今日のコミュニティ作成制限に達しました（5個）',
+                                    style: TextStyle(
+                                      color: Colors.red[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    );
+                  },
+                ),
 
                 // アイコン選択
                 Column(

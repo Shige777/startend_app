@@ -1016,6 +1016,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ],
                       ),
 
+                      // フォローボタン（他のユーザーのプロフィールの場合）
+                      if (!widget.isOwnProfile) ...[
+                        const SizedBox(height: 12),
+                        _buildFollowButton(context, user),
+                      ],
+
                       // プロフィール編集ボタン（自分のプロフィールの場合）
                       if (widget.isOwnProfile) ...[
                         const SizedBox(height: 12), // 16から12に削減
@@ -1156,6 +1162,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ],
                     ),
 
+                    // フォローボタン（他のユーザーのプロフィールの場合）
+                    if (!widget.isOwnProfile) ...[
+                      const SizedBox(height: 12),
+                      _buildFollowButton(context, user),
+                    ],
+
                     // プロフィール編集ボタン（自分のプロフィールの場合）
                     if (widget.isOwnProfile) ...[
                       const SizedBox(height: 16),
@@ -1218,17 +1230,20 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         },
       ),
-      // 他のユーザーのプロフィールの場合はナビゲーションバーを追加
-      bottomNavigationBar: !widget.isOwnProfile
-          ? BottomNavigationBar(
+      // ナビゲーションバーを表示（ホーム画面から来た場合は表示しない）
+      bottomNavigationBar: widget.fromPage == 'home'
+          ? null
+          : BottomNavigationBar(
               backgroundColor: AppColors.background, // 背景色を統一
               elevation: 0, // 影を削除
-              currentIndex: 0, // 投稿タブを選択状態にする
+              currentIndex:
+                  widget.isOwnProfile ? 1 : 0, // 自分のプロフィールの場合は軌跡タブを選択状態にする
               onTap: (index) {
                 if (index == 0) {
                   context.go('/home');
                 } else if (index == 1) {
-                  context.go('/home?tab=1');
+                  // 軌跡タブをタップした場合は自分のプロフィールに遷移
+                  context.go('/profile');
                 }
               },
               items: const [
@@ -1241,8 +1256,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   label: '軌跡',
                 ),
               ],
-            )
-          : null,
+            ),
     );
   }
 
@@ -1279,6 +1293,55 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     return content;
+  }
+
+  Widget _buildFollowButton(BuildContext context, UserModel user) {
+    final userProvider = context.read<UserProvider>();
+    final currentUser = userProvider.currentUser;
+
+    if (currentUser == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isFollowing = user.followerIds.contains(currentUser.id);
+
+    if (isFollowing) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () {
+            // フォロー解除
+            userProvider.unfollowUser(user.id);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('フォローを解除しました')),
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.primary),
+            foregroundColor: AppColors.primary,
+          ),
+          child: const Text('フォロー中'),
+        ),
+      );
+    } else {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () {
+            // フォロー
+            userProvider.followUser(user.id);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('フォローしました')),
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.primary),
+            foregroundColor: AppColors.primary,
+          ),
+          child: const Text('フォロー'),
+        ),
+      );
+    }
   }
 
   Widget _buildPostSection(BuildContext context, String category) {
@@ -1790,6 +1853,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           title: const Text('ログアウト'),
           content: const Text('本当にログアウトしますか？'),
           actions: [

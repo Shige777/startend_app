@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-// import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
@@ -38,6 +38,7 @@ import 'screens/community/community_settings_screen.dart';
 import 'screens/community/create_community_screen.dart';
 import 'screens/notifications/notification_screen.dart';
 import 'screens/invite/invite_screen.dart';
+import 'services/ad_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,38 +55,27 @@ void main() async {
     appleProvider: AppleProvider.debug,
   );
 
-  // AdMob初期化
-  // await MobileAds.instance.initialize();
+  // タイムゾーン初期化
+  tz.initializeTimeZones();
+
+  // プッシュ通知の初期化
+  await NotificationService().initialize();
+
+  // AdMob初期化（最適化）
+  await MobileAds.instance.initialize();
 
   // ネイティブ広告ファクトリーを登録
-  // MobileAds.instance.updateRequestConfiguration(
-  //   RequestConfiguration(
-  //     testDeviceIds: ['EMULATOR'],
-  //   ),
-  // );
+  MobileAds.instance.updateRequestConfiguration(
+    RequestConfiguration(
+      testDeviceIds: ['EMULATOR'],
+    ),
+  );
+
+  // 広告サービスの初期化（プリロード開始）
+  await AdService.initializeAds();
 
   // SharedPreferences初期化
   await SharedPreferences.getInstance();
-
-  // 通知サービスの初期化
-  await NotificationService().initialize();
-
-  // Google Sign-Inの初期化（簡素化版）
-  if (!kIsWeb) {
-    try {
-      GoogleSignIn(
-        scopes: ['email', 'profile'],
-      );
-
-      if (kDebugMode) {
-        print('Google Sign-In initialized');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Google Sign-In initialization error: $e');
-      }
-    }
-  }
 
   runApp(const MyApp());
 }
@@ -209,9 +199,7 @@ final GoRouter _router = GoRouter(
           final postProvider = context.read<PostProvider>();
           await postProvider.updateExpiredPosts();
         } catch (e) {
-          if (kDebugMode) {
-            print('アプリ起動時の期限切れ投稿更新エラー: $e');
-          }
+          // エラーハンドリング
         }
       });
       return '/home';

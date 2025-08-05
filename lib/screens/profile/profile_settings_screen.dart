@@ -217,7 +217,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('保存'),
+                    : const Text(
+                        '保存',
+                        style: TextStyle(color: Colors.black),
+                      ),
               ),
             ],
           ),
@@ -271,6 +274,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   // 表示名
                   TextFormField(
                     controller: _displayNameController,
+                    style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
                       labelText: '表示名',
                       hintText: 'あなたの名前を入力してください',
@@ -289,6 +293,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   // 自己紹介
                   TextFormField(
                     controller: _bioController,
+                    style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
                       labelText: '自己紹介',
                       hintText: 'あなたについて教えてください',
@@ -316,7 +321,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                               ),
                             ),
                           )
-                        : const Text('プロフィールを保存'),
+                        : const Text(
+                            'プロフィールを保存',
+                            style: TextStyle(color: Colors.white),
+                          ),
                   ),
                 ],
               ),

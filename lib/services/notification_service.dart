@@ -92,25 +92,19 @@ class NotificationService {
     try {
       final token = await _firebaseMessaging.getToken();
       if (token != null) {
-        print('FCMトークン: $token');
-        // TODO: ユーザーのFCMトークンをFirestoreに保存
         await _saveFCMToken(token);
       }
     } catch (e) {
-      print('FCMトークン取得エラー: $e');
+      // エラーハンドリング
     }
   }
 
-  /// FCMトークンをFirestoreに保存
   Future<void> _saveFCMToken(String token) async {
     try {
-      // TODO: 現在のユーザーIDを取得してトークンを保存
-      // await _firestore.collection('users').doc(userId).update({
-      //   'fcmToken': token,
-      //   'lastTokenUpdate': FieldValue.serverTimestamp(),
-      // });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fcm_token', token);
     } catch (e) {
-      print('FCMトークン保存エラー: $e');
+      // エラーハンドリング
     }
   }
 
@@ -303,26 +297,7 @@ class NotificationService {
     await sendNotificationToUser(
       userId: postOwnerId,
       title: 'いいねが付きました',
-      body: '${likerName}さんが「$postTitle」にいいねしました',
-      data: {
-        'type': 'post',
-        'id': postId,
-      },
-      notificationType: 'like',
-    );
-  }
-
-  /// コメント通知の送信
-  Future<void> sendCommentNotification({
-    required String postOwnerId,
-    required String commenterName,
-    required String postId,
-    required String postTitle,
-  }) async {
-    await sendNotificationToUser(
-      userId: postOwnerId,
-      title: 'コメントが付きました',
-      body: '${commenterName}さんが「$postTitle」にコメントしました',
+      body: '${likerName}さんがいいねしました',
       data: {
         'type': 'post',
         'id': postId,
@@ -348,7 +323,7 @@ class NotificationService {
           await sendNotificationToUser(
             userId: memberId,
             title: '$communityNameで新しい投稿',
-            body: '${posterName}さんが「$postTitle」を投稿しました',
+            body: '${posterName}さんが投稿しました',
             data: {
               'type': 'community_post',
               'communityId': communityId,
@@ -564,13 +539,11 @@ class NotificationService {
 
     await _localNotifications.zonedSchedule(
       notificationId,
-      '集中終了まであと5分！',
-      '「${post.title}」の集中時間が終了まであと5分です。',
+      '集中時間終了！',
+      '「${post.title}」の集中時間が終了しました。',
       tz.TZDateTime.from(notificationTime, tz.local),
       platformChannelSpecifics,
       payload: 'concentration_${post.id}',
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
@@ -621,8 +594,6 @@ class NotificationService {
       tz.TZDateTime.from(notificationTime, tz.local),
       platformChannelSpecifics,
       payload: 'progress_${post.id}',
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );

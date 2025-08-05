@@ -300,7 +300,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // 投稿者本人またはコミュニティメンバーの場合のみEND投稿可能
+                      // 投稿者本人のみEND投稿可能
                       final userProvider = context.read<UserProvider>();
                       final currentUser = userProvider.currentUser;
 
@@ -313,16 +313,11 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
                         return;
                       }
 
-                      // コミュニティ投稿かどうかを判定
-                      final isCommunityPost =
-                          _currentPost.communityIds.isNotEmpty;
+                      // 自分の投稿かどうかを判定
                       final isOwnPost = widget.isOwnMessage;
-                      final isCommunityMember = isCommunityPost &&
-                          currentUser.communityIds
-                              .contains(_currentPost.communityIds.first);
 
-                      // END投稿可能な条件をチェック
-                      final canCreateEndPost = isOwnPost || isCommunityMember;
+                      // END投稿可能な条件をチェック（自分の投稿のみ）
+                      final canCreateEndPost = isOwnPost;
 
                       if (canCreateEndPost) {
                         // 自分の投稿またはコミュニティメンバーの場合
@@ -349,7 +344,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
                           // 完了済みだが画像がない場合は何もしない
                         }
                       } else {
-                        // 他人の投稿でコミュニティメンバーでもない場合
+                        // 他人の投稿の場合
                         if (_currentPost.isCompleted &&
                             _currentPost.endImageUrl != null) {
                           // 画像がある場合のみ拡大表示

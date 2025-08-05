@@ -457,6 +457,34 @@ class _PostCardWidgetState extends State<PostCardWidget>
               ),
             ],
 
+            // 終了時刻の表示（完了している場合）
+            if (widget.post.isCompleted &&
+                widget.post.actualEndTime != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: AppConstants.defaultPadding,
+                  right: AppConstants.defaultPadding,
+                  bottom: 8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '終了：${DateTimeUtils.formatDateTime(widget.post.actualEndTime!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // アクションボタン
             if (widget.showActions) ...[
               Padding(
@@ -652,7 +680,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
                         child: Builder(
                           builder: (context) => GestureDetector(
                             onTap: () {
-                              // 投稿者本人またはコミュニティメンバーの場合のみEND投稿可能
+                              // 投稿者本人のみEND投稿可能
                               final userProvider = context.read<UserProvider>();
                               final currentUser = userProvider.currentUser;
 
@@ -665,21 +693,15 @@ class _PostCardWidgetState extends State<PostCardWidget>
                                 return;
                               }
 
-                              // コミュニティ投稿かどうかを判定
-                              final isCommunityPost =
-                                  widget.post.communityIds.isNotEmpty;
+                              // 自分の投稿かどうかを判定
                               final isOwnPost =
                                   widget.post.userId == currentUser.id;
-                              final isCommunityMember = isCommunityPost &&
-                                  currentUser.communityIds
-                                      .contains(widget.post.communityIds.first);
 
-                              // END投稿可能な条件をチェック
-                              final canCreateEndPost =
-                                  isOwnPost || isCommunityMember;
+                              // END投稿可能な条件をチェック（自分の投稿のみ）
+                              final canCreateEndPost = isOwnPost;
 
                               if (!canCreateEndPost) {
-                                // 他人の投稿でコミュニティメンバーでもない場合
+                                // 他人の投稿の場合
                                 if (widget.post.isCompleted &&
                                     widget.post.endImageUrl != null) {
                                   // 完了済みで画像がある場合は画像拡大
@@ -688,8 +710,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content:
-                                          Text('自分の投稿またはコミュニティメンバーのみEND投稿できます'),
+                                      content: Text('自分の投稿のみEND投稿できます'),
                                     ),
                                   );
                                 }

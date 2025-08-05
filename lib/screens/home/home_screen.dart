@@ -115,7 +115,11 @@ class _HomeScreenState extends State<HomeScreen>
             if (currentUser == null) {
               return const Center(child: CircularProgressIndicator());
             }
-            return ProfileScreen(userId: currentUser.id, isOwnProfile: true);
+            return ProfileScreen(
+              userId: currentUser.id,
+              isOwnProfile: true,
+              fromPage: 'home', // ホーム画面から来たことを示す
+            );
           },
         );
       default:
@@ -233,17 +237,28 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (_tabController.index == 0) {
       // フォロー中タブでの検索（投稿とユーザーを検索）
-      if (_searchQuery.isNotEmpty) {
-        context.read<PostProvider>().searchPosts(_searchQuery);
-        context.read<UserProvider>().searchUsers(_searchQuery);
+      if (query.trim().isNotEmpty) {
+        _performActualSearch(query.trim());
       }
-    } else if (_tabController.index == 1) {
+    } else {
       // コミュニティタブでの検索
-      if (_searchQuery.isNotEmpty) {
-        context
-            .read<CommunityProvider>()
-            .searchCommunities(query: _searchQuery);
-      }
+      // CommunityScreenで処理される
+    }
+  }
+
+  Future<void> _performActualSearch(String query) async {
+    try {
+      final postProvider = context.read<PostProvider>();
+      final userProvider = context.read<UserProvider>();
+      final currentUser = userProvider.currentUser;
+
+      // 投稿検索
+      await postProvider.searchPosts(query, currentUserId: currentUser?.id);
+
+      // ユーザー検索
+      await userProvider.searchUsers(query);
+    } catch (e) {
+      print('検索エラー: $e');
     }
   }
 

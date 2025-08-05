@@ -22,9 +22,7 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   // 検索状態を保持するstatic変数
@@ -41,24 +39,46 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    print('SearchScreen initState - 開始');
 
     // 前回の検索状態を復元
     if (_lastSearchQuery.isNotEmpty) {
       _searchController.text = _lastSearchQuery;
       _searchQuery = _lastSearchQuery;
-      _searchResults = _lastSearchResults;
-      _userSearchResults = _lastUserSearchResults;
+      _searchResults = List.from(_lastSearchResults); // 新しいリストを作成
+      _userSearchResults = List.from(_lastUserSearchResults); // 新しいリストを作成
+
+      // デバッグログを追加
+      print('SearchScreen initState - 状態復元:');
+      print('- _lastSearchQuery: $_lastSearchQuery');
+      print('- _lastSearchResults.length: ${_lastSearchResults.length}');
+      print(
+          '- _lastUserSearchResults.length: ${_lastUserSearchResults.length}');
+      print('- _searchResults.length: ${_searchResults.length}');
+      print('- _userSearchResults.length: ${_userSearchResults.length}');
+    } else {
+      print('SearchScreen initState - 状態復元なし');
     }
 
     _loadFollowingUsers();
+    print('SearchScreen initState - 完了');
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // デバッグログを追加
+    print('SearchScreen didChangeDependencies:');
+    print('- _searchQuery: $_searchQuery');
+    print('- _searchResults.length: ${_searchResults.length}');
+    print('- _userSearchResults.length: ${_userSearchResults.length}');
+    print('- _isSearching: $_isSearching');
   }
 
   Future<void> _loadFollowingUsers() async {
@@ -126,6 +146,83 @@ class _SearchScreenState extends State<SearchScreen>
       _lastSearchQuery = query;
       _lastSearchResults = posts;
       _lastUserSearchResults = users;
+
+      // デバッグログを追加
+      print('検索結果の状態更新:');
+      print('- 検索クエリ: $query');
+      print('- 投稿検索結果数: ${posts.length}');
+      print('- ユーザー検索結果数: ${users.length}');
+      print('- _searchResults.length: ${_searchResults.length}');
+      print('- _userSearchResults.length: ${_userSearchResults.length}');
+
+      // setState後の状態も確認
+      print('setState後の状態確認:');
+      print('- _searchResults.length (setState後): ${_searchResults.length}');
+      print(
+          '- _userSearchResults.length (setState後): ${_userSearchResults.length}');
+      print('- _searchQuery: $_searchQuery');
+      print('- _isSearching: $_isSearching');
+
+      // 投稿の詳細情報も出力
+      if (posts.isNotEmpty) {
+        print('投稿検索結果の詳細:');
+        for (final post in posts.take(3)) {
+          print(
+              '  - ID: ${post.id}, タイトル: "${post.title}", コメント: "${post.comment}", ENDコメント: "${post.endComment}"');
+        }
+      }
+
+      // 強制的に再描画をトリガー
+      if (mounted) {
+        print('強制再描画を実行');
+        setState(() {
+          // 状態を再設定して確実に更新
+          _searchResults = posts;
+          _userSearchResults = users;
+          _searchQuery = query;
+          print('強制再描画後の状態:');
+          print('- _searchResults.length: ${_searchResults.length}');
+          print('- _userSearchResults.length: ${_userSearchResults.length}');
+          print('- _searchQuery: $_searchQuery');
+        });
+      }
+
+      // 最終確認
+      print('最終確認:');
+      print('- _searchResults.length: ${_searchResults.length}');
+      print('- _userSearchResults.length: ${_userSearchResults.length}');
+      print('- _searchQuery: $_searchQuery');
+      print('- _isSearching: $_isSearching');
+
+      // 強制的にUIを更新
+      if (mounted) {
+        print('UI更新を強制実行');
+        setState(() {});
+      }
+
+      // さらに強制的にUIを更新
+      if (mounted) {
+        print('さらに強制UI更新を実行');
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              print('遅延UI更新を実行');
+            });
+          }
+        });
+      }
+
+      // さらに強制的にUIを更新
+      if (mounted) {
+        print('さらに強制UI更新を実行2');
+        Future.delayed(Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {
+              print('遅延UI更新を実行2');
+            });
+          }
+        });
+      }
     } catch (e) {
       setState(() {
         _isSearching = false;
@@ -185,6 +282,30 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   Widget build(BuildContext context) {
+    // デバッグログを追加
+    print('SearchScreen build: 開始');
+    print('- _searchQuery: $_searchQuery');
+    print('- _searchResults.length: ${_searchResults.length}');
+    print('- _userSearchResults.length: ${_userSearchResults.length}');
+    print('- _isSearching: $_isSearching');
+    print('- _searchController.text: ${_searchController.text}');
+    print('- _searchResults.isEmpty: ${_searchResults.isEmpty}');
+    print('- _userSearchResults.isEmpty: ${_userSearchResults.isEmpty}');
+    print('- mounted: $mounted');
+    print('- context.mounted: ${context.mounted}');
+    print('- hashCode: ${hashCode}');
+    print('- runtimeType: ${runtimeType}');
+
+    // 検索結果の詳細を出力
+    if (_searchResults.isNotEmpty) {
+      print('検索結果の詳細:');
+      for (final post in _searchResults.take(3)) {
+        print(
+            '  - 投稿ID: ${post.id}, タイトル: "${post.title}", ENDコメント: "${post.endComment}"');
+      }
+    }
+
+    print('SearchScreen build: 完了');
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -232,20 +353,7 @@ class _SearchScreenState extends State<SearchScreen>
                   onSubmitted: _performSearch,
                 ),
               ),
-              // タブバー
-              Container(
-                color: Colors.white, // 背景色を白に変更
-                child: TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: '投稿'),
-                    Tab(text: 'ユーザー'),
-                  ],
-                  indicatorColor: AppColors.primary,
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: AppColors.textSecondary,
-                ),
-              ),
+              // タブバーを削除
             ],
           ),
         ),
@@ -309,130 +417,96 @@ class _SearchScreenState extends State<SearchScreen>
                       color: AppColors.primary,
                     ),
                   )
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // 投稿検索結果
-                      _searchQuery.isEmpty
-                          ? const Center(
-                              child: Text(
-                                '投稿を検索してみましょう',
-                                style:
-                                    TextStyle(color: AppColors.textSecondary),
-                              ),
-                            )
-                          : _searchResults.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '投稿はありません',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        '検索クエリ: $_searchQuery',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        '検索結果: ${_searchResults.length}件 (クエリ: $_searchQuery)',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: ListView.builder(
-                                        itemCount: _searchResults.length,
-                                        itemBuilder: (context, index) {
-                                          final post = _searchResults[index];
-                                          return PostCardWidget(
-                                            post: post,
-                                            onTap: () {
-                                              context.push('/post/${post.id}');
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
+                : _searchQuery.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '投稿やユーザーを検索してみましょう',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      )
+                    : _searchResults.isEmpty && _userSearchResults.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '検索しましたが見つけることができませんでした',
+                                  style:
+                                      TextStyle(color: AppColors.textSecondary),
                                 ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '検索クエリ: $_searchQuery',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'デバッグ: 投稿数=${_searchResults.length}, ユーザー数=${_userSearchResults.length}',
+                                  style: TextStyle(
+                                      color: Colors.red, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.all(8),
+                            children: [
+                              // 投稿検索結果
+                              if (_searchResults.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    '投稿: ${_searchResults.length}件',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                ..._searchResults.map((post) {
+                                  print(
+                                      '投稿を表示: ID=${post.id}, タイトル=${post.title}');
+                                  return PostCardWidget(
+                                    post: post,
+                                    onTap: () {
+                                      context.push('/post/${post.id}');
+                                    },
+                                  );
+                                }).toList(),
+                                SizedBox(height: 16),
+                              ],
 
-                      // ユーザー検索結果
-                      _searchQuery.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'ユーザーを検索してみましょう',
-                                style:
-                                    TextStyle(color: AppColors.textSecondary),
-                              ),
-                            )
-                          : _userSearchResults.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'ユーザーはありません',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        '検索クエリ: $_searchQuery',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12),
-                                      ),
-                                    ],
+                              // ユーザー検索結果
+                              if (_userSearchResults.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    'ユーザー: ${_userSearchResults.length}件',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
                                   ),
-                                )
-                              : Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        '検索結果: ${_userSearchResults.length}件 (クエリ: $_searchQuery)',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: ListView.builder(
-                                        padding: const EdgeInsets.all(8),
-                                        itemCount: _userSearchResults.length,
-                                        itemBuilder: (context, index) {
-                                          return UserListItem(
-                                            user: _userSearchResults[index],
-                                            onTap: () {
-                                              setState(() {}); // フォロー状態を即時反映
-                                              context.go(
-                                                  '/profile/${_userSearchResults[index].id}',
-                                                  extra: {
-                                                    'fromPage': 'search',
-                                                    'searchQuery': _searchQuery,
-                                                  });
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
                                 ),
-                    ],
-                  ),
+                                ..._userSearchResults.map((user) {
+                                  print(
+                                      'ユーザーを表示: ID=${user.id}, 名前=${user.displayName}');
+                                  return UserListItem(
+                                    user: user,
+                                    onTap: () {
+                                      setState(() {}); // フォロー状態を即時反映
+                                      context.go('/profile/${user.id}', extra: {
+                                        'fromPage': 'search',
+                                        'searchQuery': _searchQuery,
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ],
+                            ],
+                          ),
           ),
         ],
       ),

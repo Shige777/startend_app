@@ -54,6 +54,9 @@ class _PostListWidgetState extends State<PostListWidget> {
   void _loadPosts() async {
     if (_hasInitialized) return; // 既に初期化済みの場合はスキップ
 
+    // contextが利用可能かチェック
+    if (!mounted) return;
+
     final postProvider = context.read<PostProvider>();
 
     // 期限切れ投稿を自動更新
@@ -62,41 +65,53 @@ class _PostListWidgetState extends State<PostListWidget> {
     switch (widget.type) {
       case PostListType.following:
         // フォロー中の投稿を取得（自分の投稿も含める）
-        final userProvider = context.read<UserProvider>();
-        final currentUser = userProvider.currentUser;
-        if (currentUser != null) {
-          // フォロー中のユーザーIDに自分のIDも追加
-          final followingIdsWithSelf = [
-            ...currentUser.followingIds,
-            currentUser.id
-          ];
-          await postProvider.getFollowingPosts(followingIdsWithSelf,
-              currentUserId: currentUser.id);
+        try {
+          final userProvider = context.read<UserProvider>();
+          final currentUser = userProvider.currentUser;
+          if (currentUser != null) {
+            // フォロー中のユーザーIDに自分のIDも追加
+            final followingIdsWithSelf = [
+              ...currentUser.followingIds,
+              currentUser.id
+            ];
+            await postProvider.getFollowingPosts(followingIdsWithSelf,
+                currentUserId: currentUser.id);
+          }
+        } catch (e) {
+          print('Error loading following posts: $e');
         }
         break;
       case PostListType.community:
         // コミュニティの投稿を取得
-        final userProvider = context.read<UserProvider>();
-        final currentUser = userProvider.currentUser;
-        if (currentUser != null) {
-          await postProvider
-              .getMultipleCommunityPosts(currentUser.communityIds);
+        try {
+          final userProvider = context.read<UserProvider>();
+          final currentUser = userProvider.currentUser;
+          if (currentUser != null) {
+            await postProvider
+                .getMultipleCommunityPosts(currentUser.communityIds);
+          }
+        } catch (e) {
+          print('Error loading community posts: $e');
         }
         break;
       case PostListType.user:
         // ユーザーの投稿を取得
-        final userProvider = context.read<UserProvider>();
-        final currentUser = userProvider.currentUser;
-        final targetUserId = widget.userId;
-        if (targetUserId != null) {
-          await postProvider.getUserPosts(targetUserId,
-              currentUserId: currentUser?.id);
-        } else {
-          // userIdが指定されていない場合は現在のユーザーの投稿を取得
-          if (currentUser != null) {
-            await postProvider.getUserPosts(currentUser.id,
-                currentUserId: currentUser.id);
+        try {
+          final userProvider = context.read<UserProvider>();
+          final currentUser = userProvider.currentUser;
+          final targetUserId = widget.userId;
+          if (targetUserId != null) {
+            await postProvider.getUserPosts(targetUserId,
+                currentUserId: currentUser?.id);
+          } else {
+            // userIdが指定されていない場合は現在のユーザーの投稿を取得
+            if (currentUser != null) {
+              await postProvider.getUserPosts(currentUser.id,
+                  currentUserId: currentUser.id);
+            }
           }
+        } catch (e) {
+          print('Error loading user posts: $e');
         }
         break;
     }
@@ -132,11 +147,8 @@ class _PostListWidgetState extends State<PostListWidget> {
 
         // 検索フィルタリング
         if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
-          posts = posts.where((post) {
-            final query = widget.searchQuery!.toLowerCase();
-            return post.title.toLowerCase().contains(query) ||
-                (post.comment?.toLowerCase().contains(query) ?? false);
-          }).toList();
+          // 検索結果を使用
+          posts = postProvider.searchResults;
         }
 
         // 検索結果のユーザー（フォロー中タブの場合のみ）
@@ -216,7 +228,6 @@ class _PostListWidgetState extends State<PostListWidget> {
 
               // 広告を表示するかチェック
               if (AdService.shouldShowAd(postIndex)) {
-                debugPrint('投稿リスト: 広告を表示します (postIndex=$postIndex)');
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -232,15 +243,15 @@ class _PostListWidgetState extends State<PostListWidget> {
                           ? 'following'
                           : 'posts',
                     ),
-                    // ネイティブ広告をより安全に表示
-                    const SizedBox(
-                      height: 78, // 広告の高さ + マージンを調整
-                      child: NativeAdWidget(),
+                    // ネイティブ広告を最適化して表示
+                    Container(
+                      height: 68, // 高さを調整
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: const NativeAdWidget(),
                     ),
                   ],
                 );
               } else {
-                debugPrint('投稿リスト: 広告を表示しません (postIndex=$postIndex)');
                 return PostCardWidget(
                   post: posts[postIndex],
                   onTap: widget.onPostTap != null

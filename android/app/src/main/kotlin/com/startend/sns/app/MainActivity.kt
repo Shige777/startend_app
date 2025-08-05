@@ -11,7 +11,7 @@ class MainActivity: FlutterActivity() {
         // ネイティブ広告ファクトリーを登録
         GoogleMobileAdsPlugin.registerNativeAdFactory(
             flutterEngine,
-            "adFactoryExample",
+            "listTile",
             NativeAdFactory(this)
         )
     }
@@ -20,6 +20,6 @@ class MainActivity: FlutterActivity() {
         super.cleanUpFlutterEngine(flutterEngine)
         
         // ネイティブ広告ファクトリーを削除
-        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "adFactoryExample")
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "listTile")
     }
 } 

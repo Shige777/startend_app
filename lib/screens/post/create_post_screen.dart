@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:provider/provider.dart';
 
@@ -40,6 +41,37 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _titleController.dispose();
     _commentController.dispose();
     super.dispose();
+  }
+
+  // 今日の投稿数を取得
+  Future<int> _getTodayPostCount() async {
+    try {
+      final userProvider = context.read<UserProvider>();
+      final currentUser = userProvider.currentUser;
+      if (currentUser == null) return 0;
+
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final firestore = FirebaseFirestore.instance;
+      final todayPostsSnapshot = await firestore
+          .collection('posts')
+          .where('userId', isEqualTo: currentUser.id)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final todayPosts = todayPostsSnapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .where((post) =>
+              post.createdAt.isAfter(startOfDay) &&
+              post.createdAt.isBefore(endOfDay))
+          .toList();
+
+      return todayPosts.length;
+    } catch (e) {
+      return 0;
+    }
   }
 
   @override
@@ -87,6 +119,51 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 今日の投稿制限表示（制限に達した時のみ表示）
+              Consumer<PostProvider>(
+                builder: (context, postProvider, child) {
+                  return FutureBuilder<int>(
+                    future: _getTodayPostCount(),
+                    builder: (context, snapshot) {
+                      final todayCount = snapshot.data ?? 0;
+                      if (todayCount >= 10) {
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.red[200]!,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.warning,
+                                color: Colors.red[600],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '今日の投稿制限に達しました（10件）',
+                                  style: TextStyle(
+                                    color: Colors.red[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  );
+                },
+              ),
+
               // 画像選択
               PlatformImagePicker(
                 height: 200,
@@ -180,17 +257,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                       ? '$hours時間${minutes > 0 ? '$minutes分' : ''}'
                                       : '${minutes}分';
 
-                                  // 2時間を超える場合は警告表示
-                                  if (duration.inMinutes > 120) {
-                                    return Text(
-                                      '⚠️ 集中時間が長すぎます（$durationText）',
-                                      style: const TextStyle(
-                                        color: Colors.orange,
-                                        fontSize: 12,
-                                      ),
-                                    );
-                                  }
-
                                   return Text(
                                     '集中時間: $durationText',
                                     style: const TextStyle(
@@ -260,12 +326,40 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.black,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+            dialogBackgroundColor: Colors.white,
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (date != null) {
       final time = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.now(),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Colors.black,
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: Colors.black,
+              ),
+              dialogBackgroundColor: Colors.white,
+            ),
+            child: child!,
+          );
+        },
       );
 
       if (time != null) {
@@ -306,24 +400,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
         return;
       }
-
-      // 最大集中時間を2時間（120分）に制限
-      const maxDurationMinutes = 120;
-      if (duration.inMinutes > maxDurationMinutes) {
-        final hours = maxDurationMinutes ~/ 60;
-        final minutes = maxDurationMinutes % 60;
-        final maxDurationText = hours > 0
-            ? '$hours時間${minutes > 0 ? '$minutes分' : ''}'
-            : '${minutes}分';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('集中時間は最大$maxDurationTextまでです'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
     }
 
     setState(() {
@@ -342,6 +418,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       String? imageUrl;
 
       if (_selectedImageBytes != null) {
+        if (kDebugMode) {
+          print('画像アップロード開始');
+          print('ユーザーID: ${userProvider.currentUser!.id}');
+          print('画像サイズ: ${_selectedImageBytes!.length} bytes');
+        }
+
         // バイトデータからアップロード（Web・モバイル共通）
         imageUrl = await StorageService.uploadPostImageFromBytes(
           bytes: _selectedImageBytes!,
@@ -349,9 +431,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           postId: DateTime.now().millisecondsSinceEpoch.toString(),
           fileName: _selectedImageFileName ?? 'image.jpg',
         );
+
+        if (kDebugMode) {
+          print('画像アップロード結果: $imageUrl');
+        }
       }
 
       if (imageUrl == null) {
+        if (kDebugMode) {
+          print('画像アップロード失敗: 画像URLがnull');
+          print('画像バイトサイズ: ${_selectedImageBytes?.length}');
+          print('ファイル名: $_selectedImageFileName');
+        }
         throw Exception('画像のアップロードに失敗しました');
       }
 
@@ -370,20 +461,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         updatedAt: DateTime.now(),
       );
 
-      if (kDebugMode) {
-        print('投稿作成開始: ${post.title}');
-        print('ユーザーID: ${post.userId}');
-        print('投稿タイプ: ${post.type}');
-        print('コミュニティID: ${post.communityIds}');
-      }
-
       final success = await postProvider.createPost(post);
 
       if (success != null) {
-        if (kDebugMode) {
-          print('投稿作成成功');
-        }
-
         // 終了予定時刻が設定されている場合は通知をスケジュール
         if (_selectedDateTime != null) {
           await NotificationService().scheduleReminderNotification(
@@ -418,22 +498,36 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           }
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('投稿を作成しました')));
+          ).showSnackBar(const SnackBar(
+            content: Text('投稿を作成しました'),
+            backgroundColor: Colors.black,
+          ));
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(postProvider.errorMessage ?? '投稿の作成に失敗しました'),
+              backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
+        if (kDebugMode) {
+          final userProvider = context.read<UserProvider>();
+          print('投稿作成画面エラー: $e');
+          print('ユーザーID: ${userProvider.currentUser?.id}');
+          print('コミュニティID: ${widget.communityId}');
+          print('画像サイズ: ${_selectedImageBytes?.length}');
+        }
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('エラーが発生しました: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text('エラーが発生しました: $e'),
+          backgroundColor: Colors.red,
+        ));
       }
     } finally {
       if (mounted) {

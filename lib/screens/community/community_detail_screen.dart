@@ -72,6 +72,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
       setState(() {
         _community = community;
+        // 作成者またはメンバーの場合は参加状態にする
         _isJoined = userProvider.currentUser?.communityIds
                 .contains(widget.communityId) ??
             false;
@@ -767,28 +768,39 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     ),
                                 ],
                               ),
-                              trailing: !isLeader && isCurrentUserLeader
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(
-                                              Icons.admin_panel_settings,
-                                              color: AppColors.primary),
-                                          onPressed: () =>
-                                              _transferLeadership(member.id),
-                                          tooltip: 'リーダーに任命',
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.remove_circle,
-                                              color: Colors.black),
-                                          onPressed: () =>
-                                              _removeMember(member.id),
-                                          tooltip: 'メンバーを削除',
-                                        ),
-                                      ],
-                                    )
-                                  : null,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // 自分自身の脱退ボタン
+                                  if (member.id == currentUser?.id)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.exit_to_app,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => _leaveCommunityFromMembers(member.id),
+                                      tooltip: '脱退',
+                                    ),
+                                  // リーダーの管理ボタン
+                                  if (!isLeader && isCurrentUserLeader)
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.admin_panel_settings,
+                                          color: AppColors.primary),
+                                      onPressed: () =>
+                                          _transferLeadership(member.id),
+                                      tooltip: 'リーダーに任命',
+                                    ),
+                                  if (!isLeader && isCurrentUserLeader)
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle,
+                                          color: Colors.black),
+                                      onPressed: () =>
+                                          _removeMember(member.id),
+                                      tooltip: 'メンバーを削除',
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -1204,6 +1216,46 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
         // 参加後に投稿を読み込み
         await _loadCommunityPosts();
+      }
+    }
+  }
+
+  // メンバー一覧から脱退するメソッド
+  Future<void> _leaveCommunityFromMembers(String memberId) async {
+    final userProvider = context.read<UserProvider>();
+    final communityProvider = context.read<CommunityProvider>();
+    final currentUser = userProvider.currentUser;
+    
+    if (currentUser == null || currentUser.id != memberId) return;
+
+    // 脱退確認ダイアログを表示
+    final confirmed = await _showLeaveCommunityDialog();
+    if (!confirmed) return;
+
+    final success = await communityProvider.leaveCommunity(
+      widget.communityId,
+      userId: currentUser.id,
+    );
+    
+    if (success) {
+      setState(() {
+        _isJoined = false;
+        _community = _community!.copyWith(
+          memberIds: _community!.memberIds
+              .where((id) => id != currentUser.id)
+              .toList(),
+        );
+      });
+
+      // UserProviderの現在のユーザー情報も更新
+      await userProvider.refreshCurrentUser();
+
+      // メンバー一覧ダイアログを閉じる
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('コミュニティから脱退しました')),
+        );
       }
     }
   }

@@ -359,7 +359,10 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
               context.go('/community/${widget.communityId}');
             }
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('END投稿を作成しました')),
+              const SnackBar(
+                content: Text('END投稿を作成しました'),
+                backgroundColor: Colors.black,
+              ),
             );
           }
         } else {
@@ -395,11 +398,11 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
       final success = await postProvider.createPost(endPost);
 
       if (success != null) {
+        // 元のSTART投稿を削除
+        await postProvider.deleteStartPost(widget.startPostId);
+
         // ユーザー情報を更新（投稿数を含む）
         await userProvider.refreshCurrentUser();
-
-        // 元のSTART投稿を完了状態に更新（この部分は削除）
-        // await postProvider.updatePostStatus(widget.startPostId, PostStatus.completed);
 
         if (mounted) {
           if (context.canPop()) {
@@ -408,7 +411,10 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
             context.go('/home');
           }
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('END投稿を作成しました')),
+            const SnackBar(
+              content: Text('END投稿を作成しました'),
+              backgroundColor: Colors.black,
+            ),
           );
         }
       } else {

@@ -2,7 +2,7 @@ name: startend_app
 description: "START/END投稿を軸とした進捗共有SNSアプリ"
 publish_to: 'none'
 
-version: 1.0.0+4
+version: 1.0.0+5
 
 environment:
   sdk: ^3.5.0
@@ -13,12 +13,12 @@ dependencies:
   cupertino_icons: ^1.0.2
   
   # Firebase - 最新バージョンに更新
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.5.0
-  firebase_storage: ^12.3.1
-  firebase_messaging: ^15.1.3
-  firebase_app_check: ^0.3.1
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
+  cloud_firestore: ^6.0.0
+  firebase_storage: ^13.0.0
+  firebase_messaging: ^16.0.0
+  firebase_app_check: ^0.4.0
   
   # State Management
   provider: ^6.1.2
@@ -30,27 +30,36 @@ dependencies:
   flutter_image_compress: ^2.3.0
   
   # Utils
-  intl: ^0.19.0
+  intl: ^0.20.2
   uuid: ^4.5.1
-  flutter_local_notifications: ^18.0.1
-  timezone: ^0.9.4
+  flutter_local_notifications: ^19.4.0
+  timezone: ^0.10.1
   path: ^1.8.3
   path_provider: ^2.1.3
   shared_preferences: ^2.3.2
+  crypto: ^3.0.3
   
-  # Authentication
-  google_sign_in: ^6.2.1
-  sign_in_with_apple: ^6.1.2
+  # オフライン対応
+  connectivity_plus: ^6.0.5
+  sqflite: ^2.3.3+1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  
+  # Authentication - 最新バージョンに更新
+  google_sign_in: ^7.1.1  # 最新バージョンに戻す
+  sign_in_with_apple: ^7.0.1
   
   # Navigation
-  go_router: ^14.6.2
-  # google_mobile_ads: ^4.0.0  # 配信後に再有効化予定
+  go_router: ^16.0.0
+  
+  # ネイティブ広告のみ - 最新バージョンに更新
+  google_mobile_ads: ^6.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
