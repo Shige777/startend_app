@@ -366,9 +366,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
         padding:
             const EdgeInsets.symmetric(horizontal: 6, vertical: 2), // パディングを小さく
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.green, width: 1),
+          border: Border.all(color: Colors.black, width: 1),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -376,13 +376,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
             Icon(
               Icons.check,
               size: 12, // 14から12に変更
-              color: Colors.green,
+              color: Colors.black,
             ),
             SizedBox(width: 3), // 4から3に変更
             Text(
               '参加済み',
               style: TextStyle(
-                color: Colors.green,
+                color: Colors.black,
                 fontSize: 10, // 11から10に変更
                 fontWeight: FontWeight.w600,
               ),

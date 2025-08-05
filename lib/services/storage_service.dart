@@ -40,8 +40,10 @@ class StorageService {
         throw Exception('ファイルが空です');
       }
 
-      // 画像を圧縮
-      final compressedFile = await _compressImage(filePath);
+      // 画像を圧縮（プロフィール画像の場合は専用の圧縮）
+      final compressedFile = folder == 'profiles' 
+          ? await _compressProfileImage(filePath)
+          : await _compressImage(filePath);
       final compressedSize = await compressedFile.length();
 
       // 圧縮後のファイルサイズをチェック
@@ -231,8 +233,8 @@ class StorageService {
         filePath,
         '${filePath}_compressed_profile.jpg',
         quality: 75, // プロフィール用により高い圧縮
-        maxWidth: profileMaxWidth,
-        maxHeight: profileMaxHeight,
+        minWidth: profileMaxWidth,
+        minHeight: profileMaxHeight,
         format: CompressFormat.jpeg,
       );
 
