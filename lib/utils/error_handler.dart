@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -10,7 +11,13 @@ class ErrorHandler {
     } else if (error is FirebaseException) {
       return _getFirebaseErrorMessage(error);
     } else if (error is Exception) {
-      return error.toString().replaceFirst('Exception: ', '');
+      // 詳細なエラー情報は開発時のみ表示
+      final errorMessage = error.toString().replaceFirst('Exception: ', '');
+      if (kDebugMode) {
+        return errorMessage;
+      } else {
+        return 'エラーが発生しました。しばらくしてからもう一度お試しください。';
+      }
     } else {
       return 'エラーが発生しました。しばらくしてからもう一度お試しください。';
     }
@@ -73,7 +80,8 @@ class ErrorHandler {
   }
 
   /// エラーダイアログを表示
-  static void showErrorDialog(BuildContext context, dynamic error, {String? title}) {
+  static void showErrorDialog(BuildContext context, dynamic error,
+      {String? title}) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -110,8 +118,8 @@ class ErrorHandler {
   /// ネットワークエラーかどうかを判定
   static bool isNetworkError(dynamic error) {
     if (error is FirebaseException) {
-      return error.code == 'network-request-failed' || 
-             error.code == 'unavailable';
+      return error.code == 'network-request-failed' ||
+          error.code == 'unavailable';
     }
     return false;
   }

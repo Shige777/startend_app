@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ削除 - StartEnd</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .contact-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .email {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .email:hover {
+            text-decoration: underline;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .data-types {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .data-types ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .data-types li {
+            margin-bottom: 8px;
+        }
+        .deletion-options {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .deletion-option {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .deletion-option h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .deletion-option p {
+            margin: 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>データ削除について</h1>
+        
+        <p>StartEndアプリをご利用いただき、ありがとうございます。特定のデータのみを削除したい場合は、以下の方法で対応いたします。</p>
+        
+        <div class="warning">
+            <strong>⚠️ 重要なお知らせ</strong><br>
+            データを削除すると、復元することはできません。アカウント全体を削除したい場合は、<a href="account-deletion.html">アカウント削除ページ</a>をご確認ください。
+        </div>
+        
+        <h2>データ削除の方法</h2>
+        <div class="deletion-options">
+            <div class="deletion-option">
+                <h3>1. アプリ内で直接削除可能</h3>
+                <p>以下のデータは、アプリ内で直接削除・変更できます：</p>
+                <ul>
+                    <li><strong>個別投稿</strong>: 投稿画面で削除ボタンをタップ</li>
+                    <li><strong>プロフィール情報</strong>: 設定画面で表示名・画像を変更</li>
+                    <li><strong>通知設定</strong>: 設定画面で通知の種類を変更</li>
+                    <li><strong>検索履歴</strong>: 検索画面で履歴をクリア</li>
+                    <li><strong>コミュニティ脱退</strong>: コミュニティ画面で脱退ボタンをタップ</li>
+                    <li><strong>フォロー解除</strong>: ユーザープロフィールでフォロー解除</li>
+                </ul>
+            </div>
+            
+            <div class="deletion-option">
+                <h3>2. メールでの削除リクエスト</h3>
+                <p>以下のデータは、メールでのリクエストが必要です：</p>
+                <ul>
+                    <li><strong>アプリ使用履歴</strong>: ログイン履歴、アクティビティログ</li>
+                    <li><strong>システムログ</strong>: エラーログ、パフォーマンスデータ</li>
+                    <li><strong>バックアップデータ</strong>: 自動生成されたバックアップ</li>
+                </ul>
+                <p><strong>メール送信先:</strong> startendofficial.app@gmail.com</p>
+                <p><strong>例:</strong> 「アプリ使用履歴を削除したい」「システムログを削除したい」など</p>
+            </div>
+            
+            <div class="deletion-option">
+                <h3>3. アカウント全体の削除</h3>
+                <p>すべてのデータを削除したい場合は、<a href="account-deletion.html">アカウント削除ページ</a>をご確認ください。</p>
+            </div>
+        </div>
+        
+        <h2>データ削除の手順</h2>
+        <ol>
+            <li><strong>アプリ内で削除可能なデータ</strong>の場合：
+                <ul>
+                    <li>該当する機能画面に移動</li>
+                    <li>削除・変更ボタンをタップ</li>
+                    <li>確認画面で「削除」を選択</li>
+                </ul>
+            </li>
+            <li><strong>メールでのリクエストが必要なデータ</strong>の場合：
+                <ul>
+                    <li>startendofficial.app@gmail.com にメール送信</li>
+                    <li>削除したいデータの種類を明記</li>
+                    <li>アカウントのメールアドレスを記載</li>
+                    <li>削除の理由（任意）を記載</li>
+                </ul>
+            </li>
+            <li>メールでのリクエストの場合、通常24時間以内に削除処理を完了いたします</li>
+            <li>削除完了後、確認メールをお送りします</li>
+        </ol>
+        
+        <h2>データ削除の保持期間</h2>
+        <p>データ削除リクエスト後、以下の期間でデータが削除されます：</p>
+        <ul>
+            <li><strong>即座に削除</strong>: 個別投稿、プロフィール情報の変更、検索履歴、通知設定</li>
+            <li><strong>24時間以内</strong>: コミュニティ脱退、フォロー解除</li>
+            <li><strong>30日以内</strong>: アプリ使用履歴、システムログ、バックアップデータ</li>
+            <li><strong>アカウントは保持</strong>: アカウント自体は削除されません</li>
+        </ul>
+        
+        <h2>お問い合わせ</h2>
+        <div class="contact-info">
+            <p>データ削除についてご質問がございましたら、以下のメールアドレスまでお気軽にお問い合わせください：</p>
+            <p><a href="mailto:startendofficial.app@gmail.com" class="email">startendofficial.app@gmail.com</a></p>
+            <p>通常、24時間以内にご返信いたします。</p>
+            <p><strong>注意:</strong> アカウント全体の削除をご希望の場合は、<a href="account-deletion.html">アカウント削除ページ</a>をご確認ください。</p>
+        </div>
+        
+        <h2>法的権利について</h2>
+        <p>お客様には、個人情報保護法に基づく以下の権利があります：</p>
+        <ul>
+            <li>個人情報の開示請求</li>
+            <li>個人情報の訂正・追加・削除請求</li>
+            <li>個人情報の利用停止・消去請求</li>
+            <li>個人情報の第三者提供停止請求</li>
+        </ul>
+        
+        <p style="text-align: center; margin-top: 40px; color: #999; font-size: 14px;">
+            © 2025 StartEnd. All rights reserved.<br>
+            開発者: StartEnd 開発チーム
+        </p>
+    </div>
+</body>
+</html> 

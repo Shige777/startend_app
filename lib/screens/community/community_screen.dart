@@ -110,7 +110,31 @@ class _CommunityScreenState extends State<CommunityScreen> {
       builder: (context, communityProvider, userProvider, child) {
         final currentUser = userProvider.currentUser;
         if (currentUser == null) {
-          return const Center(child: Text('ログインしてください'));
+          // ユーザー情報を再取得し、ローディング状態を表示
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              userProvider.refreshCurrentUser();
+            }
+          });
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                LeafLoadingWidget(
+                  size: 80,
+                  color: AppColors.primary,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'ユーザー情報を読み込み中...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         List<CommunityModel> displayCommunities;
@@ -238,18 +262,33 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
         return GestureDetector(
           onTap: () async {
+            print('CommunityScreen: Tapped community ${community.id}');
             if (isJoined) {
               // 参加済みの場合はコミュニティ画面に遷移
-              context.push('/community/${community.id}');
+              print('CommunityScreen: Navigating to community detail');
+              try {
+                await context.push('/community/${community.id}');
+                print('CommunityScreen: Navigation completed');
+              } catch (e) {
+                print('CommunityScreen: Navigation failed: $e');
+              }
             } else {
               // 未参加の場合の処理を検索状態によって分ける
               final isSearching = widget.searchQuery?.isNotEmpty ?? false;
 
               if (isSearching) {
                 // 検索結果の場合は詳細画面（参加画面）に遷移
-                context.push('/community/${community.id}');
+                print(
+                    'CommunityScreen: Navigating to community detail (search)');
+                try {
+                  await context.push('/community/${community.id}');
+                  print('CommunityScreen: Navigation completed (search)');
+                } catch (e) {
+                  print('CommunityScreen: Navigation failed (search): $e');
+                }
               } else {
                 // 所属コミュニティ表示の場合は直接参加（従来の動作）
+                print('CommunityScreen: Joining community directly');
                 await _joinCommunity(community);
               }
             }

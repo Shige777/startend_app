@@ -146,7 +146,9 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
             // コールバックを呼び出し
             widget.onImageSelected(resizedBytes, _fileName!);
           } catch (e) {
-            print('画像処理エラー: $e');
+            if (kDebugMode) {
+              print('画像処理エラー: $e');
+            }
             setState(() {
               _isLoading = false;
             });
@@ -154,7 +156,9 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
         });
       });
     } catch (e) {
-      print('画像選択エラー: $e');
+      if (kDebugMode) {
+        print('画像選択エラー: $e');
+      }
       setState(() {
         _isLoading = false;
       });
@@ -215,7 +219,9 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
 
       return reader.result as Uint8List;
     } catch (e) {
-      print('画像リサイズエラー: $e');
+      if (kDebugMode) {
+        print('画像リサイズエラー: $e');
+      }
       return imageBytes; // エラー時は元の画像を返す
     }
   }

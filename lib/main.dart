@@ -16,6 +16,7 @@ import 'providers/post_provider.dart';
 import 'providers/community_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/welcome_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/profile_settings_screen.dart';
@@ -107,80 +108,80 @@ class MyApp extends StatelessWidget {
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           return MaterialApp.router(
-        title: 'StartEnd SNS',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: AppColors.primary,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          fontFamily: 'NotoSansJP',
-          appBarTheme: const AppBarTheme(
-            backgroundColor: AppColors.surface,
-            foregroundColor: AppColors.textPrimary,
-            elevation: 0,
-            centerTitle: true,
-          ),
-          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: AppColors.surface,
-            selectedItemColor: AppColors.primary,
-            unselectedItemColor: AppColors.textSecondary,
-            type: BottomNavigationBarType.fixed,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            title: 'StartEnd SNS',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: AppColors.primary,
+                brightness: Brightness.light,
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
+              useMaterial3: true,
+              fontFamily: 'NotoSansJP',
+              appBarTheme: const AppBarTheme(
+                backgroundColor: AppColors.surface,
+                foregroundColor: AppColors.textPrimary,
+                elevation: 0,
+                centerTitle: true,
+              ),
+              bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+                backgroundColor: AppColors.surface,
+                selectedItemColor: AppColors.primary,
+                unselectedItemColor: AppColors.textSecondary,
+                type: BottomNavigationBarType.fixed,
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
             ),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-          ),
-        ),
-        routerConfig: _createRouter(authProvider),
-        builder: (context, child) {
-          return GestureDetector(
-            onPanUpdate: (details) {
-              // 右スワイプでの戻る機能
-              if (details.delta.dx > 10 &&
-                  details.delta.dx.abs() > details.delta.dy.abs()) {
-                try {
-                  final router = GoRouter.of(context);
-                  if (router.canPop()) {
-                    router.pop();
+            routerConfig: _createRouter(authProvider),
+            builder: (context, child) {
+              return GestureDetector(
+                onPanUpdate: (details) {
+                  // 右スワイプでの戻る機能
+                  if (details.delta.dx > 10 &&
+                      details.delta.dx.abs() > details.delta.dy.abs()) {
+                    try {
+                      final router = GoRouter.of(context);
+                      if (router.canPop()) {
+                        router.pop();
+                      }
+                    } catch (e) {
+                      // GoRouterが見つからない場合は何もしない
+                      if (kDebugMode) {
+                        print('GoRouter not found in context: $e');
+                      }
+                    }
                   }
-                } catch (e) {
-                  // GoRouterが見つからない場合は何もしない
-                  if (kDebugMode) {
-                    print('GoRouter not found in context: $e');
-                  }
-                }
-              }
+                },
+                child: child,
+              );
             },
-            child: child,
-          );
-        },
           );
         },
       ),
@@ -193,294 +194,328 @@ GoRouter _createRouter(AuthProvider authProvider) {
     initialLocation: '/',
     refreshListenable: authProvider, // AuthProviderの状態変化を監視
     redirect: (context, state) {
-    final authProvider = context.read<AuthProvider>();
-    final isAuthenticated = authProvider.isAuthenticated;
-    final isOnLoginScreen = state.matchedLocation == '/';
+      final isAuthenticated = authProvider.isAuthenticated;
+      final hasAgreedToTerms = authProvider.hasAgreedToTerms;
+      final isOnWelcomeScreen = state.matchedLocation == '/';
+      final isOnLoginScreen = state.matchedLocation == '/login';
 
-    // 認証済みでログイン画面にいる場合はホームへリダイレクト
-    if (isAuthenticated && isOnLoginScreen) {
-      // 認証済みユーザーのホーム画面遷移時に期限切れ投稿を自動更新
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          final postProvider = context.read<PostProvider>();
-          await postProvider.updateExpiredPosts();
-        } catch (e) {
-          // エラーハンドリング
+      print(
+          'GoRouter redirect: auth=$isAuthenticated, agreed=$hasAgreedToTerms, location=${state.matchedLocation}');
+
+      // 認証済みの場合は適切な画面へ
+      if (isAuthenticated) {
+        // ホーム画面以外の場合は、その画面を許可
+        if (state.matchedLocation == '/') {
+          print('Authenticated user - redirecting to home');
+          return '/home';
         }
-      });
-      return '/home';
-    }
+        return null;
+      }
 
-    // 未認証でログイン画面以外にいる場合はログイン画面へリダイレクト
-    if (!isAuthenticated && !isOnLoginScreen) {
-      return '/';
-    }
+      // 未認証で同意していない場合はウェルカム画面へ
+      if (!hasAgreedToTerms && !isOnWelcomeScreen) {
+        print('Not agreed to terms - redirecting to welcome');
+        return '/';
+      }
 
-    return null; // リダイレクトなし
-  },
-  routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: '/profile',
-      builder: (context, state) {
-        // 自分のプロフィールへの遷移は軌跡画面にリダイレクト
-        return Consumer<UserProvider>(
-          builder: (context, userProvider, child) {
-            final currentUser = userProvider.currentUser;
-            if (currentUser == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return ProfileScreen(
-              userId: currentUser.id,
-              isOwnProfile: true,
+      // 未認証で同意済みの場合はログイン画面へ
+      if (hasAgreedToTerms && !isOnLoginScreen && !isOnWelcomeScreen) {
+        print('Agreed but not authenticated - redirecting to login');
+        return '/login';
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/home',
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const HomeScreen(),
+          transitionDuration: const Duration(milliseconds: 1200),
+          reverseTransitionDuration: const Duration(milliseconds: 600),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            print('Home screen animation - value: ${animation.value}');
+
+            // 下から上にスライドアップするアニメーション
+            const begin = Offset(0.0, 1.0);
+            const end = Offset.zero;
+
+            var slideAnimation = animation.drive(
+              Tween(begin: begin, end: end).chain(
+                CurveTween(curve: Curves.easeOutCubic),
+              ),
+            );
+
+            return SlideTransition(
+              position: slideAnimation,
+              child: child,
             );
           },
-        );
-      },
-    ),
-    GoRoute(
-      path: '/profile/:userId',
-      builder: (context, state) {
-        final userId = state.pathParameters['userId']!;
-
-        // extraパラメータの処理
-        String? fromPage;
-        String? searchQuery;
-
-        if (state.extra != null && state.extra is Map<String, dynamic>) {
-          final extra = state.extra as Map<String, dynamic>;
-          fromPage = extra['fromPage'] as String?;
-          searchQuery = extra['searchQuery'] as String?;
-        }
-
-        return Consumer<UserProvider>(
-          builder: (context, userProvider, child) {
-            final currentUser = userProvider.currentUser;
-            final isOwnProfile = currentUser?.id == userId;
-
-            return ProfileScreen(
-              userId: userId,
-              isOwnProfile: isOwnProfile,
-              fromPage: fromPage,
-              searchQuery: searchQuery,
-            );
-          },
-        );
-      },
-    ),
-    GoRoute(
-      path: '/profile/settings',
-      builder: (context, state) => const ProfileSettingsScreen(),
-    ),
-    GoRoute(
-      path: '/community/:id',
-      builder: (context, state) {
-        final communityId = state.pathParameters['id']!;
-        return CommunityChatScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/invite/:token',
-      builder: (context, state) {
-        final token = state.pathParameters['token']!;
-        return InviteScreen(inviteToken: token);
-      },
-    ),
-    GoRoute(
-      path: '/search',
-      builder: (context, state) => const SearchScreen(),
-    ),
-    GoRoute(
-      path: '/community/create',
-      builder: (context, state) => const CreateCommunityScreen(),
-    ),
-    GoRoute(
-      path: '/notifications',
-      builder: (context, state) => const NotificationScreen(),
-    ),
-    GoRoute(
-      path: '/settings/notifications',
-      builder: (context, state) => const NotificationSettingsScreen(),
-    ),
-    GoRoute(
-      path: '/post/create',
-      builder: (context, state) {
-        final communityId = state.uri.queryParameters['communityId'];
-        return CreatePostScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/create-post',
-      builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        final communityId = extra?['communityId'] as String?;
-        return CreatePostScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/create-end-post',
-      builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        final startPostId = extra?['startPostId'] as String?;
-        final startPost = extra?['startPost'];
-
-        if (startPostId == null) {
-          return const Scaffold(
-            body: Center(child: Text('エラー: 投稿IDが見つかりません')),
+        ),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) {
+          // 自分のプロフィールへの遷移は軌跡画面にリダイレクト
+          return Consumer<UserProvider>(
+            builder: (context, userProvider, child) {
+              final currentUser = userProvider.currentUser;
+              if (currentUser == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return ProfileScreen(
+                userId: currentUser.id,
+                isOwnProfile: true,
+              );
+            },
           );
-        }
+        },
+      ),
+      GoRoute(
+        path: '/profile/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
 
-        return CreateEndPostScreen(
-          startPostId: startPostId,
-          startPost: startPost,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/post/create-end',
-      builder: (context, state) {
-        final communityId = state.uri.queryParameters['communityId'];
-        // コミュニティ内で直接END投稿を作成する場合は、ダミーのSTART投稿を作成
-        final dummyStartPost = PostModel(
-          id: 'dummy',
-          userId: 'dummy',
-          type: PostType.start,
-          title: 'コミュニティ投稿',
-          imageUrl: '',
-          privacyLevel: PrivacyLevel.public,
-          communityIds: communityId != null ? [communityId] : [],
-          likedByUserIds: [],
-          likeCount: 0,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
+          // extraパラメータの処理
+          String? fromPage;
+          String? searchQuery;
 
-        return CreateEndPostScreen(
-          startPostId: 'dummy',
-          startPost: dummyStartPost,
-          communityId: communityId, // コミュニティIDを追加
-        );
-      },
-    ),
-    GoRoute(
-      path: '/post/:id',
-      builder: (context, state) {
-        final postId = state.pathParameters['id']!;
-
-        // extraパラメータの安全な処理
-        PostModel? post;
-        String? fromCommunity;
-        String? fromPage;
-
-        if (state.extra != null) {
-          if (state.extra is Map<String, dynamic>) {
-            // Map形式の場合
+          if (state.extra != null && state.extra is Map<String, dynamic>) {
             final extra = state.extra as Map<String, dynamic>;
-            post = extra['post'] as PostModel?;
-            fromCommunity = extra['fromCommunity'] as String?;
             fromPage = extra['fromPage'] as String?;
-          } else if (state.extra is PostModel) {
-            // PostModel直接の場合（従来の互換性のため）
-            post = state.extra as PostModel;
+            searchQuery = extra['searchQuery'] as String?;
           }
-        }
 
-        return PostDetailScreen(
-          postId: postId,
-          post: post,
-          fromCommunity: fromCommunity,
-          fromPage: fromPage,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/community/:communityId/detail',
-      builder: (context, state) {
-        final communityId = state.pathParameters['communityId']!;
-        return CommunityDetailScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/community/:communityId/chat',
-      builder: (context, state) {
-        final communityId = state.pathParameters['communityId']!;
-        return CommunityChatScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/community/:communityId/progress',
-      builder: (context, state) {
-        final communityId = state.pathParameters['communityId']!;
-        return FutureBuilder<CommunityModel?>(
-          future: CommunityService().getCommunity(communityId),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+          return Consumer<UserProvider>(
+            builder: (context, userProvider, child) {
+              final currentUser = userProvider.currentUser;
+              final isOwnProfile = currentUser?.id == userId;
+
+              return ProfileScreen(
+                userId: userId,
+                isOwnProfile: isOwnProfile,
+                fromPage: fromPage,
+                searchQuery: searchQuery,
               );
-            }
-            if (snapshot.hasError || snapshot.data == null) {
-              return const Scaffold(
-                body: Center(child: Text('コミュニティが見つかりません')),
-              );
-            }
-            return CommunityProgressScreen(
-              communityId: communityId,
-              community: snapshot.data!,
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/profile/settings',
+        builder: (context, state) => const ProfileSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/community/:id',
+        builder: (context, state) {
+          final communityId = state.pathParameters['id']!;
+          return CommunityChatScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token',
+        builder: (context, state) {
+          final token = state.pathParameters['token']!;
+          return InviteScreen(inviteToken: token);
+        },
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        path: '/community/create',
+        builder: (context, state) => const CreateCommunityScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/post/create',
+        builder: (context, state) {
+          final communityId = state.uri.queryParameters['communityId'];
+          return CreatePostScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/create-post',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final communityId = extra?['communityId'] as String?;
+          return CreatePostScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/create-end-post',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final startPostId = extra?['startPostId'] as String?;
+          final startPost = extra?['startPost'];
+
+          if (startPostId == null) {
+            return const Scaffold(
+              body: Center(child: Text('エラー: 投稿IDが見つかりません')),
             );
-          },
-        );
-      },
-    ),
-    GoRoute(
-      path: '/community/:communityId/members',
-      builder: (context, state) {
-        final communityId = state.pathParameters['communityId']!;
-        return CommunityMemberManagementScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/community/:communityId/settings',
-      builder: (context, state) {
-        final communityId = state.pathParameters['communityId']!;
-        return CommunitySettingsScreen(communityId: communityId);
-      },
-    ),
-    GoRoute(
-      path: '/follow-list/:userId/:type',
-      builder: (context, state) {
-        final userId = state.pathParameters['userId']!;
-        final typeString = state.pathParameters['type']!;
+          }
 
-        final type = typeString == 'followers'
-            ? FollowListType.followers
-            : FollowListType.following;
-        final title = typeString == 'followers' ? 'フォロワー' : 'フォロー中';
+          return CreateEndPostScreen(
+            startPostId: startPostId,
+            startPost: startPost,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/post/create-end',
+        builder: (context, state) {
+          final communityId = state.uri.queryParameters['communityId'];
+          // コミュニティ内で直接END投稿を作成する場合は、ダミーのSTART投稿を作成
+          final dummyStartPost = PostModel(
+            id: 'dummy',
+            userId: 'dummy',
+            type: PostType.start,
+            title: 'コミュニティ投稿',
+            imageUrl: '',
+            privacyLevel: PrivacyLevel.public,
+            communityIds: communityId != null ? [communityId] : [],
+            likedByUserIds: [],
+            likeCount: 0,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
 
-        return FollowListScreen(
-          userId: userId,
-          title: title,
-          type: type,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/community-list/:userId',
-      builder: (context, state) {
-        final userId = state.pathParameters['userId']!;
-        return CommunityListScreen(
-          userId: userId,
-          title: 'コミュニティ',
-        );
-      },
-    ),
-  ],
+          return CreateEndPostScreen(
+            startPostId: 'dummy',
+            startPost: dummyStartPost,
+            communityId: communityId, // コミュニティIDを追加
+          );
+        },
+      ),
+      GoRoute(
+        path: '/post/:id',
+        builder: (context, state) {
+          final postId = state.pathParameters['id']!;
+
+          // extraパラメータの安全な処理
+          PostModel? post;
+          String? fromCommunity;
+          String? fromPage;
+
+          if (state.extra != null) {
+            if (state.extra is Map<String, dynamic>) {
+              // Map形式の場合
+              final extra = state.extra as Map<String, dynamic>;
+              post = extra['post'] as PostModel?;
+              fromCommunity = extra['fromCommunity'] as String?;
+              fromPage = extra['fromPage'] as String?;
+            } else if (state.extra is PostModel) {
+              // PostModel直接の場合（従来の互換性のため）
+              post = state.extra as PostModel;
+            }
+          }
+
+          return PostDetailScreen(
+            postId: postId,
+            post: post,
+            fromCommunity: fromCommunity,
+            fromPage: fromPage,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityId/detail',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId']!;
+          return CommunityDetailScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityId/chat',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId']!;
+          return CommunityChatScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityId/progress',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId']!;
+          return FutureBuilder<CommunityModel?>(
+            future: CommunityService().getCommunity(communityId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError || snapshot.data == null) {
+                return const Scaffold(
+                  body: Center(child: Text('コミュニティが見つかりません')),
+                );
+              }
+              return CommunityProgressScreen(
+                communityId: communityId,
+                community: snapshot.data!,
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityId/members',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId']!;
+          return CommunityMemberManagementScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityId/settings',
+        builder: (context, state) {
+          final communityId = state.pathParameters['communityId']!;
+          return CommunitySettingsScreen(communityId: communityId);
+        },
+      ),
+      GoRoute(
+        path: '/follow-list/:userId/:type',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final typeString = state.pathParameters['type']!;
+
+          final type = typeString == 'followers'
+              ? FollowListType.followers
+              : FollowListType.following;
+          final title = typeString == 'followers' ? 'フォロワー' : 'フォロー中';
+
+          return FollowListScreen(
+            userId: userId,
+            title: title,
+            type: type,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/community-list/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          return CommunityListScreen(
+            userId: userId,
+            title: 'コミュニティ',
+          );
+        },
+      ),
+    ],
   );
 }

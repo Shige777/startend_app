@@ -1,4 +1,4 @@
-package com.startend.sns.app
+package com.startend.app.startend_app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

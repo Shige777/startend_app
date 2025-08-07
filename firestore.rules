@@ -146,15 +146,10 @@ service cloud.firestore {
     
     function canReadPost(postData) {
       // 投稿者本人は常に読み取り可能
-      if (request.auth.uid == postData.userId) {
-        return true;
-      }
-      
-      // プライバシーレベルに応じた制御
-      let privacyLevel = postData.get('privacyLevel', 'public');
-      
-      return privacyLevel == 'public' ||
-        (privacyLevel == 'communityOnly' && 
+      return request.auth.uid == postData.userId ||
+        // プライバシーレベルに応じた制御
+        postData.get('privacyLevel', 'public') == 'public' ||
+        (postData.get('privacyLevel', 'public') == 'communityOnly' && 
          request.auth.uid in postData.get('communityIds', []));
     }
     

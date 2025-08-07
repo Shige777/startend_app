@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -94,7 +95,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               errorBuilder: (context, error, stackTrace) {
                 if (kDebugMode) {
                   print('プロフィール画像読み込みエラー: $error');
-                  print('URL: $imageUrl');
                 }
                 return const Icon(Icons.person, size: 40);
               },
@@ -107,7 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           radius: 40,
           backgroundImage: CachedNetworkImageProvider(imageUrl),
           onBackgroundImageError: (error, stackTrace) {
-            print('プロフィール画像読み込みエラー: $error');
+            if (kDebugMode) {
+              print('プロフィール画像読み込みエラー: $error');
+            }
           },
         );
       }
@@ -173,10 +175,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             setState(() {});
           }
 
-          if (kDebugMode) {
-            print('軌跡画面: 自分の投稿を読み込み開始 - ${_profileUser!.id}');
-          }
-
           // 投稿の読み込みを並行実行
           await Future.wait([
             postProvider.updateExpiredPosts(),
@@ -194,10 +192,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {});
             }
 
-            if (kDebugMode) {
-              print('他のユーザーのプロフィール: 投稿を読み込み開始 - ${_profileUser!.id}');
-            }
-
             // 投稿の読み込みを並行実行
             await Future.wait([
               postProvider.updateExpiredPosts(),
@@ -212,10 +206,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         setState(() {
           _hasLoadedPosts = true;
         });
-      }
-
-      if (kDebugMode) {
-        print('プロフィールデータの読み込み完了');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -240,9 +230,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         await userProvider.refreshCurrentUser();
         _profileUser = userProvider.currentUser;
         if (_profileUser != null) {
-          if (kDebugMode) {
-            print('軌跡画面: 自分の投稿を再読み込み開始 - ${_profileUser!.id}');
-          }
           // 期限切れ投稿を自動更新してから投稿を取得
           await postProvider.updateExpiredPosts();
           await postProvider.getUserPosts(_profileUser!.id,
@@ -258,19 +245,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               _profileUser = updatedUser;
             });
 
-            if (kDebugMode) {
-              print('他のユーザーのプロフィール: 投稿を再読み込み開始 - ${_profileUser!.id}');
-            }
             // 期限切れ投稿を自動更新してから投稿を取得
             await postProvider.updateExpiredPosts();
             await postProvider.getUserPosts(_profileUser!.id,
                 currentUserId: userProvider.currentUser?.id);
           }
         }
-      }
-
-      if (kDebugMode) {
-        print('プロフィールデータの再読み込み完了');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -729,6 +709,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _showNotificationSettings();
                     } else if (value == 'community_posts') {
                       _toggleCommunityPosts();
+                    } else if (value == 'account_management') {
+                      _showAccountManagement();
                     }
                   },
                   itemBuilder: (BuildContext context) => [
@@ -764,6 +746,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                             Icon(Icons.notifications),
                             SizedBox(width: 8),
                             Text('通知設定'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'account_management',
+                        child: Row(
+                          children: [
+                            Icon(Icons.account_circle, color: Colors.black),
+                            SizedBox(width: 8),
+                            Text('アカウント管理',
+                                style: TextStyle(color: Colors.black)),
                           ],
                         ),
                       ),
@@ -826,7 +819,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
                 PopupMenuButton<TimePeriod>(
-                  icon: const Icon(Icons.date_range),
+                  icon: const Icon(Icons.date_range, color: Colors.white),
+                  color: Colors.white,
                   onSelected: (period) {
                     setState(() {
                       _selectedPeriod = period;
@@ -842,9 +836,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ? Icons.radio_button_checked
                                       : Icons.radio_button_unchecked,
                                   size: 16,
+                                  color: Colors.black,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(_getPeriodText(period)),
+                                Text(
+                                  _getPeriodText(period),
+                                  style: const TextStyle(color: Colors.black),
+                                ),
                               ],
                             ),
                           ))
@@ -1029,7 +1027,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           width: double.infinity,
                           child: OutlinedButton(
                             onPressed: () {
-                              print('プロフィール編集ボタンがタップされました');
+                              if (kDebugMode) {
+                                print('プロフィール編集ボタンがタップされました');
+                              }
                               try {
                                 // GoRouterの代わりにNavigator.pushを使用
                                 Navigator.of(context).push(
@@ -1038,9 +1038,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         const ProfileSettingsScreen(),
                                   ),
                                 );
-                                print('プロフィール設定画面への遷移を実行しました');
+                                if (kDebugMode) {
+                                  print('プロフィール設定画面への遷移を実行しました');
+                                }
                               } catch (e) {
-                                print('プロフィール設定画面への遷移でエラー: $e');
+                                if (kDebugMode) {
+                                  print('プロフィール設定画面への遷移でエラー: $e');
+                                }
                               }
                             },
                             style: OutlinedButton.styleFrom(
@@ -1175,7 +1179,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
-                            print('プロフィール編集ボタンがタップされました');
+                            if (kDebugMode) {
+                              print('プロフィール編集ボタンがタップされました');
+                            }
                             try {
                               // GoRouterの代わりにNavigator.pushを使用
                               Navigator.of(context).push(
@@ -1184,9 +1190,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       const ProfileSettingsScreen(),
                                 ),
                               );
-                              print('プロフィール設定画面への遷移を実行しました');
+                              if (kDebugMode) {
+                                print('プロフィール設定画面への遷移を実行しました');
+                              }
                             } catch (e) {
-                              print('プロフィール設定画面への遷移でエラー: $e');
+                              if (kDebugMode) {
+                                print('プロフィール設定画面への遷移でエラー: $e');
+                              }
                             }
                           },
                           style: OutlinedButton.styleFrom(
@@ -1979,6 +1989,237 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() {
       _showCommunityPosts = !_showCommunityPosts;
     });
+  }
+
+  // アカウント管理画面を表示
+  void _showAccountManagement() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('アカウント管理'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'アカウントの管理と削除',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.red.shade200),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'アカウント削除',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'アカウントを削除すると、すべてのデータが完全に削除され、復元することはできません。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showAccountDeletionDialog();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('アカウント削除'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _openAccountDeletionPage();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.black),
+                            foregroundColor: Colors.black,
+                          ),
+                          child: const Text('詳細を確認'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // アカウント削除確認ダイアログ
+  void _showAccountDeletionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('アカウント削除の確認'),
+          content: const Text(
+            '本当にアカウントを削除しますか？\n\n'
+            'この操作は取り消すことができません。\n'
+            'すべてのデータが完全に削除されます。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAccount();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('削除する'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // アカウント削除詳細ページを開く
+  void _openAccountDeletionPage() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('アカウント削除について'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('アカウント削除の詳細については、以下のWebページをご確認ください：'),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () async {
+                    final url =
+                        'https://startend-sns-app.web.app/account-deletion.html';
+                    final uri = Uri.parse(url);
+
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      } else {
+                        // URLが開けない場合はスナックバーで表示
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('URLを開けませんでした: $url'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      // エラーが発生した場合
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('エラーが発生しました: $e'),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'https://startend-sns-app.web.app/account-deletion.html',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('または、startendofficial.app@gmail.com までお問い合わせください。'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('閉じる', style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // アカウント削除処理
+  Future<void> _deleteAccount() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userProvider = context.read<UserProvider>();
+
+      // ユーザーデータの削除
+      await userProvider.deleteUserData();
+
+      // Firebase認証からアカウントを削除
+      await authProvider.deleteAccount();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('アカウントを削除しました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // ログイン画面に遷移
+        context.go('/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('アカウント削除に失敗しました: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _toggleLike(PostModel post) async {

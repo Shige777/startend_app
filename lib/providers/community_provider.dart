@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/community_model.dart';
 
 class CommunityProvider extends ChangeNotifier {
@@ -63,8 +64,8 @@ class CommunityProvider extends ChangeNotifier {
 
       final todayCommunities = todayCommunitiesSnapshot.docs
           .map((doc) => CommunityModel.fromFirestore(doc))
-          .where((community) => 
-              community.createdAt.isAfter(startOfDay) && 
+          .where((community) =>
+              community.createdAt.isAfter(startOfDay) &&
               community.createdAt.isBefore(endOfDay))
           .toList();
 
@@ -307,7 +308,11 @@ class CommunityProvider extends ChangeNotifier {
       _setError(null);
 
       // userIdが指定されていない場合は現在のユーザーIDを使用
-      final targetUserId = userId ?? 'test_user_001'; // TODO: 実際のユーザーIDを取得
+      final targetUserId = userId ?? FirebaseAuth.instance.currentUser?.uid;
+      if (targetUserId == null) {
+        _setError('ユーザーが認証されていません');
+        return false;
+      }
 
       // コミュニティ情報を取得してメンバー数をチェック
       final community = await getCommunity(communityId);

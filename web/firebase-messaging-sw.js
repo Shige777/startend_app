@@ -21,7 +21,10 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
-  console.log('Background message received: ', payload);
+  // バックグラウンドメッセージのログは本番環境では無効化
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('Background message received: ', payload);
+  }
   
   const notificationTitle = payload.notification?.title || 'StartEnd';
   const notificationOptions = {

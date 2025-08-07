@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/community_model.dart';
 
 class CommunityService {
@@ -98,7 +99,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error joining community by invite: $e');
+      if (kDebugMode) {
+        print('Error joining community by invite: $e');
+      }
       return false;
     }
   }
@@ -139,7 +142,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error removing member: $e');
+      if (kDebugMode) {
+        print('Error removing member: $e');
+      }
       return false;
     }
   }
@@ -222,7 +227,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error leaving community: $e');
+      if (kDebugMode) {
+        print('Error leaving community: $e');
+      }
       return false;
     }
   }
@@ -250,7 +257,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error adding successor candidate: $e');
+      if (kDebugMode) {
+        print('Error adding successor candidate: $e');
+      }
       return false;
     }
   }
@@ -275,7 +284,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error removing successor candidate: $e');
+      if (kDebugMode) {
+        print('Error removing successor candidate: $e');
+      }
       return false;
     }
   }
@@ -310,7 +321,9 @@ class CommunityService {
         return true;
       }
     } catch (e) {
-      print('Error updating member profile: $e');
+      if (kDebugMode) {
+        print('Error updating member profile: $e');
+      }
     }
     return false;
   }
@@ -343,7 +356,9 @@ class CommunityService {
         return true;
       }
     } catch (e) {
-      print('Error updating online status: $e');
+      if (kDebugMode) {
+        print('Error updating online status: $e');
+      }
     }
     return false;
   }
@@ -365,7 +380,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error updating community settings: $e');
+      if (kDebugMode) {
+        print('Error updating community settings: $e');
+      }
       return false;
     }
   }
@@ -418,7 +435,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error deleting community: $e');
+      if (kDebugMode) {
+        print('Error deleting community: $e');
+      }
       return false;
     }
   }
@@ -447,7 +466,9 @@ class CommunityService {
 
       return true;
     } catch (e) {
-      print('Error updating community info: $e');
+      if (kDebugMode) {
+        print('Error updating community info: $e');
+      }
       return false;
     }
   }
@@ -461,7 +482,9 @@ class CommunityService {
         return CommunityModel.fromFirestore(doc);
       }
     } catch (e) {
-      print('Error getting community: $e');
+      if (kDebugMode) {
+        print('Error getting community: $e');
+      }
     }
     return null;
   }

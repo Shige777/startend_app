@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StartEndを始める</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.7;
+            color: #000000;
+            background: #ffffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Welcome Section */
+        .welcome {
+            padding: 100px 0 60px;
+            text-align: center;
+            background: #ffffff;
+            color: #000000;
+            position: relative;
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        
+        .welcome-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .welcome h1 {
+            font-size: 4.5em;
+            font-weight: 900;
+            margin-bottom: 30px;
+            line-height: 1.1;
+            color: #000000;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .welcome h1::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: #000000;
+            transform: scaleX(0);
+            transform-origin: left;
+            animation: line-animation 2s ease-out 1s forwards;
+        }
+        
+        @keyframes line-animation {
+            to {
+                transform: scaleX(1);
+            }
+        }
+        
+        .welcome p {
+            font-size: 1.4em;
+            margin-bottom: 40px;
+            color: #333333;
+            font-weight: 400;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 0.5s forwards;
+        }
+        
+        .start-button {
+            display: inline-block;
+            background: #000000;
+            color: #ffffff;
+            padding: 18px 40px;
+            text-decoration: none;
+            border-radius: 0;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #000000;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 0.7s forwards;
+            cursor: pointer;
+        }
+        
+        .start-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            transition: left 0.3s ease;
+            z-index: -1;
+        }
+        
+        .start-button:hover::before {
+            left: 0;
+        }
+        
+        .start-button:hover {
+            color: #000000;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Terms Links */
+        .terms-links {
+            margin-top: 40px;
+            font-size: 0.9em;
+            color: #666666;
+        }
+        
+        .terms-links a {
+            color: #000000;
+            text-decoration: underline;
+            margin: 0 10px;
+            transition: color 0.3s ease;
+        }
+        
+        .terms-links a:hover {
+            color: #333333;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            background-color: #ffffff;
+            margin: 5% auto;
+            padding: 40px;
+            border: none;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .close {
+            color: #000000;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        
+        .close:hover {
+            color: #333333;
+        }
+        
+        /* Agreement Modal */
+        .agreement-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+        
+        .agreement-content {
+            background-color: #ffffff;
+            margin: 10% auto;
+            padding: 40px;
+            border: none;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .agreement-content h2 {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #000000;
+        }
+        
+        .agreement-content p {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            color: #333333;
+            line-height: 1.6;
+        }
+        
+        .agreement-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .agree-btn, .disagree-btn {
+            padding: 15px 30px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 0;
+        }
+        
+        .agree-btn {
+            background: #000000;
+            color: #ffffff;
+            border: 2px solid #000000;
+        }
+        
+        .agree-btn:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+        
+        .disagree-btn {
+            background: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+        }
+        
+        .disagree-btn:hover {
+            background: #000000;
+            color: #ffffff;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .welcome h1 {
+                font-size: 2.5em;
+            }
+            
+            .welcome p {
+                font-size: 1.2em;
+            }
+            
+            .agreement-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .agree-btn, .disagree-btn {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Section -->
+    <section class="welcome">
+        <div class="container">
+            <div class="welcome-content">
+                <h1>StartEndを始める</h1>
+                <p>「変わる」を楽しむSNSで、あなたの成長の軌跡を記録し、仲間と共有しましょう。</p>
+                <button class="start-button" onclick="showAgreement()">StartEndを始める</button>
+                
+                <div class="terms-links">
+                    <a href="#" onclick="showTerms()">利用規約</a>
+                    <span>・</span>
+                    <a href="#" onclick="showPrivacy()">プライバシーポリシー</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('termsModal')">&times;</span>
+            <h2>利用規約</h2>
+            <div id="termsContent">
+                <!-- 利用規約の内容がここに読み込まれます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Modal -->
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('privacyModal')">&times;</span>
+            <h2>プライバシーポリシー</h2>
+            <div id="privacyContent">
+                <!-- プライバシーポリシーの内容がここに読み込まれます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Agreement Modal -->
+    <div id="agreementModal" class="agreement-modal">
+        <div class="agreement-content">
+            <h2>利用規約とプライバシーポリシーに同意しますか？</h2>
+            <p>StartEndをご利用いただくには、利用規約とプライバシーポリシーに同意していただく必要があります。</p>
+            <div class="agreement-buttons">
+                <button class="agree-btn" onclick="agreeToTerms()">同意する</button>
+                <button class="disagree-btn" onclick="disagreeToTerms()">同意しない</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // モーダルを表示する関数
+        function showModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // モーダルを閉じる関数
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        // 利用規約を表示
+        function showTerms() {
+            // 利用規約の内容を読み込む
+            fetch('terms-of-service.html')
+                .then(response => response.text())
+                .then(html => {
+                    // HTMLから本文部分を抽出
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const content = doc.querySelector('.container');
+                    document.getElementById('termsContent').innerHTML = content.innerHTML;
+                    showModal('termsModal');
+                })
+                .catch(error => {
+                    console.error('利用規約の読み込みに失敗しました:', error);
+                    document.getElementById('termsContent').innerHTML = '<p>利用規約の読み込みに失敗しました。</p>';
+                    showModal('termsModal');
+                });
+        }
+        
+        // プライバシーポリシーを表示
+        function showPrivacy() {
+            // プライバシーポリシーの内容を読み込む
+            fetch('privacy-policy.html')
+                .then(response => response.text())
+                .then(html => {
+                    // HTMLから本文部分を抽出
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const content = doc.querySelector('.container');
+                    document.getElementById('privacyContent').innerHTML = content.innerHTML;
+                    showModal('privacyModal');
+                })
+                .catch(error => {
+                    console.error('プライバシーポリシーの読み込みに失敗しました:', error);
+                    document.getElementById('privacyContent').innerHTML = '<p>プライバシーポリシーの読み込みに失敗しました。</p>';
+                    showModal('privacyModal');
+                });
+        }
+        
+        // 同意確認モーダルを表示
+        function showAgreement() {
+            showModal('agreementModal');
+        }
+        
+        // 同意する
+        function agreeToTerms() {
+            closeModal('agreementModal');
+            // ここでアカウント登録・ログイン画面に遷移
+            // 実際のアプリでは適切なURLにリダイレクト
+            alert('利用規約とプライバシーポリシーに同意しました。アカウント登録・ログイン画面に移動します。');
+            // window.location.href = '/auth'; // 実際の認証画面のURL
+        }
+        
+        // 同意しない
+        function disagreeToTerms() {
+            closeModal('agreementModal');
+            alert('利用規約とプライバシーポリシーに同意しない場合、アプリをご利用いただけません。');
+        }
+        
+        // モーダル外をクリックして閉じる
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal, .agreement-modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+        }
+        
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modals = document.querySelectorAll('.modal, .agreement-modal');
+                modals.forEach(modal => {
+                    if (modal.style.display === 'block') {
+                        modal.style.display = 'none';
+                        document.body.style.overflow = 'auto';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

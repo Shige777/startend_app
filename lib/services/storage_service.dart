@@ -109,14 +109,9 @@ class StorageService {
       }
 
       final originalSize = bytes.length;
-      print('元のファイルサイズ: ${(originalSize / 1024 / 1024).toStringAsFixed(2)}MB');
-
       // 画像を圧縮
       final compressedBytes = await _compressImageFromBytes(bytes, fileName);
       final compressedSize = compressedBytes.length;
-
-      print(
-          '画像圧縮: ${(originalSize / 1024 / 1024).toStringAsFixed(2)}MB → ${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB');
 
       // 圧縮後のファイルサイズをチェック
       if (compressedSize > maxFileSizeBytes) {
@@ -130,7 +125,6 @@ class StorageService {
 
       // より短いStorage参照を作成
       final storagePath = '$folder/$finalFileName';
-      print('Storage path: $storagePath');
 
       final ref = _storage.ref().child(storagePath);
 
@@ -139,29 +133,29 @@ class StorageService {
         contentType: 'image/jpeg',
       );
 
-      print('アップロード開始: ${compressedBytes.length}bytes');
-
       // 圧縮した画像をアップロード
       final uploadTask = ref.putData(compressedBytes, metadata);
 
       // アップロード完了を待機
       final snapshot = await uploadTask;
-      print('アップロード完了');
 
       // ダウンロードURLを取得
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      print('ダウンロードURL取得完了: ${downloadUrl.length}文字');
 
       return downloadUrl;
     } on FirebaseException catch (e) {
-      print('Firebase Storage エラー詳細:');
-      print('  Code: ${e.code}');
-      print('  Message: ${e.message}');
-      print('  Plugin: ${e.plugin}');
-      print('  StackTrace: ${e.stackTrace}');
+      if (kDebugMode) {
+        print('Firebase Storage エラー詳細:');
+        print('  Code: ${e.code}');
+        print('  Message: ${e.message}');
+        print('  Plugin: ${e.plugin}');
+        print('  StackTrace: ${e.stackTrace}');
+      }
       return _handleFirebaseStorageError(e);
     } catch (e) {
-      print('画像アップロードエラー: $e');
+      if (kDebugMode) {
+        print('画像アップロードエラー: $e');
+      }
       rethrow;
     }
   }
@@ -289,7 +283,9 @@ class StorageService {
 
       return compressedBytes;
     } catch (e) {
-      print('画像圧縮エラー: $e');
+      if (kDebugMode) {
+        print('画像圧縮エラー: $e');
+      }
       // 圧縮に失敗した場合は元のバイトデータを返す
       return bytes;
     }
@@ -297,21 +293,27 @@ class StorageService {
 
   /// Firebase Storageエラーの統一的な処理
   static String? _handleFirebaseStorageError(FirebaseException e) {
-    print('Firebase Storage Error Details:');
-    print('  Code: ${e.code}');
-    print('  Message: ${e.message}');
-    print('  Plugin: ${e.plugin}');
+    if (kDebugMode) {
+      print('Firebase Storage Error Details:');
+      print('  Code: ${e.code}');
+      print('  Message: ${e.message}');
+      print('  Plugin: ${e.plugin}');
+    }
 
     switch (e.code) {
       case 'object-not-found':
         return null;
       case 'unauthorized':
-        print('  詳細: Firebase Storage のセキュリティルールで書き込み権限が拒否されました');
-        print('  解決策: Firebase Console でセキュリティルールを確認してください');
+        if (kDebugMode) {
+          print('  詳細: Firebase Storage のセキュリティルールで書き込み権限が拒否されました');
+          print('  解決策: Firebase Console でセキュリティルールを確認してください');
+        }
         throw Exception('アップロード権限がありません。Firebase Storage の設定を確認してください。');
       case 'permission-denied':
-        print('  詳細: 権限が拒否されました');
-        print('  解決策: ユーザーが認証されているか、適切な権限があるか確認してください');
+        if (kDebugMode) {
+          print('  詳細: 権限が拒否されました');
+          print('  解決策: ユーザーが認証されているか、適切な権限があるか確認してください');
+        }
         throw Exception('アップロード権限がありません。ログイン状態を確認してください。');
       case 'canceled':
         throw Exception('アップロードがキャンセルされました');
@@ -321,10 +323,14 @@ class StorageService {
         } else if (e.message?.contains('network') == true) {
           throw Exception('ネットワークエラーが発生しました。接続を確認してください。');
         } else if (e.message?.contains('PERMISSION_DENIED') == true) {
-          print('  詳細: セキュリティルールによる権限拒否');
+          if (kDebugMode) {
+            print('  詳細: セキュリティルールによる権限拒否');
+          }
           throw Exception('アップロード権限がありません。Firebase Storage の設定を確認してください。');
         } else {
-          print('  不明なエラー: ${e.message}');
+          if (kDebugMode) {
+            print('  不明なエラー: ${e.message}');
+          }
           throw Exception('アップロードに失敗しました。しばらく待ってから再試行してください。');
         }
       case 'retry-limit-exceeded':
@@ -332,14 +338,20 @@ class StorageService {
       case 'quota-exceeded':
         throw Exception('ストレージ容量が不足しています。');
       case 'invalid-argument':
-        print('  詳細: 無効な引数が渡されました');
+        if (kDebugMode) {
+          print('  詳細: 無効な引数が渡されました');
+        }
         throw Exception('アップロード処理でエラーが発生しました。');
       case 'unauthenticated':
-        print('  詳細: ユーザーが認証されていません');
+        if (kDebugMode) {
+          print('  詳細: ユーザーが認証されていません');
+        }
         throw Exception('ログインしてからアップロードしてください。');
       default:
-        print('  未知のエラーコード: ${e.code}');
-        throw Exception('アップロードに失敗しました: ${e.message}');
+        if (kDebugMode) {
+          print('  未知のエラーコード: ${e.code}');
+        }
+        throw Exception('アップロードに失敗しました。しばらく待ってから再試行してください。');
     }
   }
 
@@ -441,7 +453,9 @@ class StorageService {
       await ref.delete();
       return true;
     } catch (e) {
-      print('画像削除エラー: $e');
+      if (kDebugMode) {
+        print('画像削除エラー: $e');
+      }
       return false;
     }
   }
@@ -470,7 +484,9 @@ class StorageService {
         folder: folder,
       );
     } catch (e) {
-      print('圧縮画像アップロードエラー: $e');
+      if (kDebugMode) {
+        print('圧縮画像アップロードエラー: $e');
+      }
       return null;
     }
   }
@@ -483,7 +499,9 @@ class StorageService {
       // ここでは簡易実装として0を返す
       return 0;
     } catch (e) {
-      print('ストレージ使用量取得エラー: $e');
+      if (kDebugMode) {
+        print('ストレージ使用量取得エラー: $e');
+      }
       return 0;
     }
   }

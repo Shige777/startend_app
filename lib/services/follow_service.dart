@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import 'notification_service.dart';
 
@@ -43,7 +44,9 @@ class FollowService {
 
       return true;
     } catch (e) {
-      print('フォローエラー: $e');
+      if (kDebugMode) {
+        print('フォローエラー: $e');
+      }
       return false;
     }
   }
@@ -73,7 +76,9 @@ class FollowService {
       await batch.commit();
       return true;
     } catch (e) {
-      print('フォロー解除エラー: $e');
+      if (kDebugMode) {
+        print('フォロー解除エラー: $e');
+      }
       return false;
     }
   }
@@ -93,7 +98,9 @@ class FollowService {
 
       return followingIds.contains(followingId);
     } catch (e) {
-      print('フォロー状態確認エラー: $e');
+      if (kDebugMode) {
+        print('フォロー状態確認エラー: $e');
+      }
       return false;
     }
   }
@@ -110,7 +117,9 @@ class FollowService {
       ]);
       return futures[0] && futures[1];
     } catch (e) {
-      print('相互フォロー確認エラー: $e');
+      if (kDebugMode) {
+        print('相互フォロー確認エラー: $e');
+      }
       return false;
     }
   }
@@ -263,7 +272,9 @@ class FollowService {
 
       return users;
     } catch (e) {
-      print('おすすめユーザー取得エラー: $e');
+      if (kDebugMode) {
+        print('おすすめユーザー取得エラー: $e');
+      }
       return [];
     }
   }
@@ -296,7 +307,9 @@ class FollowService {
 
       return true;
     } catch (e) {
-      print('フォロー申請エラー: $e');
+      if (kDebugMode) {
+        print('フォロー申請エラー: $e');
+      }
       return false;
     }
   }
@@ -354,7 +367,9 @@ class FollowService {
 
       return true;
     } catch (e) {
-      print('フォロー申請承認エラー: $e');
+      if (kDebugMode) {
+        print('フォロー申請承認エラー: $e');
+      }
       return false;
     }
   }
@@ -368,7 +383,9 @@ class FollowService {
       });
       return true;
     } catch (e) {
-      print('フォロー申請拒否エラー: $e');
+      if (kDebugMode) {
+        print('フォロー申請拒否エラー: $e');
+      }
       return false;
     }
   }
@@ -439,7 +456,9 @@ class FollowService {
 
       return users.take(limit).toList();
     } catch (e) {
-      print('ユーザー検索エラー: $e');
+      if (kDebugMode) {
+        print('ユーザー検索エラー: $e');
+      }
       return [];
     }
   }

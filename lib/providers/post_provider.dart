@@ -132,7 +132,9 @@ class PostProvider extends ChangeNotifier {
       if (createdPost.communityIds.isNotEmpty) {
         _communityPosts.insert(0, createdPost);
         if (kDebugMode) {
-          print('コミュニティ投稿リストに追加: ${createdPost.title}');
+          if (kDebugMode) {
+            print('コミュニティ投稿リストに追加: ${createdPost.title}');
+          }
         }
       }
 
@@ -270,7 +272,9 @@ class PostProvider extends ChangeNotifier {
       _setError(null);
 
       if (kDebugMode) {
-        print('コミュニティ投稿取得開始: $communityId');
+        if (kDebugMode) {
+          print('コミュニティ投稿取得開始: $communityId');
+        }
       }
 
       // インデックスが作成されるまでの一時的な回避策：orderByを削除
@@ -278,7 +282,9 @@ class PostProvider extends ChangeNotifier {
       try {
         // まずorderByありで試行（チャット形式のため昇順）
         if (kDebugMode) {
-          print('orderByありでクエリ試行中...');
+          if (kDebugMode) {
+            print('orderByありでクエリ試行中...');
+          }
         }
         querySnapshot = await _firestore
             .collection('posts')
@@ -288,11 +294,15 @@ class PostProvider extends ChangeNotifier {
             .get();
 
         if (kDebugMode) {
-          print('orderByありでクエリ成功');
+          if (kDebugMode) {
+            print('orderByありでクエリ成功');
+          }
         }
       } catch (indexError) {
         if (kDebugMode) {
-          print('インデックス不足のため、orderByなしで再試行: $indexError');
+          if (kDebugMode) {
+            print('インデックス不足のため、orderByなしで再試行: $indexError');
+          }
         }
         // インデックスエラーの場合、orderByなしで取得してクライアント側でソート
         querySnapshot = await _firestore
@@ -302,12 +312,16 @@ class PostProvider extends ChangeNotifier {
             .get();
 
         if (kDebugMode) {
-          print('orderByなしでクエリ完了');
+          if (kDebugMode) {
+            print('orderByなしでクエリ完了');
+          }
         }
       }
 
       if (kDebugMode) {
-        print('Firestore取得完了: ${querySnapshot.docs.length}件のドキュメント');
+        if (kDebugMode) {
+          print('Firestore取得完了: ${querySnapshot.docs.length}件のドキュメント');
+        }
         for (final doc in querySnapshot.docs) {
           final data = doc.data() as Map<String, dynamic>;
           print(
@@ -330,8 +344,10 @@ class PostProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('コミュニティ投稿取得完了: ${posts.length}件');
         for (final post in posts) {
-          print(
-              '- ${post.title} (communityIds: ${post.communityIds}, userId: ${post.userId})');
+          if (kDebugMode) {
+            print(
+                '- ${post.title} (communityIds: ${post.communityIds}, userId: ${post.userId})');
+          }
         }
       }
 
@@ -469,9 +485,13 @@ class PostProvider extends ChangeNotifier {
       _userPostsCacheTime[userId] = DateTime.now();
 
       if (kDebugMode) {
-        print('ユーザー投稿取得完了: ${_userPosts.length}件');
+        if (kDebugMode) {
+          print('ユーザー投稿取得完了: ${_userPosts.length}件');
+        }
         for (final post in _userPosts) {
-          print('- ${post.title} (${post.status})');
+          if (kDebugMode) {
+            print('- ${post.title} (${post.status})');
+          }
         }
       }
 
@@ -491,21 +511,31 @@ class PostProvider extends ChangeNotifier {
   // 投稿をIDで取得
   Future<PostModel?> getPostById(String postId) async {
     try {
-      print('PostProvider.getPostById called with ID: $postId');
+      if (kDebugMode) {
+        print('PostProvider.getPostById called with ID: $postId');
+      }
       _setLoading(true);
       _setError(null);
 
       final doc = await _firestore.collection('posts').doc(postId).get();
-      print('Firestore query result - exists: ${doc.exists}');
+      if (kDebugMode) {
+        print('Firestore query result - exists: ${doc.exists}');
+      }
       if (doc.exists) {
         final post = PostModel.fromFirestore(doc);
-        print('Post loaded successfully: ${post.id}');
+        if (kDebugMode) {
+          print('Post loaded successfully: ${post.id}');
+        }
         return post;
       }
-      print('Post not found in Firestore');
+      if (kDebugMode) {
+        print('Post not found in Firestore');
+      }
       return null;
     } catch (e) {
-      print('Error loading post: $e');
+      if (kDebugMode) {
+        print('Error loading post: $e');
+      }
       _setError('投稿取得に失敗しました');
       return null;
     } finally {
@@ -524,7 +554,9 @@ class PostProvider extends ChangeNotifier {
         return [];
       }
 
-      print('投稿検索開始: $query');
+      if (kDebugMode) {
+        print('投稿検索開始: $query');
+      }
 
       // シンプルな検索：最新の投稿から検索
       final querySnapshot = await _firestore
@@ -537,11 +569,15 @@ class PostProvider extends ChangeNotifier {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
-      print('取得した投稿数: ${posts.length}');
+      if (kDebugMode) {
+        print('取得した投稿数: ${posts.length}');
+      }
 
       // 部分一致でフィルタリング
       final searchQuery = query.toLowerCase();
-      print('検索クエリ: $searchQuery');
+      if (kDebugMode) {
+        print('検索クエリ: $searchQuery');
+      }
 
       final filteredPosts = posts.where((post) {
         // タイトル、コメント、ENDコメントで検索
@@ -560,25 +596,33 @@ class PostProvider extends ChangeNotifier {
         return titleMatch || commentMatch || endCommentMatch;
       }).toList();
 
-      print('フィルタリング後の投稿数: ${filteredPosts.length}');
+      if (kDebugMode) {
+        print('フィルタリング後の投稿数: ${filteredPosts.length}');
+      }
 
       // 検索結果の詳細をログ出力
       for (final post in filteredPosts.take(10)) {
-        print(
-            '検索結果例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
+        if (kDebugMode) {
+          print(
+              '検索結果例: ID=${post.id}, タイトル=${post.title}, 作成日=${post.createdAt}, タイプ=${post.type}');
+        }
       }
 
       // デバッグ用：全投稿のタイトルをログ出力
-      print('=== 全投稿のタイトル ===');
-      for (final post in posts.take(10)) {
-        print('投稿: ${post.title}');
+      if (kDebugMode) {
+        print('=== 全投稿のタイトル ===');
+        for (final post in posts.take(10)) {
+          print('投稿: ${post.title}');
+        }
+        print('=====================');
       }
-      print('=====================');
 
       _searchResults = filteredPosts; // 検索結果をキャッシュ
       return filteredPosts;
     } catch (e) {
-      print('投稿検索エラー: $e');
+      if (kDebugMode) {
+        print('投稿検索エラー: $e');
+      }
       _setError('投稿検索に失敗しました');
       return [];
     } finally {
@@ -719,6 +763,7 @@ class PostProvider extends ChangeNotifier {
   // 24時間経過した投稿のステータスを自動更新
   Future<void> updateExpiredPosts() async {
     try {
+      print('PostProvider: Starting updateExpiredPosts');
       final now = DateTime.now();
       final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
 
@@ -767,7 +812,10 @@ class PostProvider extends ChangeNotifier {
           updatePostInLists(updatedPost);
         }
       }
+
+      print('PostProvider: updateExpiredPosts completed');
     } catch (e) {
+      print('PostProvider: updateExpiredPosts error: $e');
       if (kDebugMode) {
         print('期限切れ投稿の自動更新エラー: $e');
       }

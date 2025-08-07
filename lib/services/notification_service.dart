@@ -110,7 +110,11 @@ class NotificationService {
 
   /// フォアグラウンド通知の処理
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    print('フォアグラウンド通知を受信: ${message.notification?.title}');
+    if (kDebugMode) {
+      if (kDebugMode) {
+        print('フォアグラウンド通知を受信: ${message.notification?.title}');
+      }
+    }
 
     // ローカル通知として表示
     await _showLocalNotification(message);
@@ -118,7 +122,9 @@ class NotificationService {
 
   /// バックグラウンド通知の処理
   Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-    print('バックグラウンド通知を受信: ${message.notification?.title}');
+    if (kDebugMode) {
+      print('バックグラウンド通知を受信: ${message.notification?.title}');
+    }
 
     // 通知タップ時の処理
     _navigateToScreen(message.data);
@@ -159,7 +165,9 @@ class NotificationService {
   void _onDidReceiveNotificationResponse(NotificationResponse response) {
     if (response.payload != null) {
       // TODO: 通知データに基づいて適切な画面に遷移
-      print('通知がタップされました: ${response.payload}');
+      if (kDebugMode) {
+        print('通知がタップされました: ${response.payload}');
+      }
     }
   }
 
@@ -197,7 +205,9 @@ class NotificationService {
             prefs.getBool('deadline_notifications') ?? true,
       };
     } catch (e) {
-      print('通知設定取得エラー: $e');
+      if (kDebugMode) {
+        print('通知設定取得エラー: $e');
+      }
       return {
         'push_notifications': true,
         'like_notifications': true,
@@ -223,7 +233,11 @@ class NotificationService {
       // プッシュ通知がOFFの場合は、すべての通知を無効にする
       final pushNotificationsEnabled = settings['push_notifications'] ?? true;
       if (!pushNotificationsEnabled) {
-        print('プッシュ通知がOFFのため、すべての通知を送信しません');
+        if (kDebugMode) {
+          if (kDebugMode) {
+            print('プッシュ通知がOFFのため、すべての通知を送信しません');
+          }
+        }
         return;
       }
 
@@ -250,7 +264,11 @@ class NotificationService {
 
       // 設定がOFFの場合は通知を送信しない
       if (!shouldSend) {
-        print('通知設定がOFFのため、通知を送信しません: $notificationType');
+        if (kDebugMode) {
+          if (kDebugMode) {
+            print('通知設定がOFFのため、通知を送信しません: $notificationType');
+          }
+        }
         return;
       }
 
@@ -265,7 +283,9 @@ class NotificationService {
         'read': false,
       });
     } catch (e) {
-      print('通知送信エラー: $e');
+      if (kDebugMode) {
+        print('通知送信エラー: $e');
+      }
     }
   }
 
@@ -334,7 +354,9 @@ class NotificationService {
         }
       }
     } catch (e) {
-      print('コミュニティ投稿通知送信エラー: $e');
+      if (kDebugMode) {
+        print('コミュニティ投稿通知送信エラー: $e');
+      }
     }
   }
 
@@ -391,7 +413,9 @@ class NotificationService {
     // プッシュ通知がOFFの場合は、すべての通知を無効にする
     final pushNotificationsEnabled = settings['push_notifications'] ?? true;
     if (!pushNotificationsEnabled) {
-      print('プッシュ通知がOFFのため、終了予定時刻通知をスケジュールしません');
+      if (kDebugMode) {
+        print('プッシュ通知がOFFのため、終了予定時刻通知をスケジュールしません');
+      }
       return;
     }
 
@@ -461,7 +485,9 @@ class NotificationService {
         'readAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('通知既読エラー: $e');
+      if (kDebugMode) {
+        print('通知既読エラー: $e');
+      }
     }
   }
 
@@ -487,7 +513,9 @@ class NotificationService {
 
       await batch.commit();
     } catch (e) {
-      print('全通知既読エラー: $e');
+      if (kDebugMode) {
+        print('全通知既読エラー: $e');
+      }
     }
   }
 
@@ -548,7 +576,9 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    debugPrint('集中通知をスケジュール: ${post.title} - ${notificationTime}');
+    if (kDebugMode) {
+      debugPrint('集中通知をスケジュール: ${post.title} - ${notificationTime}');
+    }
   }
 
   // 進行中投稿の24時間前通知をスケジュール
@@ -598,7 +628,9 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    debugPrint('進行中通知をスケジュール: ${post.title} - ${notificationTime}');
+    if (kDebugMode) {
+      debugPrint('進行中通知をスケジュール: ${post.title} - ${notificationTime}');
+    }
   }
 
   // 投稿の通知をキャンセル
@@ -611,7 +643,9 @@ class NotificationService {
     await _localNotifications.cancel(concentrationId);
     await _localNotifications.cancel(progressId);
 
-    debugPrint('投稿の通知をキャンセル: $postId');
+    if (kDebugMode) {
+      debugPrint('投稿の通知をキャンセル: $postId');
+    }
   }
 
   // 投稿作成時の通知スケジュール
@@ -648,5 +682,7 @@ class NotificationService {
 /// バックグラウンド通知ハンドラー
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('バックグラウンド通知を受信: ${message.notification?.title}');
+  if (kDebugMode) {
+    print('バックグラウンド通知を受信: ${message.notification?.title}');
+  }
 }

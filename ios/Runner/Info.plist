@@ -97,6 +97,8 @@
 		<string>googleplus</string>
 		<string>googlechrome</string>
 		<string>googlechromes</string>
+		<string>https</string>
+		<string>http</string>
 	</array>
 	<!-- AdMob設定 -->
 	<key>GADApplicationIdentifier</key>

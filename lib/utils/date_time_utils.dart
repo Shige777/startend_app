@@ -1,12 +1,12 @@
 import 'package:intl/intl.dart';
 
 class DateTimeUtils {
-  // 日時をフォーマットする（例: 2024年1月1日 12:00）
+  // 日時をフォーマットする（例: 2025年1月1日 12:00）
   static String formatDateTime(DateTime dateTime) {
     return DateFormat('yyyy年M月d日 HH:mm').format(dateTime);
   }
 
-  // 日付をフォーマットする（例: 2024年1月1日）
+  // 日付をフォーマットする（例: 2025年1月1日）
   static String formatDate(DateTime dateTime) {
     return DateFormat('yyyy年M月d日').format(dateTime);
   }

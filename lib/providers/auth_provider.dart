@@ -18,25 +18,67 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _suppressNotifications = false; // notifyListeners制御フラグ
+  bool _isAuthenticating = false;
+  bool _hasAgreedToTerms = false;
 
   // ▼▼▼ ゲッタープロパティを追加 ▼▼▼
   bool get isAuthenticated => _user != null; // 認証状態を返す
+
+  @override
+  void notifyListeners() {
+    if (!_suppressNotifications) {
+      super.notifyListeners();
+    } else {
+      print('AuthProvider: notifyListeners suppressed');
+    }
+  }
+
+  void suppressNotifications(bool suppress) {
+    _suppressNotifications = suppress;
+    print('AuthProvider: notifications ${suppress ? 'suppressed' : 'enabled'}');
+  }
+
   String? get currentUserId => _user?.uid; // ログイン中のユーザーIDを返す
   User? get user => _user; // ログイン中のUserオブジェクトを返す
   User? get currentUser => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isSignedIn => _user != null;
+  bool get isAuthenticating => _isAuthenticating;
+  bool get hasAgreedToTerms => _hasAgreedToTerms;
   // ▲▲▲ ここまで ▲▲▲
 
   AuthProvider() {
+    // 初期状態を確実に復元
+    _initializeAuthState();
+
+    // 認証状態の変更を監視
     _auth.authStateChanges().listen((User? user) {
+      print('AuthProvider: authStateChanges - user: ${user?.uid ?? 'null'}');
       _user = user;
       notifyListeners();
     });
 
     // GoogleSignInの初期化を開始
     _initializeGoogleSignIn();
+  }
+
+  // 初期認証状態の復元
+  Future<void> _initializeAuthState() async {
+    try {
+      // 現在のユーザーを取得
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        print('AuthProvider: Found existing user: ${currentUser.uid}');
+        _user = currentUser;
+        notifyListeners();
+      } else {
+        print('AuthProvider: No existing user found');
+      }
+    } catch (e) {
+      print('AuthProvider: Error initializing auth state: $e');
+    }
   }
 
   void _setLoading(bool loading) {
@@ -47,6 +89,41 @@ class AuthProvider extends ChangeNotifier {
   void _setError(String? error) {
     _errorMessage = error;
     notifyListeners();
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void clearErrorSilently() {
+    _errorMessage = null;
+    // 通知なしでエラーをクリア
+  }
+
+  void setAgreedToTerms(bool agreed,
+      {bool delayNotification = false, bool skipNotification = false}) {
+    print(
+        'AuthProvider: setAgreedToTerms called with: $agreed, delayNotification: $delayNotification, skipNotification: $skipNotification');
+    _hasAgreedToTerms = agreed;
+    print('AuthProvider: _hasAgreedToTerms is now: $_hasAgreedToTerms');
+
+    if (skipNotification) {
+      print('AuthProvider: skipping notifyListeners');
+      return;
+    }
+
+    if (delayNotification) {
+      print('AuthProvider: delaying notifyListeners');
+      // 次のフレームまで通知を遅延
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+        print('AuthProvider: delayed notifyListeners called');
+      });
+    } else {
+      notifyListeners();
+      print('AuthProvider: immediate notifyListeners called');
+    }
   }
 
   // GoogleSignIn 7.1.1の新しい初期化処理
@@ -83,6 +160,9 @@ class AuthProvider extends ChangeNotifier {
 
       if (_user != null) {
         await _createOrUpdateUser(_user!);
+        _setLoading(false);
+        // 認証成功時のみ状態更新を通知
+        notifyListeners();
         return true;
       } else {
         _setError('アカウント作成に失敗しました');
@@ -112,6 +192,9 @@ class AuthProvider extends ChangeNotifier {
 
       if (userCredential.user != null) {
         await _createOrUpdateUser(userCredential.user!);
+        _setLoading(false);
+        // 認証成功時のみ状態更新を通知
+        notifyListeners();
         return true;
       }
       return false;
@@ -128,6 +211,19 @@ class AuthProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
+      _isAuthenticating = true;
+      // 認証処理開始を通知（リダイレクト防止のため）
+      notifyListeners();
+      print(
+          'AuthProvider: Google sign-in started - authenticating=true, loading=true');
+
+      // 認証処理中の状態を確実に設定（複数回通知）
+      notifyListeners();
+      print('AuthProvider: Authentication state immediately re-notified');
+
+      // 認証処理中であることを確実に通知
+      notifyListeners();
+      print('AuthProvider: Authentication state triple-notified for safety');
 
       // 1. まず初期化が完了していることを確認する
       await _ensureGoogleSignInInitialized();
@@ -155,6 +251,12 @@ class AuthProvider extends ChangeNotifier {
 
       if (_user != null) {
         await _createOrUpdateUser(_user!);
+        _setLoading(false);
+        _isAuthenticating = false;
+        // 認証成功時のみ状態更新を通知
+        notifyListeners();
+        print(
+            'AuthProvider: Google sign-in completed successfully - authenticating=false, loading=false');
         return true;
       } else {
         _setError('Googleサインインに失敗しました');
@@ -168,6 +270,9 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+      _isAuthenticating = false;
+      print(
+          'AuthProvider: Google sign-in finished - authenticating=false, loading=false');
     }
   }
 
@@ -209,6 +314,20 @@ class AuthProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
+      _isAuthenticating = true;
+      // 認証処理開始を通知（リダイレクト防止のため）
+      notifyListeners();
+      print(
+          'AuthProvider: Apple sign-in started - authenticating=true, loading=true');
+
+      // 認証処理中の状態を確実に設定（複数回通知）
+      notifyListeners();
+      print('AuthProvider: Apple authentication state immediately re-notified');
+
+      // 認証処理中であることを確実に通知
+      notifyListeners();
+      print(
+          'AuthProvider: Apple authentication state triple-notified for safety');
 
       final rawNonce = _generateNonce();
       final nonce = _sha256ofString(rawNonce);
@@ -229,6 +348,10 @@ class AuthProvider extends ChangeNotifier {
       final userCredential = await _auth.signInWithCredential(oauthCredential);
       if (userCredential.user != null) {
         await _createOrUpdateUser(userCredential.user!);
+        _setLoading(false);
+        _isAuthenticating = false;
+        // 認証成功時のみ状態更新を通知
+        notifyListeners();
         return true;
       }
       return false;
@@ -237,6 +360,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+      _isAuthenticating = false;
     }
   }
 
@@ -267,6 +391,39 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // アカウント削除
+  Future<bool> deleteAccount() async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final user = _auth.currentUser;
+      if (user == null) {
+        _setError('ユーザーが見つかりません');
+        return false;
+      }
+
+      // Firebase認証からアカウントを削除
+      await user.delete();
+
+      // Google Sign-Inからもサインアウト
+      await _googleSignIn.signOut();
+
+      _user = null;
+      _setError(null);
+
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _setError(_getErrorMessage(e.code));
+      return false;
+    } catch (e) {
+      _setError(_getErrorMessage(e.toString()));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // ユーザー情報の作成・更新
   Future<void> _createOrUpdateUser(User user) async {
     try {
@@ -277,7 +434,6 @@ class AuthProvider extends ChangeNotifier {
 
       if (existingDoc.exists) {
         // 既存ユーザーの場合、名前とプロフィール画像は更新しない
-        final existingData = existingDoc.data() as Map<String, dynamic>;
         final userData = {
           'email': user.email,
           'lastSignInAt': FieldValue.serverTimestamp(),

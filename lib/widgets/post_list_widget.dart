@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../models/post_model.dart';
@@ -57,10 +58,16 @@ class _PostListWidgetState extends State<PostListWidget> {
     // contextが利用可能かチェック
     if (!mounted) return;
 
+    print('PostListWidget: Starting _loadPosts');
     final postProvider = context.read<PostProvider>();
 
-    // 期限切れ投稿を自動更新
-    await postProvider.updateExpiredPosts();
+    try {
+      // 期限切れ投稿を自動更新
+      await postProvider.updateExpiredPosts();
+      print('PostListWidget: updateExpiredPosts completed');
+    } catch (e) {
+      print('PostListWidget: updateExpiredPosts error: $e');
+    }
 
     switch (widget.type) {
       case PostListType.following:
@@ -78,7 +85,9 @@ class _PostListWidgetState extends State<PostListWidget> {
                 currentUserId: currentUser.id);
           }
         } catch (e) {
-          print('Error loading following posts: $e');
+          if (kDebugMode) {
+            print('Error loading following posts: $e');
+          }
         }
         break;
       case PostListType.community:
@@ -91,7 +100,9 @@ class _PostListWidgetState extends State<PostListWidget> {
                 .getMultipleCommunityPosts(currentUser.communityIds);
           }
         } catch (e) {
-          print('Error loading community posts: $e');
+          if (kDebugMode) {
+            print('Error loading community posts: $e');
+          }
         }
         break;
       case PostListType.user:
@@ -111,7 +122,9 @@ class _PostListWidgetState extends State<PostListWidget> {
             }
           }
         } catch (e) {
-          print('Error loading user posts: $e');
+          if (kDebugMode) {
+            print('Error loading user posts: $e');
+          }
         }
         break;
     }

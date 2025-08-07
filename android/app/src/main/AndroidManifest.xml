@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- AdMob用の権限 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- URL起動用の権限 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     
     <application
         android:label="startend_app"

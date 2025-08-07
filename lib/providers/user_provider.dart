@@ -20,17 +20,50 @@ class UserProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  @override
+  void dispose() {
+    // AuthProviderのリスナーを削除
+    _authProvider?.removeListener(_onAuthStateChanged);
+    super.dispose();
+  }
+
   void setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
+
+    // AuthProviderの状態変更を監視
+    authProvider.addListener(_onAuthStateChanged);
+
     _initializeCurrentUser();
+  }
+
+  // 認証状態の変更を監視
+  void _onAuthStateChanged() {
+    if (_authProvider?.isAuthenticated == true) {
+      // 認証された場合、ユーザー情報を初期化
+      _initializeCurrentUser();
+    } else {
+      // 未認証の場合、ユーザー情報をクリア
+      clearCurrentUser();
+    }
   }
 
   // 現在のユーザーを初期化
   Future<void> _initializeCurrentUser() async {
-    final userId = _authProvider?.currentUserId;
-    if (userId != null) {
-      // 実際のFirestoreからユーザーを取得または作成
-      await _getOrCreateUser(userId);
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final userId = _authProvider?.currentUserId;
+      if (userId != null) {
+        // 実際のFirestoreからユーザーを取得または作成
+        await _getOrCreateUser(userId);
+      } else {
+        _setError('認証情報が見つかりません');
+      }
+    } catch (e) {
+      _setError('ユーザー初期化に失敗しました: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -208,14 +241,31 @@ class UserProvider extends ChangeNotifier {
 
   // 現在のユーザー情報を再読み込み
   Future<void> refreshCurrentUser() async {
-    if (_currentUser?.id != null) {
-      final updatedUser = await getUser(_currentUser!.id);
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      // AuthProviderから現在のユーザーIDを取得
+      final userId = _authProvider?.currentUserId;
+      if (userId == null) {
+        _setError('認証情報が見つかりません');
+        return;
+      }
+
+      // ユーザー情報を取得
+      final updatedUser = await getUser(userId);
       if (updatedUser != null) {
         _currentUser = updatedUser;
         // キャッシュも更新
         _userCache[_currentUser!.id] = updatedUser;
         notifyListeners();
+      } else {
+        _setError('ユーザー情報の取得に失敗しました');
       }
+    } catch (e) {
+      _setError('ユーザー情報の更新に失敗しました: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -224,6 +274,8 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     _userCache.clear();
     _searchResults.clear();
+    _setLoading(false);
+    _setError(null);
     notifyListeners();
   }
 
@@ -540,5 +592,92 @@ class UserProvider extends ChangeNotifier {
   void setCurrentUser(UserModel user) {
     _currentUser = user;
     notifyListeners();
+  }
+
+  // ユーザーデータの削除
+  Future<bool> deleteUserData() async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      final userId = _authProvider?.currentUserId;
+      if (userId == null) {
+        _setError('ユーザーIDが取得できません');
+        return false;
+      }
+
+      // ユーザーの投稿を削除
+      final postsQuery = await _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      for (final doc in postsQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // ユーザーのコミュニティ参加情報を削除
+      final communitiesQuery = await _firestore
+          .collection('communities')
+          .where('memberIds', arrayContains: userId)
+          .get();
+
+      for (final doc in communitiesQuery.docs) {
+        final communityData = doc.data();
+        final memberIds = List<String>.from(communityData['memberIds'] ?? []);
+        memberIds.remove(userId);
+
+        await doc.reference.update({
+          'memberIds': memberIds,
+          'memberCount': memberIds.length,
+        });
+      }
+
+      // 他のユーザーのフォロー/フォロワーリストから削除
+      final allUsersQuery = await _firestore.collection('users').get();
+
+      for (final doc in allUsersQuery.docs) {
+        final userData = doc.data();
+        final followerIds = List<String>.from(userData['followerIds'] ?? []);
+        final followingIds = List<String>.from(userData['followingIds'] ?? []);
+
+        bool updated = false;
+
+        if (followerIds.contains(userId)) {
+          followerIds.remove(userId);
+          updated = true;
+        }
+
+        if (followingIds.contains(userId)) {
+          followingIds.remove(userId);
+          updated = true;
+        }
+
+        if (updated) {
+          await doc.reference.update({
+            'followerIds': followerIds,
+            'followingIds': followingIds,
+          });
+        }
+      }
+
+      // ユーザー自身のドキュメントを削除
+      await _firestore.collection('users').doc(userId).delete();
+
+      // キャッシュをクリア
+      _currentUser = null;
+      _users.clear();
+      _searchResults.clear();
+      _userCache.clear();
+
+      notifyListeners();
+
+      return true;
+    } catch (e) {
+      _setError('ユーザーデータの削除に失敗しました: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 }

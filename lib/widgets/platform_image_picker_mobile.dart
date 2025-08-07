@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 class PlatformImagePickerWidget extends StatefulWidget {
@@ -156,7 +157,9 @@ class _PlatformImagePickerWidgetState extends State<PlatformImagePickerWidget> {
         });
       }
     } catch (e) {
-      print('画像選択エラー: $e');
+      if (kDebugMode) {
+        print('画像選択エラー: $e');
+      }
       setState(() {
         _isLoading = false;
       });

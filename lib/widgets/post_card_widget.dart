@@ -146,7 +146,6 @@ class _PostCardWidgetState extends State<PostCardWidget>
             errorBuilder: (context, error, stackTrace) {
               if (kDebugMode) {
                 print('Web画像読み込みエラー: $error');
-                print('URL: $imageUrl');
               }
               return Container(
                 color: AppColors.surfaceVariant,

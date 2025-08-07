@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 enum PostType { start, end } // endは廃止予定（互換性のため残す）
 
@@ -76,7 +77,9 @@ class PostModel {
         }
         return null;
       } catch (e) {
-        print('タイムスタンプ解析エラー: $e');
+        if (kDebugMode) {
+          print('タイムスタンプ解析エラー: $e');
+        }
         return null;
       }
     }

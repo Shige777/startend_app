@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/progress_model.dart';
 import '../models/post_model.dart';
 
@@ -21,7 +22,9 @@ class ProgressService {
           .map((doc) => ActivityStats.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting community activity stats: $e');
+      if (kDebugMode) {
+        print('Error getting community activity stats: $e');
+      }
       return [];
     }
   }
@@ -121,7 +124,9 @@ class ProgressService {
 
       return rankings;
     } catch (e) {
-      print('Error getting community ranking: $e');
+      if (kDebugMode) {
+        print('Error getting community ranking: $e');
+      }
       return [];
     }
   }
@@ -203,7 +208,9 @@ class ProgressService {
 
       return summary;
     } catch (e) {
-      print('Error generating activity summary: $e');
+      if (kDebugMode) {
+        print('Error generating activity summary: $e');
+      }
       return null;
     }
   }
@@ -297,7 +304,9 @@ class ProgressService {
             .add(newStats.toFirestore());
       }
     } catch (e) {
-      print('Error updating activity stats: $e');
+      if (kDebugMode) {
+        print('Error updating activity stats: $e');
+      }
     }
   }
 
@@ -320,7 +329,9 @@ class ProgressService {
           .map((doc) => ActivitySummary.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting activity summaries: $e');
+      if (kDebugMode) {
+        print('Error getting activity summaries: $e');
+      }
       return [];
     }
   }

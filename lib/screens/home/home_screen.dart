@@ -39,34 +39,43 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
 
-    // URLパラメータからタブを設定
+    // 初期化完了後にローディング状態をfalseに設定
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final uri = GoRouterState.of(context).uri;
-      final tabParam = uri.queryParameters['tab'];
-      if (tabParam == '1') {
+      if (mounted) {
         setState(() {
-          _selectedIndex = 1; // 軌跡タブ
+          _isLoading = false;
         });
-      } else if (tabParam == 'community') {
-        setState(() {
-          _selectedIndex = 0; // 投稿画面
-        });
-        // コミュニティタブを選択
-        _tabController.index = 1;
-      } else {
-        // デフォルトまたは投稿タブ
-        setState(() {
-          _selectedIndex = 0;
-        });
-        _tabController.index = 0;
       }
     });
 
-    // 初期化完了後にローディング状態をfalseに設定
+    // URLパラメータからタブを設定（GoRouterStateエラー回避）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        try {
+          final uri = GoRouterState.of(context).uri;
+          final tabParam = uri.queryParameters['tab'];
+          if (tabParam == '1') {
+            setState(() {
+              _selectedIndex = 1; // 軌跡タブ
+            });
+          } else if (tabParam == 'community') {
+            setState(() {
+              _selectedIndex = 0; // 投稿画面
+            });
+            // コミュニティタブを選択
+            _tabController.index = 1;
+          } else {
+            // デフォルトまたは投稿タブ
+            setState(() {
+              _selectedIndex = 0;
+            });
+            _tabController.index = 0;
+          }
+        } catch (e) {
+          print('GoRouterState not available: $e');
+          // デフォルトタブを使用
+        }
+      }
     });
   }
 
@@ -113,7 +122,31 @@ class _HomeScreenState extends State<HomeScreen>
           builder: (context, userProvider, child) {
             final currentUser = userProvider.currentUser;
             if (currentUser == null) {
-              return const Center(child: CircularProgressIndicator());
+              // ユーザー情報を再取得し、ローディング状態を表示
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  userProvider.refreshCurrentUser();
+                }
+              });
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    LeafLoadingWidget(
+                      size: 80,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'ユーザー情報を読み込み中...',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
             return ProfileScreen(
               userId: currentUser.id,

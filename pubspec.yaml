@@ -2,7 +2,7 @@ name: startend_app
 description: "START/END投稿を軸とした進捗共有SNSアプリ"
 publish_to: 'none'
 
-version: 1.0.0+6
+version: 1.0.0+7
 
 environment:
   sdk: ^3.5.0
@@ -51,6 +51,9 @@ dependencies:
   
   # Navigation
   go_router: ^16.0.0
+  
+  # URL Launcher
+  url_launcher: ^6.3.2
   
   # ネイティブ広告のみ - 最新バージョンに更新
   google_mobile_ads: ^6.0.0

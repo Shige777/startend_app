@@ -1,4 +1,4 @@
-package com.startend.sns.app
+package com.startend.app.startend_app
 
 import android.content.Context
 import android.view.LayoutInflater

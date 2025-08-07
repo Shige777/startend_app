@@ -34,7 +34,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    print('ProfileSettingsScreen: initState called');
+
     // ビルド完了後にユーザーデータを読み込み
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
@@ -42,7 +42,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   void _loadUserData() {
-    print('ProfileSettingsScreen: _loadUserData called');
     final user = context.read<UserProvider>().currentUser;
     print('ProfileSettingsScreen: Loading user data - ${user?.displayName}');
     if (user != null) {
@@ -52,14 +51,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         _selectedImagePath = user.profileImageUrl;
         _isPrivate = user.isPrivate;
       });
-      print('ProfileSettingsScreen: User data loaded successfully');
-      print(
-          'ProfileSettingsScreen: Display Name: ${_displayNameController.text}');
-      print('ProfileSettingsScreen: Bio: ${_bioController.text}');
-      print('ProfileSettingsScreen: Image Path: $_selectedImagePath');
-    } else {
-      print('ProfileSettingsScreen: No user data available');
-    }
+    } else {}
   }
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
@@ -98,8 +90,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  print('プロフィール画像読み込みエラー: $error');
-                  print('URL: $_selectedImagePath');
+                  if (kDebugMode) {
+                    print('プロフィール画像読み込みエラー: $error');
+                  }
                   return const Icon(Icons.person, size: 60);
                 },
               ),
@@ -153,12 +146,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('ProfileSettingsScreen: build called');
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final user = userProvider.currentUser;
-        print(
-            'ProfileSettingsScreen: build - user is ${user != null ? 'available' : 'null'}');
 
         if (user == null) {
           return Scaffold(
@@ -326,6 +316,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                             style: TextStyle(color: Colors.white),
                           ),
                   ),
+                  const SizedBox(height: 32),
+                  // アカウント削除セクション
+                  _buildAccountDeletionSection(),
                 ],
               ),
             ),
@@ -354,6 +347,193 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           _selectedImagePath = pickedFile.path;
           _selectedImageBytes = null; // 既存のバイトデータをクリア
           _selectedImageFileName = null;
+        });
+      }
+    }
+  }
+
+  Widget _buildAccountDeletionSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        const Text(
+          'アカウント管理',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            border: Border.all(color: Colors.red.shade200),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'アカウント削除',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'アカウントを削除すると、すべてのデータが完全に削除され、復元することはできません。',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _showAccountDeletionDialog(),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: Colors.red,
+                      ),
+                      child: const Text('アカウント削除'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _openAccountDeletionPage(),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.blue),
+                        foregroundColor: Colors.blue,
+                      ),
+                      child: const Text('詳細を確認'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAccountDeletionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('アカウント削除の確認'),
+          content: const Text(
+            '本当にアカウントを削除しますか？\n\n'
+            'この操作は取り消すことができません。\n'
+            'すべてのデータが完全に削除されます。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAccount();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('削除する'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openAccountDeletionPage() {
+    // モバイル環境ではダイアログで情報を表示
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('アカウント削除について'),
+          content: const SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('アカウント削除の詳細については、以下のWebページをご確認ください：'),
+                SizedBox(height: 16),
+                Text(
+                  'https://startend-sns-app.web.app/account-deletion.html',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text('または、startendofficial.app@gmail.com までお問い合わせください。'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('閉じる'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final authProvider = context.read<auth.AuthProvider>();
+      final userProvider = context.read<UserProvider>();
+
+      // ユーザーデータの削除
+      await userProvider.deleteUserData();
+
+      // Firebase認証からアカウントを削除
+      await authProvider.deleteAccount();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('アカウントを削除しました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // ログイン画面に遷移
+        context.go('/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('アカウント削除に失敗しました: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }

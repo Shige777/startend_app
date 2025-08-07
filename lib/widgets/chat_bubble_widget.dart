@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -627,8 +628,10 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
 
     if (_isUpdating) return;
 
-    print(
-        'リアクション開始: 投稿ID=${_currentPost.id}, ユーザーID=${currentUser.id}'); // デバッグログ追加
+    if (kDebugMode) {
+      print(
+          'リアクション開始: 投稿ID=${_currentPost.id}, ユーザーID=${currentUser.id}'); // デバッグログ追加
+    }
 
     setState(() {
       _isUpdating = true;
@@ -637,7 +640,9 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
     final postProvider = context.read<PostProvider>();
     final isLiked = _currentPost.isLikedBy(currentUser.id);
 
-    print('現在のいいね状態: $isLiked, いいね数: ${_currentPost.likeCount}'); // デバッグログ追加
+    if (kDebugMode) {
+      print('現在のいいね状態: $isLiked, いいね数: ${_currentPost.likeCount}'); // デバッグログ追加
+    }
 
     // 即座にローカル状態を更新（楽観的更新）
     final newLikeCount = isLiked
@@ -650,8 +655,10 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
             .toList()
         : [..._currentPost.likedByUserIds, currentUser.id];
 
-    print(
-        '新しいいいね数: $newLikeCount, いいねユーザー数: ${newLikedByUserIds.length}'); // デバッグログ追加
+    if (kDebugMode) {
+      print(
+          '新しいいいね数: $newLikeCount, いいねユーザー数: ${newLikedByUserIds.length}'); // デバッグログ追加
+    }
 
     // ローカル状態を即座に更新
     setState(() {
@@ -664,27 +671,37 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
     try {
       bool success;
       if (isLiked) {
-        print('いいね解除を実行'); // デバッグログ追加
+        if (kDebugMode) {
+          print('いいね解除を実行'); // デバッグログ追加
+        }
         success =
             await postProvider.unlikePost(_currentPost.id, currentUser.id);
       } else {
-        print('いいね追加を実行'); // デバッグログ追加
+        if (kDebugMode) {
+          print('いいね追加を実行'); // デバッグログ追加
+        }
         success = await postProvider.likePost(_currentPost.id, currentUser.id);
       }
 
-      print('サーバー更新結果: $success'); // デバッグログ追加
+      if (kDebugMode) {
+        print('サーバー更新結果: $success'); // デバッグログ追加
+      }
 
       if (success) {
         // サーバー更新も成功した場合、PostProviderの各リストも更新
         postProvider.updatePostInLists(_currentPost);
-        print('リアクション成功'); // デバッグログ追加
+        if (kDebugMode) {
+          print('リアクション成功'); // デバッグログ追加
+        }
       } else {
         // 失敗した場合は元の状態に戻す
         setState(() {
           _currentPost = widget.post;
         });
 
-        print('リアクション失敗: ${postProvider.errorMessage}'); // デバッグログ追加
+        if (kDebugMode) {
+          print('リアクション失敗: ${postProvider.errorMessage}'); // デバッグログ追加
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(postProvider.errorMessage ?? 'エラーが発生しました')),
         );
@@ -695,7 +712,9 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
         _currentPost = widget.post;
       });
 
-      print('リアクションエラー: $e'); // デバッグログ追加
+      if (kDebugMode) {
+        print('リアクションエラー: $e'); // デバッグログ追加
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('エラーが発生しました: $e')),
       );

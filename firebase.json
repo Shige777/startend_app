@@ -39,14 +39,14 @@
     }
   },
   "firestore": {
-    "rules": "firestore_simple.rules",
+    "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
   "storage": {
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "docs",
+    "public": "web",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -56,6 +56,17 @@
       {
         "source": "**",
         "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
       }
     ]
   }

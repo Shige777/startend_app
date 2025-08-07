@@ -153,7 +153,7 @@ flutter run
 
 ## 👨‍💻 開発者
 
-**内山茂樹**
+**内山重樹**
 - GitHub: [@Shige777](https://github.com/Shige777)
 - 技術スタック: Flutter, Firebase, Dart, iOS/Android開発
 
