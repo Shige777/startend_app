@@ -30,10 +30,13 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.userId &&
         validatePostData(request.resource.data);
       
-      // 投稿の更新：投稿者本人のみ可能（END投稿も含む）
-      allow update: if request.auth != null && 
-        request.auth.uid == resource.data.userId &&
-        validatePostUpdate(resource.data, request.resource.data);
+      // 投稿の更新：投稿者本人のみ可能（END投稿も含む）、ただしいいね機能は誰でも可能
+      allow update: if request.auth != null && (
+        (request.auth.uid == resource.data.userId &&
+         validatePostUpdate(resource.data, request.resource.data)) ||
+        // いいね機能のみの更新：認証済みユーザーなら誰でも可能
+        isLikeOnlyUpdate(resource.data, request.resource.data)
+      );
       
       // 投稿の削除：投稿者本人のみ可能
       allow delete: if request.auth != null && 
@@ -213,7 +216,34 @@ service cloud.firestore {
         // 必須フィールドの存在確認
         newData.keys().hasAll(['userId', 'type', 'updatedAt']) &&
         // オプションフィールドの検証
-        validateOptionalFields(newData);
+        validateOptionalFields(newData) &&
+        // いいね関連フィールドの検証
+        validateLikeFields(newData);
+    }
+    
+    function validateLikeFields(data) {
+      return (
+        // likedByUserIds: 配列
+        (!('likedByUserIds' in data) || data.likedByUserIds is list) &&
+        // likeCount: 数値
+        (!('likeCount' in data) || data.likeCount is number) &&
+        // reactions: マップ
+        (!('reactions' in data) || data.reactions is map)
+      );
+    }
+    
+    function isLikeOnlyUpdate(oldData, newData) {
+      // いいね・リアクション関連のフィールドのみが変更されていることを確認
+      let allowedKeys = ['likedByUserIds', 'likeCount', 'reactions', 'updatedAt'];
+      let affectedKeys = newData.diff(oldData).affectedKeys();
+      
+      // 変更されたキーがいいね・リアクション関連のキーのみであることを確認
+      return affectedKeys.hasOnly(allowedKeys) &&
+             // 基本データは変更されていない
+             newData.userId == oldData.userId &&
+             newData.type == oldData.type &&
+             // いいね・リアクション関連フィールドの妥当性
+             validateLikeFields(newData);
     }
     
     function validateCommunityData(data) {

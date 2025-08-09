@@ -699,6 +699,46 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
+  // リアクション追加
+  Future<bool> addReaction(String postId, String emoji, String userId) async {
+    try {
+      _setError(null);
+
+      await _firestore.collection('posts').doc(postId).update({
+        'reactions.$emoji': FieldValue.arrayUnion([userId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('リアクション追加エラー: $e');
+      }
+      _setError('リアクションの追加に失敗しました');
+      return false;
+    }
+  }
+
+  // リアクション削除
+  Future<bool> removeReaction(String postId, String emoji, String userId) async {
+    try {
+      _setError(null);
+
+      await _firestore.collection('posts').doc(postId).update({
+        'reactions.$emoji': FieldValue.arrayRemove([userId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('リアクション削除エラー: $e');
+      }
+      _setError('リアクションの削除に失敗しました');
+      return false;
+    }
+  }
+
   // 投稿削除
   Future<bool> deletePost(String postId) async {
     try {

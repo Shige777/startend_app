@@ -34,6 +34,7 @@ class PostModel {
   final List<String> communityIds;
   final List<String> likedByUserIds;
   final int likeCount;
+  final Map<String, List<String>> reactions; // リアクション emoji -> [userId1, userId2, ...]
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -54,6 +55,7 @@ class PostModel {
     required this.communityIds,
     required this.likedByUserIds,
     required this.likeCount,
+    this.reactions = const {},
     required this.createdAt,
     required this.updatedAt,
   });
@@ -84,6 +86,23 @@ class PostModel {
       }
     }
 
+    // リアクションデータの解析
+    static Map<String, List<String>> _parseReactions(dynamic reactionsData) {
+      if (reactionsData == null) return {};
+      
+      try {
+        final Map<String, dynamic> reactionsMap = Map<String, dynamic>.from(reactionsData);
+        return reactionsMap.map((emoji, userIds) {
+          return MapEntry(emoji, List<String>.from(userIds ?? []));
+        });
+      } catch (e) {
+        if (kDebugMode) {
+          print('リアクションデータ解析エラー: $e');
+        }
+        return {};
+      }
+    }
+
     return PostModel(
       id: doc.id,
       userId: data['userId'] ?? '',
@@ -107,6 +126,7 @@ class PostModel {
       communityIds: List<String>.from(data['communityIds'] ?? []),
       likedByUserIds: List<String>.from(data['likedByUserIds'] ?? []),
       likeCount: data['likeCount'] ?? 0,
+      reactions: _parseReactions(data['reactions']),
       createdAt: parseTimestamp(data['createdAt']) ?? DateTime.now(),
       updatedAt: parseTimestamp(data['updatedAt']) ?? DateTime.now(),
     );
@@ -132,6 +152,7 @@ class PostModel {
       'communityIds': communityIds,
       'likedByUserIds': likedByUserIds,
       'likeCount': likeCount,
+      'reactions': reactions,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -154,6 +175,7 @@ class PostModel {
     List<String>? communityIds,
     List<String>? likedByUserIds,
     int? likeCount,
+    Map<String, List<String>>? reactions,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -174,6 +196,7 @@ class PostModel {
       communityIds: communityIds ?? this.communityIds,
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
       likeCount: likeCount ?? this.likeCount,
+      reactions: reactions ?? this.reactions,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -218,6 +241,25 @@ class PostModel {
 
   bool isLikedBy(String userId) {
     return likedByUserIds.contains(userId);
+  }
+
+  // リアクション関連のヘルパーメソッド
+  bool hasReaction(String emoji, String userId) {
+    return reactions[emoji]?.contains(userId) ?? false;
+  }
+
+  int getReactionCount(String emoji) {
+    return reactions[emoji]?.length ?? 0;
+  }
+
+  int getTotalReactionCount() {
+    return reactions.values.fold(0, (sum, userIds) => sum + userIds.length);
+  }
+
+  List<String> getPopularReactions({int limit = 5}) {
+    final sortedReactions = reactions.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    return sortedReactions.take(limit).map((e) => e.key).toList();
   }
 
   Duration? get remainingTime {
