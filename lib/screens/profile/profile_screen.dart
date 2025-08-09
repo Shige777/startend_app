@@ -1963,12 +1963,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                   inactiveTrackColor: Colors.grey.shade300,
                 ),
                 SwitchListTile(
-                  title: const Text('コミュニティ投稿を他のユーザーに表示'),
-                  subtitle: const Text('他のユーザーに自分のコミュニティ内での投稿を表示するかどうか'),
-                  value: currentUser.showCommunityPostsToOthers,
+                  title: const Text('他のユーザーにコミュニティ内での投稿を表示しない'),
+                  subtitle: const Text('ONにすると、他のユーザーからコミュニティ投稿が見えなくなります'),
+                  value: !currentUser.showCommunityPostsToOthers, // 値を反転
                   onChanged: (value) async {
                     final updatedUser =
-                        currentUser.copyWith(showCommunityPostsToOthers: value);
+                        currentUser.copyWith(showCommunityPostsToOthers: !value); // 値を反転して保存
                     await userProvider.updateUser(updatedUser);
                   },
                   activeColor: AppColors.primary,
