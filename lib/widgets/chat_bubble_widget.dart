@@ -9,7 +9,9 @@ import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
 import 'reaction_picker.dart';
+import 'advanced_reaction_picker.dart';
 import 'reaction_display.dart';
+import 'enhanced_reaction_display.dart';
 import '../constants/app_colors.dart';
 import '../utils/date_time_utils.dart';
 
@@ -537,14 +539,15 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // リアクション表示
-            ReactionDisplay(
-              post: _currentPost,
-              currentUserId: currentUser?.id,
-              onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
-              onAddReaction: () => _showReactionPicker(context, currentUser),
-              maxDisplayed: 4,
-            ),
+                                        // リアクション表示（強化版）
+                            EnhancedReactionDisplay(
+                              post: _currentPost,
+                              currentUserId: currentUser?.id,
+                              onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
+                              onAddReaction: () => _showReactionPicker(context, currentUser),
+                              maxDisplayed: 4,
+                              emojiSize: 18,
+                            ),
             
             const SizedBox(height: 4),
             
@@ -570,7 +573,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
       return;
     }
 
-    showReactionPicker(context, (emoji) {
+    showAdvancedReactionPicker(context, (emoji) {
       _addReaction(context, emoji, currentUser);
     });
   }

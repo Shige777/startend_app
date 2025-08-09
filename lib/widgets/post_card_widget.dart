@@ -12,7 +12,9 @@ import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
 import '../models/user_model.dart';
 import 'reaction_picker.dart';
+import 'advanced_reaction_picker.dart';
 import 'reaction_display.dart';
+import 'enhanced_reaction_display.dart';
 
 class PostCardWidget extends StatefulWidget {
   final PostModel post;
@@ -513,13 +515,14 @@ class _PostCardWidgetState extends State<PostCardWidget>
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // リアクション表示
-                            ReactionDisplay(
+                            // リアクション表示（強化版）
+                            EnhancedReactionDisplay(
                               post: widget.post,
                               currentUserId: currentUser?.id,
                               onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
                               onAddReaction: () => _showReactionPicker(context, currentUser),
                               maxDisplayed: 4,
+                              emojiSize: 20,
                             ),
                           ],
                         );
@@ -947,7 +950,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
       return;
     }
 
-    showReactionPicker(context, (emoji) {
+    showAdvancedReactionPicker(context, (emoji) {
       _addReaction(context, emoji, currentUser);
     });
   }

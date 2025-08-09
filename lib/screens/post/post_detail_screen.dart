@@ -9,7 +9,9 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../widgets/post_card_widget.dart';
 import '../../widgets/reaction_picker.dart';
+import '../../widgets/advanced_reaction_picker.dart';
 import '../../widgets/reaction_display.dart';
+import '../../widgets/enhanced_reaction_display.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -138,7 +140,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       return;
     }
 
-    showReactionPicker(context, (emoji) {
+    showAdvancedReactionPicker(context, (emoji) {
       _addReaction(emoji, currentUser);
     });
   }
@@ -149,7 +151,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
 
     try {
       final postProvider = context.read<PostProvider>();
-      final success = await postProvider.addReaction(_post!.id, emoji, currentUser.id);
+      final success =
+          await postProvider.addReaction(_post!.id, emoji, currentUser.id);
 
       if (success) {
         // ローカル状態を更新
@@ -168,7 +171,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         postProvider.updatePostInLists(_post!);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
         );
       }
     } catch (e) {
@@ -192,19 +196,21 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     try {
       final postProvider = context.read<PostProvider>();
       final hasReaction = _post!.hasReaction(emoji, currentUser.id);
-      
+
       bool success;
       if (hasReaction) {
-        success = await postProvider.removeReaction(_post!.id, emoji, currentUser.id);
+        success =
+            await postProvider.removeReaction(_post!.id, emoji, currentUser.id);
       } else {
-        success = await postProvider.addReaction(_post!.id, emoji, currentUser.id);
+        success =
+            await postProvider.addReaction(_post!.id, emoji, currentUser.id);
       }
 
       if (success) {
         // ローカル状態を更新
         setState(() {
           final newReactions = Map<String, List<String>>.from(_post!.reactions);
-          
+
           if (hasReaction) {
             // リアクション削除
             newReactions[emoji]?.remove(currentUser.id);
@@ -220,7 +226,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
               newReactions[emoji]!.add(currentUser.id);
             }
           }
-          
+
           _post = _post!.copyWith(reactions: newReactions);
         });
 
@@ -228,7 +234,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         postProvider.updatePostInLists(_post!);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
         );
       }
     } catch (e) {
@@ -490,13 +497,14 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // リアクション表示
-                          ReactionDisplay(
+                          // リアクション表示（強化版）
+                          EnhancedReactionDisplay(
                             post: _post!,
                             currentUserId: currentUser?.id,
                             onReactionTap: (emoji) => _toggleReaction(emoji, currentUser),
                             onAddReaction: () => _showReactionPicker(currentUser),
-                            maxDisplayed: 5,
+                            maxDisplayed: 6,
+                            emojiSize: 24,
                           ),
                         ],
                       );
