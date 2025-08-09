@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:flutter_emoji/flutter_emoji.dart';
 import '../constants/app_colors.dart';
 
 class AdvancedReactionPicker extends StatefulWidget {
@@ -16,7 +15,6 @@ class AdvancedReactionPicker extends StatefulWidget {
 }
 
 class _AdvancedReactionPickerState extends State<AdvancedReactionPicker> {
-  final EmojiParser emojiParser = EmojiParser();
   
   // カテゴリ別の人気絵文字
   static const Map<String, List<String>> categoryEmojis = {
@@ -270,16 +268,6 @@ class _AdvancedReactionPickerState extends State<AdvancedReactionPicker> {
                     verticalSpacing: 0,
                     horizontalSpacing: 0,
                     gridPadding: EdgeInsets.zero,
-                    initCategory: Category.RECENT,
-                    bgColor: const Color(0xFFF2F2F2),
-                    indicatorColor: AppColors.primary,
-                    iconColor: Colors.grey,
-                    iconColorSelected: AppColors.primary,
-                    backspaceColor: AppColors.primary,
-                    skinToneDialogBgColor: Colors.white,
-                    skinToneIndicatorColor: Colors.grey,
-                    enableSkinTones: true,
-                    showRecentsTab: true,
                     recentsLimit: 28,
                     replaceEmojiOnLimitExceed: false,
                     noRecents: const Text(
@@ -288,10 +276,22 @@ class _AdvancedReactionPickerState extends State<AdvancedReactionPicker> {
                       textAlign: TextAlign.center,
                     ),
                     loadingIndicator: const SizedBox.shrink(),
+                    buttonMode: ButtonMode.MATERIAL,
+                  ),
+                  skinToneConfig: const SkinToneConfig(
+                    enabled: true,
+                    dialogBackgroundColor: Colors.white,
+                    indicatorColor: Colors.grey,
+                  ),
+                  categoryViewConfig: CategoryViewConfig(
+                    initCategory: Category.RECENT,
+                    backgroundColor: const Color(0xFFF2F2F2),
+                    indicatorColor: AppColors.primary,
+                    iconColor: Colors.grey,
+                    iconColorSelected: AppColors.primary,
+                    backspaceColor: AppColors.primary,
                     tabIndicatorAnimDuration: kTabScrollDuration,
                     categoryIcons: const CategoryIcons(),
-                    buttonMode: ButtonMode.MATERIAL,
-                    checkPlatformCompatibility: true,
                   ),
                 ),
               ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_emoji/flutter_emoji.dart';
 import '../constants/app_colors.dart';
 import '../models/post_model.dart';
 

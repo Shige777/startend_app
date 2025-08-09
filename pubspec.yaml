@@ -29,7 +29,6 @@ dependencies:
   photo_view: ^0.15.0
   flutter_image_compress: ^2.3.0
   emoji_picker_flutter: ^3.0.0
-  flutter_emoji: ^2.5.1
   
   # Utils
   intl: ^0.20.2

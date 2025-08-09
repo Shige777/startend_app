@@ -8,9 +8,7 @@ import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../widgets/post_card_widget.dart';
-import '../../widgets/reaction_picker.dart';
 import '../../widgets/advanced_reaction_picker.dart';
-import '../../widgets/reaction_display.dart';
 import '../../widgets/enhanced_reaction_display.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -501,8 +499,10 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                           EnhancedReactionDisplay(
                             post: _post!,
                             currentUserId: currentUser?.id,
-                            onReactionTap: (emoji) => _toggleReaction(emoji, currentUser),
-                            onAddReaction: () => _showReactionPicker(currentUser),
+                            onReactionTap: (emoji) =>
+                                _toggleReaction(emoji, currentUser),
+                            onAddReaction: () =>
+                                _showReactionPicker(currentUser),
                             maxDisplayed: 6,
                             emojiSize: 24,
                           ),
