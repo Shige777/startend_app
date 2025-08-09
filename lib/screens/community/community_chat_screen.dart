@@ -466,6 +466,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ChatBubbleWidget(
           post: post,
           isOwnMessage: isOwnMessage,
+          showLikeButton: true, // コミュニティチャットではハートボタンを表示
           onTap: () {
             // コミュニティ投稿の詳細画面に遷移する際に、戻り先をコミュニティ画面に指定
             context.push('/post/${post.id}', extra: {

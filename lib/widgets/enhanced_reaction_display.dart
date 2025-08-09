@@ -26,13 +26,15 @@ class EnhancedReactionDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     final reactions = post.reactions;
     
-    if (reactions.isEmpty && showAddButton) {
+    // リアクション数でソート（カウントが0のものは除外）
+    final sortedReactions = reactions.entries
+        .where((entry) => entry.value.isNotEmpty) // カウント0のリアクションを除外
+        .toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+
+    if (sortedReactions.isEmpty && showAddButton) {
       return _buildAddButton(context);
     }
-
-    // リアクション数でソート
-    final sortedReactions = reactions.entries.toList()
-      ..sort((a, b) => b.value.length.compareTo(a.value.length));
 
     // 表示するリアクションを制限
     final displayedReactions = sortedReactions.take(maxDisplayed).toList();
@@ -41,12 +43,15 @@ class EnhancedReactionDisplay extends StatelessWidget {
       spacing: 6,
       runSpacing: 6,
       children: [
-        // リアクションボタン
+        // リアクションボタン（カウントが0でないもののみ）
         ...displayedReactions.map((entry) {
           final emoji = entry.key;
           final userIds = entry.value;
           final count = userIds.length;
           final isReactedByUser = currentUserId != null && userIds.contains(currentUserId);
+          
+          // カウントが0の場合は表示しない（念のため再チェック）
+          if (count == 0) return const SizedBox.shrink();
           
           return _buildReactionChip(
             context,

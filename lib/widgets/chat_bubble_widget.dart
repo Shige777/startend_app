@@ -17,6 +17,7 @@ import '../utils/date_time_utils.dart';
 class ChatBubbleWidget extends StatefulWidget {
   final PostModel post;
   final bool isOwnMessage;
+  final bool showLikeButton; // ハートボタンの表示制御
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -24,6 +25,7 @@ class ChatBubbleWidget extends StatefulWidget {
     super.key,
     required this.post,
     required this.isOwnMessage,
+    this.showLikeButton = false, // デフォルトは非表示
     this.onTap,
     this.onDelete,
   });
@@ -519,15 +521,16 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
               emojiSize: 18,
             ),
 
-            const SizedBox(height: 4),
-
-            // ハートボタン（従来のいいね機能）
-            LikeButton(
-              post: _currentPost,
-              currentUserId: currentUser?.id,
-              onTap: () => _toggleLike(context, currentUser),
-              isLoading: _isUpdating,
-            ),
+                        // ハートボタン（従来のいいね機能）- 条件付き表示
+            if (widget.showLikeButton) ...[
+              const SizedBox(height: 4),
+              LikeButton(
+                post: _currentPost,
+                currentUserId: currentUser?.id,
+                onTap: () => _toggleLike(context, currentUser),
+                isLoading: _isUpdating,
+              ),
+            ],
           ],
         );
       },

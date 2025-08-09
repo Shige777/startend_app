@@ -704,6 +704,10 @@ class PostProvider extends ChangeNotifier {
     try {
       _setError(null);
 
+      // ローカル状態を即座に更新
+      _updateLocalReaction(postId, emoji, userId, isAdding: true);
+
+      // Firestoreを更新
       await _firestore.collection('posts').doc(postId).update({
         'reactions.$emoji': FieldValue.arrayUnion([userId]),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -714,6 +718,8 @@ class PostProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('リアクション追加エラー: $e');
       }
+      // エラー時はローカル状態を元に戻す
+      _updateLocalReaction(postId, emoji, userId, isAdding: false);
       _setError('リアクションの追加に失敗しました');
       return false;
     }
@@ -724,6 +730,10 @@ class PostProvider extends ChangeNotifier {
     try {
       _setError(null);
 
+      // ローカル状態を即座に更新
+      _updateLocalReaction(postId, emoji, userId, isAdding: false);
+
+      // Firestoreを更新
       await _firestore.collection('posts').doc(postId).update({
         'reactions.$emoji': FieldValue.arrayRemove([userId]),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -734,9 +744,53 @@ class PostProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('リアクション削除エラー: $e');
       }
+      // エラー時はローカル状態を元に戻す
+      _updateLocalReaction(postId, emoji, userId, isAdding: true);
       _setError('リアクションの削除に失敗しました');
       return false;
     }
+  }
+
+  // ローカルリアクション状態の即座更新
+  void _updateLocalReaction(String postId, String emoji, String userId, {required bool isAdding}) {
+    // 各リストでpostIdを探して更新
+    void updatePostInList(List<PostModel> posts) {
+      final index = posts.indexWhere((post) => post.id == postId);
+      if (index != -1) {
+        final post = posts[index];
+        final reactions = Map<String, List<String>>.from(post.reactions);
+        
+        if (isAdding) {
+          // リアクション追加
+          reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
+          if (!reactions[emoji]!.contains(userId)) {
+            reactions[emoji]!.add(userId);
+          }
+        } else {
+          // リアクション削除
+          if (reactions.containsKey(emoji)) {
+            reactions[emoji] = List<String>.from(reactions[emoji]!);
+            reactions[emoji]!.remove(userId);
+            // リストが空になったら絵文字キーごと削除
+            if (reactions[emoji]!.isEmpty) {
+              reactions.remove(emoji);
+            }
+          }
+        }
+        
+        // 更新されたPostModelを作成
+        final updatedPost = post.copyWith(reactions: reactions);
+        posts[index] = updatedPost;
+      }
+    }
+
+    // 全てのリストを更新
+    updatePostInList(_userPosts);
+    updatePostInList(_followingPosts);
+    updatePostInList(_communityPosts);
+    
+    // UIに即座に反映
+    notifyListeners();
   }
 
   // 投稿削除
