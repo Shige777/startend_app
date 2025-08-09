@@ -87,7 +87,9 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context)!.loadPostFailed}: $e')),
+          SnackBar(
+              content:
+                  Text('${AppLocalizations.of(context)!.loadPostFailed}: $e')),
         );
       }
     } finally {
@@ -115,18 +117,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   void _syncPostWithProvider(PostProvider postProvider) {
     if (_post == null) return;
 
-    // 全てのリストから検索
-    final allPosts = [
-      ...postProvider.userPosts,
-      ...postProvider.followingPosts,
-      ...postProvider.communityPosts,
-    ];
-
-    try {
-      final updatedPost = allPosts.firstWhere(
-        (post) => post.id == _post!.id,
-      );
-
+    final updatedPost = _getCurrentPostFromProvider(postProvider);
+    if (updatedPost != null) {
       // 更新があった場合のみsetState
       if (updatedPost.reactions != _post!.reactions ||
           updatedPost.likeCount != _post!.likeCount ||
@@ -135,11 +127,30 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           _post = updatedPost;
         });
       }
+    }
+  }
+
+  // PostProviderから最新の投稿データを取得
+  PostModel? _getCurrentPostFromProvider(PostProvider postProvider) {
+    if (_post == null) return null;
+
+    // 全てのリストから検索
+    final allPosts = [
+      ...postProvider.userPosts,
+      ...postProvider.followingPosts,
+      ...postProvider.communityPosts,
+    ];
+
+    try {
+      return allPosts.firstWhere(
+        (post) => post.id == _post!.id,
+      );
     } catch (e) {
-      // 投稿が見つからない場合は現在の状態を維持
+      // 投稿が見つからない場合はnullを返す
       if (kDebugMode) {
-        print('投稿が見つかりませんでした: ${_post!.id}');
+        print('投稿がPostProviderのリストで見つかりませんでした: ${_post!.id}');
       }
+      return null;
     }
   }
 
@@ -147,23 +158,62 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   Future<void> _addReaction(String emoji, UserModel currentUser) async {
     if (_post == null) return;
 
+    // 即座にローカル状態を更新（オプティミスティック更新）
+    setState(() {
+      final reactions = Map<String, List<String>>.from(_post!.reactions);
+      reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
+      if (!reactions[emoji]!.contains(currentUser.id)) {
+        reactions[emoji]!.add(currentUser.id);
+      }
+      _post = _post!.copyWith(reactions: reactions);
+    });
+
     try {
       final postProvider = context.read<PostProvider>();
       final success =
           await postProvider.addReaction(_post!.id, emoji, currentUser.id);
 
       if (success) {
-        // PostProviderから最新の投稿データで_postを更新
+        // PostProviderから最新の投稿データで_postを更新（ダブルチェック）
         _syncPostWithProvider(postProvider);
       } else {
+        // 失敗時は元の状態に戻す（削除）
+        setState(() {
+          final reactions = Map<String, List<String>>.from(_post!.reactions);
+          if (reactions.containsKey(emoji)) {
+            reactions[emoji] = List<String>.from(reactions[emoji]!);
+            reactions[emoji]!.remove(currentUser.id);
+            if (reactions[emoji]!.isEmpty) {
+              reactions.remove(emoji);
+            }
+          }
+          _post = _post!.copyWith(reactions: reactions);
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(postProvider.errorMessage ?? AppLocalizations.of(context)!.addReactionFailed)),
+              content: Text(postProvider.errorMessage ??
+                  AppLocalizations.of(context)!.addReactionFailed)),
         );
       }
     } catch (e) {
+      // エラー時は元の状態に戻す（削除）
+      setState(() {
+        final reactions = Map<String, List<String>>.from(_post!.reactions);
+        if (reactions.containsKey(emoji)) {
+          reactions[emoji] = List<String>.from(reactions[emoji]!);
+          reactions[emoji]!.remove(currentUser.id);
+          if (reactions[emoji]!.isEmpty) {
+            reactions.remove(emoji);
+          }
+        }
+        _post = _post!.copyWith(reactions: reactions);
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
+        SnackBar(
+            content:
+                Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
     }
   }
@@ -172,7 +222,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   Future<void> _toggleReaction(String emoji, UserModel? currentUser) async {
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログインが必要です')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.loginRequired)),
       );
       return;
     }
@@ -182,6 +232,31 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     try {
       final postProvider = context.read<PostProvider>();
       final hasReaction = _post!.hasReaction(emoji, currentUser.id);
+
+      // 即座にローカル状態を更新（オプティミスティック更新）
+      setState(() {
+        final reactions = Map<String, List<String>>.from(_post!.reactions);
+        
+        if (hasReaction) {
+          // リアクション削除
+          if (reactions.containsKey(emoji)) {
+            reactions[emoji] = List<String>.from(reactions[emoji]!);
+            reactions[emoji]!.remove(currentUser.id);
+            // リストが空になったら絵文字キーごと削除
+            if (reactions[emoji]!.isEmpty) {
+              reactions.remove(emoji);
+            }
+          }
+        } else {
+          // リアクション追加
+          reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
+          if (!reactions[emoji]!.contains(currentUser.id)) {
+            reactions[emoji]!.add(currentUser.id);
+          }
+        }
+        
+        _post = _post!.copyWith(reactions: reactions);
+      });
 
       bool success;
       if (hasReaction) {
@@ -193,20 +268,71 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       }
 
       if (success) {
-        // PostProviderから最新の投稿データで_postを更新
+        // PostProviderから最新の投稿データで_postを更新（ダブルチェック）
         _syncPostWithProvider(postProvider);
-
-        // PostProviderの各リストも更新
-        postProvider.updatePostInLists(_post!);
       } else {
+        // 失敗時は元の状態に戻す
+        if (hasReaction) {
+          // リアクション削除に失敗 → 元に戻す（追加）
+          setState(() {
+            final reactions = Map<String, List<String>>.from(_post!.reactions);
+            reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
+            if (!reactions[emoji]!.contains(currentUser.id)) {
+              reactions[emoji]!.add(currentUser.id);
+            }
+            _post = _post!.copyWith(reactions: reactions);
+          });
+        } else {
+          // リアクション追加に失敗 → 元に戻す（削除）
+          setState(() {
+            final reactions = Map<String, List<String>>.from(_post!.reactions);
+            if (reactions.containsKey(emoji)) {
+              reactions[emoji] = List<String>.from(reactions[emoji]!);
+              reactions[emoji]!.remove(currentUser.id);
+              if (reactions[emoji]!.isEmpty) {
+                reactions.remove(emoji);
+              }
+            }
+            _post = _post!.copyWith(reactions: reactions);
+          });
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(postProvider.errorMessage ?? AppLocalizations.of(context)!.updateReactionFailed)),
+              content: Text(postProvider.errorMessage ??
+                  AppLocalizations.of(context)!.updateReactionFailed)),
         );
       }
     } catch (e) {
+      // エラー時も状態を元に戻す処理を追加
+      final hasReaction = _post!.hasReaction(emoji, currentUser.id);
+      setState(() {
+        final reactions = Map<String, List<String>>.from(_post!.reactions);
+        
+        if (!hasReaction) {
+          // 追加処理でエラー → 削除して元に戻す
+          if (reactions.containsKey(emoji)) {
+            reactions[emoji] = List<String>.from(reactions[emoji]!);
+            reactions[emoji]!.remove(currentUser.id);
+            if (reactions[emoji]!.isEmpty) {
+              reactions.remove(emoji);
+            }
+          }
+        } else {
+          // 削除処理でエラー → 追加して元に戻す
+          reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
+          if (!reactions[emoji]!.contains(currentUser.id)) {
+            reactions[emoji]!.add(currentUser.id);
+          }
+        }
+        
+        _post = _post!.copyWith(reactions: reactions);
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
+        SnackBar(
+            content:
+                Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
     }
   }
@@ -278,7 +404,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppLocalizations.of(context)!.deletePostFailed)),
+            SnackBar(
+                content: Text(AppLocalizations.of(context)!.deletePostFailed)),
           );
         }
       }
@@ -286,7 +413,9 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       if (mounted) {
         Navigator.of(context).pop(); // ローディング終了
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
+          SnackBar(
+              content:
+                  Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
         );
       }
     }
@@ -399,21 +528,28 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // リアクション表示（強化版）
+                          // リアクション表示（強化版）- PostProviderから最新状態を取得
                           ConstrainedBox(
                             constraints: BoxConstraints(
                               maxWidth: MediaQuery.of(context).size.width -
                                   32, // パディング考慮
                             ),
-                            child: EnhancedReactionDisplay(
-                              post: _post!,
-                              currentUserId: currentUser?.id,
-                              onReactionTap: (emoji) =>
-                                  _toggleReaction(emoji, currentUser),
-                              onAddReaction: () =>
-                                  _showReactionPicker(currentUser),
-                              maxDisplayed: 8, // 投稿詳細では多めに表示
-                              emojiSize: 22,
+                            child: Consumer<PostProvider>(
+                              builder: (context, postProvider, child) {
+                                // PostProviderから最新の投稿データを取得、なければローカル状態を使用
+                                final currentPost = _getCurrentPostFromProvider(postProvider) ?? _post!;
+                                
+                                return EnhancedReactionDisplay(
+                                  post: currentPost,
+                                  currentUserId: currentUser?.id,
+                                  onReactionTap: (emoji) =>
+                                      _toggleReaction(emoji, currentUser),
+                                  onAddReaction: () =>
+                                      _showReactionPicker(currentUser),
+                                  maxDisplayed: 8, // 投稿詳細では多めに表示
+                                  emojiSize: 22,
+                                );
+                              },
                             ),
                           ),
                         ],
