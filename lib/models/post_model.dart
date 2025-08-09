@@ -86,23 +86,6 @@ class PostModel {
       }
     }
 
-    // リアクションデータの解析
-    static Map<String, List<String>> _parseReactions(dynamic reactionsData) {
-      if (reactionsData == null) return {};
-      
-      try {
-        final Map<String, dynamic> reactionsMap = Map<String, dynamic>.from(reactionsData);
-        return reactionsMap.map((emoji, userIds) {
-          return MapEntry(emoji, List<String>.from(userIds ?? []));
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          print('リアクションデータ解析エラー: $e');
-        }
-        return {};
-      }
-    }
-
     return PostModel(
       id: doc.id,
       userId: data['userId'] ?? '',
@@ -130,6 +113,22 @@ class PostModel {
       createdAt: parseTimestamp(data['createdAt']) ?? DateTime.now(),
       updatedAt: parseTimestamp(data['updatedAt']) ?? DateTime.now(),
     );
+  }
+
+  static Map<String, List<String>> _parseReactions(dynamic reactionsData) {
+    if (reactionsData == null) return {};
+    
+    try {
+      final Map<String, dynamic> reactionsMap = Map<String, dynamic>.from(reactionsData);
+      return reactionsMap.map((emoji, userIds) {
+        return MapEntry(emoji, List<String>.from(userIds ?? []));
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('リアクションデータ解析エラー: $e');
+      }
+      return {};
+    }
   }
 
   Map<String, dynamic> toFirestore() {
