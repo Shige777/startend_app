@@ -521,7 +521,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
               emojiSize: 18,
             ),
 
-                        // ハートボタン（従来のいいね機能）- 条件付き表示
+            // ハートボタン（従来のいいね機能）- 条件付き表示
             if (widget.showLikeButton) ...[
               const SizedBox(height: 4),
               LikeButton(

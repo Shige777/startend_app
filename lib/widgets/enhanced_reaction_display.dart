@@ -2,6 +2,19 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../models/post_model.dart';
 
+// リアクション数の短縮表示用ヘルパー関数
+String _formatReactionCount(int count) {
+  if (count < 1000) {
+    return count.toString();
+  } else if (count < 1000000) {
+    final k = count / 1000;
+    return k >= 100 ? '${k.round()}K' : '${k.toStringAsFixed(1).replaceAll('.0', '')}K';
+  } else {
+    final m = count / 1000000;
+    return m >= 100 ? '${m.round()}M' : '${m.toStringAsFixed(1).replaceAll('.0', '')}M';
+  }
+}
+
 class EnhancedReactionDisplay extends StatelessWidget {
   final PostModel post;
   final String? currentUserId;
@@ -39,36 +52,44 @@ class EnhancedReactionDisplay extends StatelessWidget {
     // 表示するリアクションを制限
     final displayedReactions = sortedReactions.take(maxDisplayed).toList();
     
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        // リアクションボタン（カウントが0でないもののみ）
-        ...displayedReactions.map((entry) {
-          final emoji = entry.key;
-          final userIds = entry.value;
-          final count = userIds.length;
-          final isReactedByUser = currentUserId != null && userIds.contains(currentUserId);
-          
-          // カウントが0の場合は表示しない（念のため再チェック）
-          if (count == 0) return const SizedBox.shrink();
-          
-          return _buildReactionChip(
-            context,
-            emoji,
-            count,
-            isReactedByUser,
-            () => onReactionTap(emoji),
-          );
-        }),
-        
-        // 追加のリアクションがある場合の表示
-        if (sortedReactions.length > maxDisplayed)
-          _buildMoreIndicator(context, sortedReactions.length - maxDisplayed),
-        
-        // 追加ボタン
-        if (showAddButton) _buildAddButton(context),
-      ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 200), // 最大高さ制限
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: IntrinsicHeight(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              // リアクションボタン（カウントが0でないもののみ）
+              ...displayedReactions.map((entry) {
+                final emoji = entry.key;
+                final userIds = entry.value;
+                final count = userIds.length;
+                final isReactedByUser = currentUserId != null && userIds.contains(currentUserId);
+                
+                // カウントが0の場合は表示しない（念のため再チェック）
+                if (count == 0) return const SizedBox.shrink();
+                
+                return _buildReactionChip(
+                  context,
+                  emoji,
+                  count,
+                  isReactedByUser,
+                  () => onReactionTap(emoji),
+                );
+              }),
+              
+              // 追加のリアクションがある場合の表示
+              if (sortedReactions.length > maxDisplayed)
+                _buildMoreIndicator(context, sortedReactions.length - maxDisplayed),
+              
+              // 追加ボタン
+              if (showAddButton) _buildAddButton(context),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -83,6 +104,10 @@ class EnhancedReactionDisplay extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+        constraints: const BoxConstraints(
+          minWidth: 50,
+          maxWidth: 120, // 最大幅制限
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
@@ -116,22 +141,26 @@ class EnhancedReactionDisplay extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             // カウントのスタイリング強化
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary.withOpacity(0.1)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
                   color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+                      ? AppColors.primary.withOpacity(0.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _formatReactionCount(count), // 短縮表示を使用
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis, // テキスト溢れ対策
+                  maxLines: 1,
                 ),
               ),
             ),
@@ -161,7 +190,7 @@ class EnhancedReactionDisplay extends StatelessWidget {
           ),
           const SizedBox(width: 3),
           Text(
-            '+$hiddenCount',
+            '+${_formatReactionCount(hiddenCount)}',
             style: TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,

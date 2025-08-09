@@ -2,6 +2,19 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../models/post_model.dart';
 
+// リアクション数の短縮表示用ヘルパー関数
+String _formatReactionCount(int count) {
+  if (count < 1000) {
+    return count.toString();
+  } else if (count < 1000000) {
+    final k = count / 1000;
+    return k >= 100 ? '${k.round()}K' : '${k.toStringAsFixed(1).replaceAll('.0', '')}K';
+  } else {
+    final m = count / 1000000;
+    return m >= 100 ? '${m.round()}M' : '${m.toStringAsFixed(1).replaceAll('.0', '')}M';
+  }
+}
+
 class ReactionDisplay extends StatelessWidget {
   final PostModel post;
   final String? currentUserId;
@@ -33,10 +46,15 @@ class ReactionDisplay extends StatelessWidget {
     // 表示するリアクションを制限
     final displayedReactions = sortedReactions.take(maxDisplayed).toList();
     
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 150), // 最大高さ制限
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: IntrinsicHeight(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
         // リアクションボタン
         ...displayedReactions.map((entry) {
           final emoji = entry.key;
@@ -59,7 +77,10 @@ class ReactionDisplay extends StatelessWidget {
         
         // 追加ボタン
         _buildAddButton(context),
-      ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -96,7 +117,7 @@ class ReactionDisplay extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              count.toString(),
+              _formatReactionCount(count), // 短縮表示を使用
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
