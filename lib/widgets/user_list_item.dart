@@ -22,6 +22,7 @@ class UserListItem extends StatefulWidget {
 class _UserListItemState extends State<UserListItem> {
   bool _isFollowing = false;
   bool _isLoading = false;
+  bool _hasRequestSent = false;
 
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
@@ -83,9 +84,20 @@ class _UserListItemState extends State<UserListItem> {
         followerId: currentUser.id,
         followingId: widget.user.id,
       );
+
+      // プライベートアカウントの場合、リクエスト送信済みかもチェック
+      bool hasRequestSent = false;
+      if (widget.user.isPrivate && !isFollowing) {
+        hasRequestSent = await FollowService.hasFollowRequestSent(
+          requesterId: currentUser.id,
+          targetUserId: widget.user.id,
+        );
+      }
+
       if (mounted) {
         setState(() {
           _isFollowing = isFollowing;
+          _hasRequestSent = hasRequestSent;
         });
       }
     }
@@ -131,6 +143,9 @@ class _UserListItemState extends State<UserListItem> {
             requesterName: currentUser.displayName,
           );
           if (success) {
+            setState(() {
+              _hasRequestSent = true;
+            });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('フォローリクエストを送信しました')),
             );
@@ -263,14 +278,18 @@ class _UserListItemState extends State<UserListItem> {
                         ),
                       )
                     : ElevatedButton(
-                        onPressed: _toggleFollow,
+                        onPressed: _hasRequestSent ? null : _toggleFollow,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _isFollowing
                               ? AppColors.surfaceVariant
-                              : AppColors.primary,
+                              : _hasRequestSent
+                                  ? AppColors.surfaceVariant
+                                  : AppColors.primary,
                           foregroundColor: _isFollowing
                               ? AppColors.textPrimary
-                              : AppColors.textOnPrimary,
+                              : _hasRequestSent
+                                  ? AppColors.textSecondary
+                                  : AppColors.textOnPrimary,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 6,
@@ -281,9 +300,11 @@ class _UserListItemState extends State<UserListItem> {
                         child: Text(
                           _isFollowing
                               ? 'フォロー中'
-                              : widget.user.isPrivate
-                                  ? 'リクエスト'
-                                  : 'フォロー',
+                              : _hasRequestSent
+                                  ? 'リクエスト済み'
+                                  : widget.user.isPrivate
+                                      ? 'リクエスト'
+                                      : 'フォロー',
                           style: const TextStyle(fontSize: 10),
                           overflow: TextOverflow.ellipsis,
                         ),

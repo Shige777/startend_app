@@ -16,6 +16,7 @@ import '../../models/user_model.dart';
 
 import '../../widgets/post_card_widget.dart';
 import '../../widgets/leaf_loading_widget.dart';
+import '../../widgets/profile_follow_button.dart';
 import '../../services/notification_service.dart';
 import 'profile_settings_screen.dart';
 
@@ -1350,45 +1351,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       return const SizedBox.shrink();
     }
 
-    final isFollowing = user.followerIds.contains(currentUser.id);
-
-    if (isFollowing) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () {
-            // フォロー解除
-            userProvider.unfollowUser(user.id);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('フォローを解除しました')),
-            );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.primary),
-            foregroundColor: AppColors.primary,
-          ),
-          child: const Text('フォロー中'),
-        ),
-      );
-    } else {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () {
-            // フォロー
-            userProvider.followUser(user.id);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('フォローしました')),
-            );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.primary),
-            foregroundColor: AppColors.primary,
-          ),
-          child: const Text('フォロー'),
-        ),
-      );
-    }
+    return ProfileFollowButton(
+      user: user,
+      currentUser: currentUser,
+    );
   }
 
   Widget _buildPostSection(BuildContext context, String category) {

@@ -439,6 +439,28 @@ class FollowService {
     });
   }
 
+  /// フォローリクエストが既に送信済みかチェックする
+  static Future<bool> hasFollowRequestSent({
+    required String requesterId,
+    required String targetUserId,
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection('follow_requests')
+          .where('requesterId', isEqualTo: requesterId)
+          .where('targetUserId', isEqualTo: targetUserId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      if (kDebugMode) {
+        print('フォローリクエスト状態確認エラー: $e');
+      }
+      return false;
+    }
+  }
+
   /// ユーザー検索
   static Future<List<UserModel>> searchUsers({
     required String query,

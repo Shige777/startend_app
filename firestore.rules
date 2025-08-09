@@ -92,12 +92,25 @@ service cloud.firestore {
     
     // Follow requests collection
     match /follow_requests/{requestId} {
-      allow read, write: if request.auth != null && (
+      // フォローリクエストの読み取り：リクエスター本人またはターゲットユーザー
+      allow read: if request.auth != null && (
         request.auth.uid == resource.data.get('requesterId', '') ||
         request.auth.uid == resource.data.get('targetUserId', '')
       );
+      
+      // フォローリクエストの作成：リクエスター本人のみ
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.requesterId;
+      
+      // フォローリクエストの更新：ターゲットユーザーのみ（承認・拒否）
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.get('targetUserId', '');
+      
+      // フォローリクエストの削除：リクエスター本人またはターゲットユーザー
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.get('requesterId', '') ||
+        request.auth.uid == resource.data.get('targetUserId', '')
+      );
     }
     
     // Scheduled notifications collection
