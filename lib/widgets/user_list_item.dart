@@ -201,28 +201,34 @@ class _UserListItemState extends State<UserListItem> {
         vertical: AppConstants.smallPadding / 2,
       ),
       child: ListTile(
-        onTap: widget.onTap,
-        leading: _buildProfileImage(widget.user.profileImageUrl),
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                widget.user.displayName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                overflow: TextOverflow.ellipsis,
+        onTap: null, // ListTile自体のタップを無効化
+        leading: GestureDetector(
+          onTap: isCurrentUser ? null : widget.onTap,
+          child: _buildProfileImage(widget.user.profileImageUrl),
+        ),
+        title: GestureDetector(
+          onTap: isCurrentUser ? null : widget.onTap,
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  widget.user.displayName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            if (widget.user.isPrivate) ...[
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.lock,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
+              if (widget.user.isPrivate) ...[
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.lock,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,51 +270,56 @@ class _UserListItemState extends State<UserListItem> {
         ),
         trailing: isCurrentUser
             ? null
-            : SizedBox(
-                width: 80,
-                child: _isLoading
-                    ? const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+            : GestureDetector(
+                onTap: () {
+                  // このエリアのタップをキャッチして伝播を防ぐ
+                },
+                child: SizedBox(
+                  width: 80,
+                  child: _isLoading
+                      ? const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : ElevatedButton(
+                          onPressed: _hasRequestSent ? null : _toggleFollow,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isFollowing
+                                ? AppColors.surfaceVariant
+                                : _hasRequestSent
+                                    ? AppColors.surfaceVariant
+                                    : AppColors.primary,
+                            foregroundColor: _isFollowing
+                                ? AppColors.textPrimary
+                                : _hasRequestSent
+                                    ? AppColors.textSecondary
+                                    : AppColors.textOnPrimary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            _isFollowing
+                                ? 'フォロー中'
+                                : _hasRequestSent
+                                    ? 'リクエスト済み'
+                                    : widget.user.isPrivate
+                                        ? 'リクエスト'
+                                        : 'フォロー',
+                            style: const TextStyle(fontSize: 10),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      )
-                    : ElevatedButton(
-                        onPressed: _hasRequestSent ? null : _toggleFollow,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isFollowing
-                              ? AppColors.surfaceVariant
-                              : _hasRequestSent
-                                  ? AppColors.surfaceVariant
-                                  : AppColors.primary,
-                          foregroundColor: _isFollowing
-                              ? AppColors.textPrimary
-                              : _hasRequestSent
-                                  ? AppColors.textSecondary
-                                  : AppColors.textOnPrimary,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          _isFollowing
-                              ? 'フォロー中'
-                              : _hasRequestSent
-                                  ? 'リクエスト済み'
-                                  : widget.user.isPrivate
-                                      ? 'リクエスト'
-                                      : 'フォロー',
-                          style: const TextStyle(fontSize: 10),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                ),
               ),
       ),
     );
