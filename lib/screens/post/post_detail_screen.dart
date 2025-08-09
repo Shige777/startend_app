@@ -158,6 +158,17 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   Future<void> _addReaction(String emoji, UserModel currentUser) async {
     if (_post == null) return;
 
+    // 重複実行を防止
+    if (_isReactionProcessing) {
+      if (kDebugMode) {
+        print('PostDetailScreen: _addReaction 処理中のため無視 - $emoji');
+      }
+      return;
+    }
+
+    // 即座にフラグを設定
+    _isReactionProcessing = true;
+
     // 即座にローカル状態を更新（オプティミスティック更新）
     setState(() {
       final reactions = Map<String, List<String>>.from(_post!.reactions);
@@ -189,7 +200,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           }
           _post = _post!.copyWith(reactions: reactions);
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(postProvider.errorMessage ??
@@ -209,17 +220,32 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         }
         _post = _post!.copyWith(reactions: reactions);
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content:
                 Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
+    } finally {
+      // 確実にフラグをリセット
+      _isReactionProcessing = false;
+
+      if (kDebugMode) {
+        print('PostDetailScreen: _addReaction 処理完了、フラグをfalseに設定');
+      }
     }
   }
 
+  // リアクション処理中フラグ
+  bool _isReactionProcessing = false;
+
   // リアクションの切り替え（追加/削除）
   Future<void> _toggleReaction(String emoji, UserModel? currentUser) async {
+    if (kDebugMode) {
+      print(
+          'PostDetailScreen: _toggleReaction called - emoji: $emoji, postId: ${_post?.id}');
+    }
+
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context)!.loginRequired)),
@@ -229,14 +255,31 @@ class _PostDetailScreenState extends State<PostDetailScreen>
 
     if (_post == null) return;
 
+    // 重複実行を防止
+    if (_isReactionProcessing) {
+      if (kDebugMode) {
+        print('PostDetailScreen: リアクション処理中のため無視 - $emoji');
+      }
+      return;
+    }
+
+    // 即座にフラグを設定
+    _isReactionProcessing = true;
+
     try {
       final postProvider = context.read<PostProvider>();
       final hasReaction = _post!.hasReaction(emoji, currentUser.id);
 
+      if (kDebugMode) {
+        print('PostDetailScreen: hasReaction: $hasReaction');
+        print(
+            'PostDetailScreen: Before local update - reactions: ${_post!.reactions}');
+      }
+
       // 即座にローカル状態を更新（オプティミスティック更新）
       setState(() {
         final reactions = Map<String, List<String>>.from(_post!.reactions);
-        
+
         if (hasReaction) {
           // リアクション削除
           if (reactions.containsKey(emoji)) {
@@ -254,22 +297,46 @@ class _PostDetailScreenState extends State<PostDetailScreen>
             reactions[emoji]!.add(currentUser.id);
           }
         }
-        
+
         _post = _post!.copyWith(reactions: reactions);
+
+        if (kDebugMode) {
+          print(
+              'PostDetailScreen: After local update - reactions: ${_post!.reactions}');
+        }
       });
 
       bool success;
       if (hasReaction) {
+        if (kDebugMode) {
+          print('PostDetailScreen: Calling removeReaction');
+        }
         success =
             await postProvider.removeReaction(_post!.id, emoji, currentUser.id);
       } else {
+        if (kDebugMode) {
+          print('PostDetailScreen: Calling addReaction');
+        }
         success =
             await postProvider.addReaction(_post!.id, emoji, currentUser.id);
+      }
+
+      if (kDebugMode) {
+        print('PostDetailScreen: Server operation success: $success');
       }
 
       if (success) {
         // PostProviderから最新の投稿データで_postを更新（ダブルチェック）
         _syncPostWithProvider(postProvider);
+
+        // Consumer の確実な更新のため、少し遅延してから再ビルドを促す
+        Future.microtask(() {
+          if (mounted) {
+            setState(() {
+              // Consumer の再ビルドを促すための軽微な状態変更
+            });
+          }
+        });
       } else {
         // 失敗時は元の状態に戻す
         if (hasReaction) {
@@ -296,7 +363,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
             _post = _post!.copyWith(reactions: reactions);
           });
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(postProvider.errorMessage ??
@@ -308,7 +375,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       final hasReaction = _post!.hasReaction(emoji, currentUser.id);
       setState(() {
         final reactions = Map<String, List<String>>.from(_post!.reactions);
-        
+
         if (!hasReaction) {
           // 追加処理でエラー → 削除して元に戻す
           if (reactions.containsKey(emoji)) {
@@ -325,15 +392,22 @@ class _PostDetailScreenState extends State<PostDetailScreen>
             reactions[emoji]!.add(currentUser.id);
           }
         }
-        
+
         _post = _post!.copyWith(reactions: reactions);
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content:
                 Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
+    } finally {
+      // 確実にフラグをリセット
+      _isReactionProcessing = false;
+
+      if (kDebugMode) {
+        print('PostDetailScreen: _toggleReaction 処理完了、フラグをfalseに設定');
+      }
     }
   }
 
@@ -537,9 +611,20 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             child: Consumer<PostProvider>(
                               builder: (context, postProvider, child) {
                                 // PostProviderから最新の投稿データを取得、なければローカル状態を使用
-                                final currentPost = _getCurrentPostFromProvider(postProvider) ?? _post!;
-                                
+                                final currentPost =
+                                    _getCurrentPostFromProvider(postProvider) ??
+                                        _post!;
+
+                                if (kDebugMode) {
+                                  print(
+                                      'PostDetailScreen: Consumer rebuild - currentPost reactions: ${currentPost.reactions}');
+                                  print(
+                                      'PostDetailScreen: _post reactions: ${_post?.reactions}');
+                                }
+
                                 return EnhancedReactionDisplay(
+                                  key: ValueKey(
+                                      '${currentPost.id}_${currentPost.reactions.hashCode}'),
                                   post: currentPost,
                                   currentUserId: currentUser?.id,
                                   onReactionTap: (emoji) =>

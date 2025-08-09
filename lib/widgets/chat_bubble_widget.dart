@@ -545,6 +545,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
           children: [
             // リアクション表示（強化版）
             EnhancedReactionDisplay(
+              key: ValueKey(
+                  '${_currentPost.id}_${_currentPost.reactions.hashCode}'),
               post: _currentPost,
               currentUserId: currentUser?.id,
               onReactionTap: (emoji) =>

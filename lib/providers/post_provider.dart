@@ -726,7 +726,8 @@ class PostProvider extends ChangeNotifier {
   }
 
   // リアクション削除
-  Future<bool> removeReaction(String postId, String emoji, String userId) async {
+  Future<bool> removeReaction(
+      String postId, String emoji, String userId) async {
     try {
       _setError(null);
 
@@ -752,14 +753,27 @@ class PostProvider extends ChangeNotifier {
   }
 
   // ローカルリアクション状態の即座更新
-  void _updateLocalReaction(String postId, String emoji, String userId, {required bool isAdding}) {
+  void _updateLocalReaction(String postId, String emoji, String userId,
+      {required bool isAdding}) {
+    if (kDebugMode) {
+      print(
+          'PostProvider: _updateLocalReaction called - postId: $postId, emoji: $emoji, isAdding: $isAdding');
+    }
+
+    bool foundInAnyList = false;
+
     // 各リストでpostIdを探して更新
-    void updatePostInList(List<PostModel> posts) {
+    void updatePostInList(List<PostModel> posts, String listName) {
       final index = posts.indexWhere((post) => post.id == postId);
       if (index != -1) {
+        foundInAnyList = true;
+        if (kDebugMode) {
+          print('PostProvider: Found post in $listName at index $index');
+        }
+
         final post = posts[index];
         final reactions = Map<String, List<String>>.from(post.reactions);
-        
+
         if (isAdding) {
           // リアクション追加
           reactions[emoji] = List<String>.from(reactions[emoji] ?? []);
@@ -777,20 +791,44 @@ class PostProvider extends ChangeNotifier {
             }
           }
         }
-        
+
         // 更新されたPostModelを作成
         final updatedPost = post.copyWith(reactions: reactions);
         posts[index] = updatedPost;
+
+        if (kDebugMode) {
+          print(
+              'PostProvider: Updated post reactions: ${updatedPost.reactions}');
+        }
       }
     }
 
     // 全てのリストを更新
-    updatePostInList(_userPosts);
-    updatePostInList(_followingPosts);
-    updatePostInList(_communityPosts);
-    
+    updatePostInList(_userPosts, 'userPosts');
+    updatePostInList(_followingPosts, 'followingPosts');
+    updatePostInList(_communityPosts, 'communityPosts');
+
+    if (kDebugMode) {
+      if (!foundInAnyList) {
+        print('PostProvider: WARNING - Post $postId not found in any list!');
+        print('PostProvider: userPosts count: ${_userPosts.length}');
+        print('PostProvider: followingPosts count: ${_followingPosts.length}');
+        print('PostProvider: communityPosts count: ${_communityPosts.length}');
+        print('PostProvider: Will still notify listeners for UI update');
+      } else {
+        print('PostProvider: Successfully updated post in lists');
+      }
+    }
+
+    // 投稿がリストに見つからない場合でも、
+    // 投稿詳細画面などのローカル状態更新のためにnotifyListenersを実行
+
     // UIに即座に反映
     notifyListeners();
+
+    if (kDebugMode) {
+      print('PostProvider: notifyListeners() called');
+    }
   }
 
   // 投稿削除
@@ -837,7 +875,8 @@ class PostProvider extends ChangeNotifier {
   }
 
   // フォロー中タブでの表示判定
-  Future<bool> _shouldShowInFollowingAsync(PostModel post, String? currentUserId) async {
+  Future<bool> _shouldShowInFollowingAsync(
+      PostModel post, String? currentUserId) async {
     final now = DateTime.now();
 
     // 自分のコミュニティ投稿は表示しない
@@ -850,10 +889,12 @@ class PostProvider extends ChangeNotifier {
     // 他のユーザーのコミュニティ投稿の場合、プライバシー設定をチェック
     if (post.communityIds.isNotEmpty) {
       try {
-        final userDoc = await _firestore.collection('users').doc(post.userId).get();
+        final userDoc =
+            await _firestore.collection('users').doc(post.userId).get();
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
-          final showCommunityPostsToOthers = userData['showCommunityPostsToOthers'] ?? true;
+          final showCommunityPostsToOthers =
+              userData['showCommunityPostsToOthers'] ?? true;
           if (!showCommunityPostsToOthers) {
             return false; // 他のユーザーにコミュニティ投稿を表示しない設定
           }

@@ -38,11 +38,13 @@ class PostCardWidget extends StatefulWidget {
     return other is PostCardWidget &&
         other.post.id == post.id &&
         other.post.updatedAt == post.updatedAt &&
+        other.post.reactions == post.reactions &&
         other.showActions == showActions;
   }
 
   @override
-  int get hashCode => Object.hash(post.id, post.updatedAt, showActions);
+  int get hashCode =>
+      Object.hash(post.id, post.updatedAt, post.reactions, showActions);
 
   @override
   State<PostCardWidget> createState() => _PostCardWidgetState();
@@ -106,7 +108,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
       ...postProvider.followingPosts,
       ...postProvider.communityPosts,
     ];
-    
+
     try {
       return allPosts.firstWhere(
         (post) => post.id == widget.post.id,
@@ -532,19 +534,24 @@ class _PostCardWidgetState extends State<PostCardWidget>
                         // リアクション表示（強化版）- 幅制限を回避
                         ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width - 
-                                      (AppConstants.defaultPadding * 2), // パディング考慮
+                            maxWidth: MediaQuery.of(context).size.width -
+                                (AppConstants.defaultPadding * 2), // パディング考慮
                           ),
                           child: Consumer<PostProvider>(
                             builder: (context, postProvider, child) {
                               // PostProviderから最新の投稿データを取得
-                              final currentPost = _getCurrentPost(postProvider) ?? widget.post;
-                              
+                              final currentPost =
+                                  _getCurrentPost(postProvider) ?? widget.post;
+
                               return EnhancedReactionDisplay(
+                                key: ValueKey(
+                                    '${currentPost.id}_${currentPost.reactions.hashCode}'),
                                 post: currentPost,
                                 currentUserId: currentUser?.id,
-                                onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
-                                onAddReaction: () => _showReactionPicker(context, currentUser),
+                                onReactionTap: (emoji) => _toggleReaction(
+                                    context, emoji, currentUser),
+                                onAddReaction: () =>
+                                    _showReactionPicker(context, currentUser),
                                 maxDisplayed: 6, // フォロー中タブでは少し多めに表示
                                 emojiSize: 18,
                               );
@@ -981,22 +988,39 @@ class _PostCardWidgetState extends State<PostCardWidget>
   }
 
   // リアクション追加
-  Future<void> _addReaction(BuildContext context, String emoji, UserModel currentUser) async {
-    if (_isProcessingLike) return;
+  Future<void> _addReaction(
+      BuildContext context, String emoji, UserModel currentUser) async {
+    if (_isProcessingLike) {
+      if (kDebugMode) {
+        print('PostCard: _addReaction 処理中のため無視 - $emoji');
+      }
+      return;
+    }
 
-    setState(() {
-      _isProcessingLike = true;
-    });
+    // 即座にフラグを設定
+    _isProcessingLike = true;
+
+    if (kDebugMode) {
+      print('PostCard: _addReaction 処理フラグを true に設定 - $emoji');
+    }
 
     try {
       final postProvider = context.read<PostProvider>();
-      final success = await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
+      final success =
+          await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
 
       if (success) {
         // PostProviderが自動的にローカル状態を更新済み
+        // 即座にUIを更新
+        if (mounted) {
+          setState(() {
+            // Consumer の強制再ビルドを促す
+          });
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
         );
       }
     } catch (e) {
@@ -1007,14 +1031,28 @@ class _PostCardWidgetState extends State<PostCardWidget>
         SnackBar(content: Text('エラーが発生しました: $e')),
       );
     } finally {
-      setState(() {
-        _isProcessingLike = false;
-      });
+      // 確実にフラグをリセット
+      _isProcessingLike = false;
+
+      if (kDebugMode) {
+        print('PostCard: _addReaction 処理完了、フラグをfalseに設定');
+      }
+
+      // UIの更新は必要に応じて
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
   // リアクションの切り替え（追加/削除）
-  void _toggleReaction(BuildContext context, String emoji, UserModel? currentUser) async {
+  void _toggleReaction(
+      BuildContext context, String emoji, UserModel? currentUser) async {
+    if (kDebugMode) {
+      print(
+          'PostCard: _toggleReaction called - emoji: $emoji, postId: ${widget.post.id}, isProcessing: $_isProcessingLike');
+    }
+
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ログインが必要です')),
@@ -1022,28 +1060,54 @@ class _PostCardWidgetState extends State<PostCardWidget>
       return;
     }
 
-    if (_isProcessingLike) return;
+    if (_isProcessingLike) {
+      if (kDebugMode) {
+        print('PostCard: リアクション処理中のため無視 - $emoji');
+      }
+      return;
+    }
 
-    setState(() {
-      _isProcessingLike = true;
-    });
+    // 即座にフラグを設定（setStateより高速）
+    _isProcessingLike = true;
+
+    if (kDebugMode) {
+      print('PostCard: 処理フラグを true に設定');
+    }
 
     try {
       final postProvider = context.read<PostProvider>();
       final hasReaction = widget.post.hasReaction(emoji, currentUser.id);
-      
+
+      if (kDebugMode) {
+        print(
+            'PostCard: hasReaction: $hasReaction, calling ${hasReaction ? "removeReaction" : "addReaction"}');
+      }
+
       bool success;
       if (hasReaction) {
-        success = await postProvider.removeReaction(widget.post.id, emoji, currentUser.id);
+        success = await postProvider.removeReaction(
+            widget.post.id, emoji, currentUser.id);
       } else {
-        success = await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
+        success = await postProvider.addReaction(
+            widget.post.id, emoji, currentUser.id);
+      }
+
+      if (kDebugMode) {
+        print('PostCard: リアクション操作完了 - success: $success');
       }
 
       if (success) {
         // PostProviderが自動的にローカル状態を更新済み
+        // 即座にUIを更新
+        if (mounted) {
+          setState(() {
+            // Consumer の強制再ビルドを促す
+          });
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
         );
       }
     } catch (e) {
@@ -1054,9 +1118,17 @@ class _PostCardWidgetState extends State<PostCardWidget>
         SnackBar(content: Text('エラーが発生しました: $e')),
       );
     } finally {
-      setState(() {
-        _isProcessingLike = false;
-      });
+      // 確実にフラグをリセット
+      _isProcessingLike = false;
+
+      if (kDebugMode) {
+        print('PostCard: リアクション処理完了、フラグをfalseに設定');
+      }
+
+      // UIの更新は必要に応じて（しかし今回はPostProviderが管理）
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
