@@ -54,19 +54,19 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
   void _syncWithProvider(PostProvider postProvider) {
     // 最新の投稿データを各リストから検索
     PostModel? updatedPost;
-    
+
     // 全てのリストから検索
     final allPosts = [
       ...postProvider.userPosts,
       ...postProvider.followingPosts,
       ...postProvider.communityPosts,
     ];
-    
+
     try {
       updatedPost = allPosts.firstWhere(
         (post) => post.id == _currentPost.id,
       );
-      
+
       // 更新があった場合のみsetState
       if (updatedPost.reactions != _currentPost.reactions ||
           updatedPost.likeCount != _currentPost.likeCount ||
@@ -595,7 +595,7 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
 
     try {
       final postProvider = context.read<PostProvider>();
-      
+
       // PostProviderのaddReactionが即座にローカル状態とnotifyListenersを実行
       final success = await postProvider.addReaction(
           _currentPost.id, emoji, currentUser.id);

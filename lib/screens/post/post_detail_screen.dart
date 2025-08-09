@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/post_model.dart';
@@ -143,6 +144,38 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     });
   }
 
+  // PostProviderから最新の投稿データで_postを同期
+  void _syncPostWithProvider(PostProvider postProvider) {
+    if (_post == null) return;
+    
+    // 全てのリストから検索
+    final allPosts = [
+      ...postProvider.userPosts,
+      ...postProvider.followingPosts,
+      ...postProvider.communityPosts,
+    ];
+    
+    try {
+      final updatedPost = allPosts.firstWhere(
+        (post) => post.id == _post!.id,
+      );
+      
+      // 更新があった場合のみsetState
+      if (updatedPost.reactions != _post!.reactions ||
+          updatedPost.likeCount != _post!.likeCount ||
+          updatedPost.likedByUserIds != _post!.likedByUserIds) {
+        setState(() {
+          _post = updatedPost;
+        });
+      }
+    } catch (e) {
+      // 投稿が見つからない場合は現在の状態を維持
+      if (kDebugMode) {
+        print('投稿が見つかりませんでした: ${_post!.id}');
+      }
+    }
+  }
+
   // リアクション追加
   Future<void> _addReaction(String emoji, UserModel currentUser) async {
     if (_post == null) return;
@@ -153,20 +186,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           await postProvider.addReaction(_post!.id, emoji, currentUser.id);
 
       if (success) {
-        // ローカル状態を更新
-        setState(() {
-          final newReactions = Map<String, List<String>>.from(_post!.reactions);
-          if (newReactions[emoji] == null) {
-            newReactions[emoji] = [];
-          }
-          if (!newReactions[emoji]!.contains(currentUser.id)) {
-            newReactions[emoji]!.add(currentUser.id);
-          }
-          _post = _post!.copyWith(reactions: newReactions);
-        });
-
-        // PostProviderの各リストも更新
-        postProvider.updatePostInLists(_post!);
+        // PostProviderから最新の投稿データで_postを更新
+        _syncPostWithProvider(postProvider);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -205,28 +226,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       }
 
       if (success) {
-        // ローカル状態を更新
-        setState(() {
-          final newReactions = Map<String, List<String>>.from(_post!.reactions);
-
-          if (hasReaction) {
-            // リアクション削除
-            newReactions[emoji]?.remove(currentUser.id);
-            if (newReactions[emoji]?.isEmpty == true) {
-              newReactions.remove(emoji);
-            }
-          } else {
-            // リアクション追加
-            if (newReactions[emoji] == null) {
-              newReactions[emoji] = [];
-            }
-            if (!newReactions[emoji]!.contains(currentUser.id)) {
-              newReactions[emoji]!.add(currentUser.id);
-            }
-          }
-
-          _post = _post!.copyWith(reactions: newReactions);
-        });
+        // PostProviderから最新の投稿データで_postを更新
+        _syncPostWithProvider(postProvider);
 
         // PostProviderの各リストも更新
         postProvider.updatePostInLists(_post!);
@@ -498,7 +499,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                           // リアクション表示（強化版）
                           ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width - 32, // パディング考慮
+                              maxWidth: MediaQuery.of(context).size.width -
+                                  32, // パディング考慮
                             ),
                             child: EnhancedReactionDisplay(
                               post: _post!,

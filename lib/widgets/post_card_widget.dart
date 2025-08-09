@@ -98,6 +98,25 @@ class _PostCardWidgetState extends State<PostCardWidget>
     super.dispose();
   }
 
+  // PostProviderから最新の投稿データを取得
+  PostModel? _getCurrentPost(PostProvider postProvider) {
+    // 全てのリストから検索
+    final allPosts = [
+      ...postProvider.userPosts,
+      ...postProvider.followingPosts,
+      ...postProvider.communityPosts,
+    ];
+    
+    try {
+      return allPosts.firstWhere(
+        (post) => post.id == widget.post.id,
+      );
+    } catch (e) {
+      // 投稿が見つからない場合はnullを返す
+      return null;
+    }
+  }
+
   // 画像URLがネットワークURLかローカルファイルパスかを判別
   bool _isNetworkUrl(String url) {
     return url.startsWith('http://') || url.startsWith('https://');
@@ -516,13 +535,20 @@ class _PostCardWidgetState extends State<PostCardWidget>
                             maxWidth: MediaQuery.of(context).size.width - 
                                       (AppConstants.defaultPadding * 2), // パディング考慮
                           ),
-                          child: EnhancedReactionDisplay(
-                            post: widget.post,
-                            currentUserId: currentUser?.id,
-                            onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
-                            onAddReaction: () => _showReactionPicker(context, currentUser),
-                            maxDisplayed: 6, // フォロー中タブでは少し多めに表示
-                            emojiSize: 18,
+                          child: Consumer<PostProvider>(
+                            builder: (context, postProvider, child) {
+                              // PostProviderから最新の投稿データを取得
+                              final currentPost = _getCurrentPost(postProvider) ?? widget.post;
+                              
+                              return EnhancedReactionDisplay(
+                                post: currentPost,
+                                currentUserId: currentUser?.id,
+                                onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
+                                onAddReaction: () => _showReactionPicker(context, currentUser),
+                                maxDisplayed: 6, // フォロー中タブでは少し多めに表示
+                                emojiSize: 18,
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -967,17 +993,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
       final success = await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
 
       if (success) {
-        // PostProviderの各リストも更新
-        final updatedPost = widget.post.copyWith(
-          reactions: {
-            ...widget.post.reactions,
-            emoji: [
-              ...(widget.post.reactions[emoji] ?? []),
-              if (!(widget.post.reactions[emoji]?.contains(currentUser.id) ?? false)) currentUser.id,
-            ],
-          },
-        );
-        postProvider.updatePostInLists(updatedPost);
+        // PostProviderが自動的にローカル状態を更新済み
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
@@ -1024,27 +1040,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
       }
 
       if (success) {
-        // ローカル状態を更新
-        final newReactions = Map<String, List<String>>.from(widget.post.reactions);
-        
-        if (hasReaction) {
-          // リアクション削除
-          newReactions[emoji]?.remove(currentUser.id);
-          if (newReactions[emoji]?.isEmpty == true) {
-            newReactions.remove(emoji);
-          }
-        } else {
-          // リアクション追加
-          if (newReactions[emoji] == null) {
-            newReactions[emoji] = [];
-          }
-          if (!newReactions[emoji]!.contains(currentUser.id)) {
-            newReactions[emoji]!.add(currentUser.id);
-          }
-        }
-
-        final updatedPost = widget.post.copyWith(reactions: newReactions);
-        postProvider.updatePostInLists(updatedPost);
+        // PostProviderが自動的にローカル状態を更新済み
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
