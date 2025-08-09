@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/post_model.dart';
+import '../../models/user_model.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
