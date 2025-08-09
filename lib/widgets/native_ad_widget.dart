@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../constants/app_colors.dart';
+
 import '../services/ad_service.dart';
 
 class NativeAdWidget extends StatefulWidget {

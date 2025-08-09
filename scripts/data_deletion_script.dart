@@ -1,13 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:firebase_storage/firebase_storage.dart';
 
 /// データ削除スクリプト
 /// メールでの削除リクエストを効率化するためのツール
 class DataDeletionScript {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   /// ユーザーの全データを削除
@@ -353,7 +353,7 @@ void main() async {
   // Firebase初期化
   await Firebase.initializeApp();
 
-  final script = DataDeletionScript();
+      DataDeletionScript();
 
   // 使用例
   // await script.deleteUserData('user@example.com');

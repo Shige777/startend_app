@@ -220,19 +220,11 @@ class EnhancedReactionDisplay extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: AppColors.primary.withOpacity(0.3),
             style: BorderStyle.solid,
-          ),
-          gradient: LinearGradient(
-            colors: [
-              AppColors.surface,
-              AppColors.primary.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
         ),
         child: Row(
@@ -241,7 +233,7 @@ class EnhancedReactionDisplay extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(

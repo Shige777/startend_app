@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
-import '../../providers/post_provider.dart';
+
 import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {

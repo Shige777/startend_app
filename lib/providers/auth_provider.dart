@@ -246,11 +246,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      if (googleUser == null) {
-        // ユーザーが認証をキャンセルした場合
-        _setError('Googleサインインがキャンセルされました');
-        return false;
-      }
+
 
       // 3. 認証情報を取得
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;

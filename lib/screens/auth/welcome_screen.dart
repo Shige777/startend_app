@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:startend_app/providers/auth_provider.dart';
-import 'package:go_router/go_router.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 import 'package:startend_app/screens/auth/login_screen.dart';
 import 'package:startend_app/screens/home/home_screen.dart';

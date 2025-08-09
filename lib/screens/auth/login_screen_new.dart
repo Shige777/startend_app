@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:startend_app/providers/auth_provider.dart';
-import 'package:startend_app/providers/post_provider.dart';
+
 import 'package:startend_app/constants/app_colors.dart';
 import 'package:startend_app/screens/home/home_screen.dart';
 

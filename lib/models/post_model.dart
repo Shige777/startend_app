@@ -73,7 +73,7 @@ class PostModel {
         } else if (timestamp is Map<String, dynamic>) {
           // iOSの場合、TimestampがMapとして保存されることがある
           final seconds = timestamp['_seconds'] as int?;
-          final nanoseconds = timestamp['_nanoseconds'] as int?;
+
           if (seconds != null) {
             return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
           }

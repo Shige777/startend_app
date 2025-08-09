@@ -34,37 +34,13 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     with SingleTickerProviderStateMixin {
   PostModel? _post;
   bool _isLoading = false;
-  bool _isLiked = false;
-  late AnimationController _likeAnimationController;
-  late Animation<double> _likeAnimation;
-  late Animation<double> _rotationAnimation;
+
 
   @override
   void initState() {
     super.initState();
     _post = widget.post; // 初期化を追加
-    _likeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200), // アニメーション時間を調整
-      vsync: this,
-    );
 
-    // 回転アニメーション
-    _rotationAnimation = Tween<double>(
-      begin: -0.2,
-      end: 0.0, // 終了位置を0に修正
-    ).animate(CurvedAnimation(
-      parent: _likeAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // スケールアニメーション
-    _likeAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _likeAnimationController,
-      curve: Curves.elasticOut,
-    ));
 
     // 投稿詳細を読み込む
     _loadPostDetails();
@@ -72,7 +48,6 @@ class _PostDetailScreenState extends State<PostDetailScreen>
 
   @override
   void dispose() {
-    _likeAnimationController.dispose();
     super.dispose();
   }
 
@@ -84,9 +59,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       final userProvider = context.read<UserProvider>();
       final currentUser = userProvider.currentUser;
       if (currentUser != null) {
-        setState(() {
-          _isLiked = _post!.isLikedBy(currentUser.id);
-        });
+
       }
       return;
     }
@@ -106,9 +79,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           _post = post;
           final userProvider = context.read<UserProvider>();
           final currentUser = userProvider.currentUser;
-          if (currentUser != null) {
-            _isLiked = post.isLikedBy(currentUser.id);
-          }
+
         });
       } else {
         if (mounted) {
@@ -244,69 +215,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     }
   }
 
-  Future<void> _toggleLike() async {
-    if (_post == null) return;
 
-    final userProvider = context.read<UserProvider>();
-    final postProvider = context.read<PostProvider>();
-    final currentUser = userProvider.currentUser;
-
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログインが必要です')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLiked = !_isLiked;
-      _post = _post!.copyWith(
-        likeCount: _isLiked ? _post!.likeCount + 1 : _post!.likeCount - 1,
-        likedByUserIds: _isLiked
-            ? [..._post!.likedByUserIds, currentUser.id]
-            : _post!.likedByUserIds
-                .where((id) => id != currentUser.id)
-                .toList(),
-      );
-    });
-
-    try {
-      bool success;
-      if (_isLiked) {
-        success = await postProvider.likePost(_post!.id, currentUser.id);
-      } else {
-        success = await postProvider.unlikePost(_post!.id, currentUser.id);
-      }
-
-      if (!success) {
-        // エラーの場合は状態を戻す
-        setState(() {
-          _isLiked = !_isLiked;
-          _post = _post!.copyWith(
-            likeCount: _isLiked ? _post!.likeCount + 1 : _post!.likeCount - 1,
-            likedByUserIds: _isLiked
-                ? [..._post!.likedByUserIds, currentUser.id]
-                : _post!.likedByUserIds
-                    .where((id) => id != currentUser.id)
-                    .toList(),
-          );
-        });
-      }
-    } catch (e) {
-      // エラーの場合は状態を戻す
-      setState(() {
-        _isLiked = !_isLiked;
-        _post = _post!.copyWith(
-          likeCount: _isLiked ? _post!.likeCount + 1 : _post!.likeCount - 1,
-          likedByUserIds: _isLiked
-              ? [..._post!.likedByUserIds, currentUser.id]
-              : _post!.likedByUserIds
-                  .where((id) => id != currentUser.id)
-                  .toList(),
-        );
-      });
-    }
-  }
 
   // 投稿者本人かどうかを判定
   bool _isPostOwner() {
@@ -526,10 +435,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     );
   }
 
-  // 日時フォーマット関数
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.month}/${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
+
 
   // 実際にかかった時間を計算する関数
   String _getElapsedTime() {
@@ -549,38 +455,5 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     }
   }
 
-  // 残り時間を計算する関数
-  String _getRemainingTime() {
-    if (_post?.scheduledEndTime == null) return '未定';
 
-    final now = DateTime.now();
-    final remaining = _post!.scheduledEndTime!.difference(now);
-
-    if (remaining.isNegative) {
-      final overdue = now.difference(_post!.scheduledEndTime!);
-      final days = overdue.inDays;
-      final hours = overdue.inHours % 24;
-      final minutes = overdue.inMinutes % 60;
-
-      if (days > 0) {
-        return '予定時刻を${days}日${hours}時間${minutes}分経過';
-      } else if (hours > 0) {
-        return '予定時刻を${hours}時間${minutes}分経過';
-      } else {
-        return '予定時刻を${minutes}分経過';
-      }
-    } else {
-      final days = remaining.inDays;
-      final hours = remaining.inHours % 24;
-      final minutes = remaining.inMinutes % 60;
-
-      if (days > 0) {
-        return '残り${days}日${hours}時間${minutes}分';
-      } else if (hours > 0) {
-        return '残り${hours}時間${minutes}分';
-      } else {
-        return '残り${minutes}分';
-      }
-    }
-  }
 }
