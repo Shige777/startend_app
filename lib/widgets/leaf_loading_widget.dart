@@ -27,11 +27,11 @@ class _LeafLoadingWidgetState extends State<LeafLoadingWidget>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 3), // 2秒から3秒に変更してより滑らかに
+      duration: const Duration(seconds: 4), // 回転速度を下げてCPU負荷軽減
       vsync: this,
     );
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000), // パルス速度も下げる
       vsync: this,
     );
 

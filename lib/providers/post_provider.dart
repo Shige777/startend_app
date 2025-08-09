@@ -22,7 +22,8 @@ class PostProvider extends ChangeNotifier {
   // ユーザー投稿のキャッシュ
   Map<String, List<PostModel>> _userPostsCache = {};
   Map<String, DateTime> _userPostsCacheTime = {};
-  static const Duration _cacheExpiry = Duration(minutes: 10); // 10分間キャッシュ（高速化）
+  static const Duration _cacheExpiry =
+      Duration(minutes: 15); // キャッシュ時間を延長してパフォーマンス向上
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;

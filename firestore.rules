@@ -133,11 +133,25 @@ service cloud.firestore {
     }
     
     function validateUserUpdate(oldData, newData) {
-      return newData.keys().hasAll(['displayName', 'email', 'updatedAt']) &&
-        newData.displayName is string &&
-        newData.displayName.size() > 0 &&
-        newData.displayName.size() <= 50 &&
-        newData.email == oldData.email; // メールアドレスは変更不可
+      // 基本フィールドの検証（メールアドレスは変更不可）
+      let hasValidBasicFields = newData.keys().hasAll(['updatedAt']) &&
+        newData.email == oldData.email;
+      
+      // オプションフィールドの検証
+      let hasValidOptionalFields = (
+        // displayName: 文字列で50文字以下
+        (!('displayName' in newData) || (newData.displayName is string && newData.displayName.size() > 0 && newData.displayName.size() <= 50)) &&
+        // followingIds: 配列
+        (!('followingIds' in newData) || newData.followingIds is list) &&
+        // followerIds: 配列  
+        (!('followerIds' in newData) || newData.followerIds is list) &&
+        // postCount: 数値
+        (!('postCount' in newData) || newData.postCount is number) &&
+        // その他のフィールドは自由
+        true
+      );
+      
+      return hasValidBasicFields && hasValidOptionalFields;
     }
     
     function validatePostData(data) {

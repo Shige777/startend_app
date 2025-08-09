@@ -228,17 +228,17 @@ class _LoginScreenState extends State<LoginScreen>
       authProvider.suppressNotifications(false);
       print('AuthProvider notifications re-enabled');
 
-      // PostProviderの更新処理
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          final postProvider =
-              Provider.of<PostProvider>(context, listen: false);
-          await postProvider.updateExpiredPosts();
-          print('Expired posts updated successfully');
-        } catch (e) {
-          print('Error updating expired posts: $e');
-        }
-      });
+      // 期限切れ投稿の自動更新機能は削除済みのため無効化（パフォーマンス向上）
+      // WidgetsBinding.instance.addPostFrameCallback((_) async {
+      //   try {
+      //     final postProvider =
+      //         Provider.of<PostProvider>(context, listen: false);
+      //     await postProvider.updateExpiredPosts();
+      //     print('Expired posts updated successfully');
+      //   } catch (e) {
+      //     print('Error updating expired posts: $e');
+      //   }
+      // });
     } catch (e) {
       print('Direct navigation failed: $e');
 

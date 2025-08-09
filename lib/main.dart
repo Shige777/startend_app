@@ -240,16 +240,10 @@ GoRouter _createRouter(AuthProvider authProvider) {
         pageBuilder: (context, state) => CustomTransitionPage<void>(
           key: state.pageKey,
           child: const HomeScreen(),
-          transitionDuration: const Duration(milliseconds: 800),
-          reverseTransitionDuration: const Duration(milliseconds: 400),
+          transitionDuration: const Duration(milliseconds: 600),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // アニメーション完了時のみログを出力（冗長化を防止）
-            if (kDebugMode &&
-                animation.value < 1.0 &&
-                animation.value % 0.2 < 0.05) {
-              print(
-                  'Home screen animation - value: ${animation.value.toStringAsFixed(2)}');
-            }
+            // ログ出力を完全に削除してパフォーマンス向上
 
             // 下から上にスライドアップするアニメーション
             const begin = Offset(0.0, 1.0);

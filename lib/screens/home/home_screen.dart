@@ -37,28 +37,19 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
 
-    // 初期化完了後にローディング状態をfalseに設定し、ユーザー情報を確認（フレームレート制御）
+    // 初期化を単一のaddPostFrameCallbackにまとめてフレーム処理最適化
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // フレーム処理の重複を避けるため、少し遅延させる
-        Future.delayed(const Duration(milliseconds: 100), () {
+        // すべての初期化処理を一つのコールバックで実行
+        Future.delayed(const Duration(milliseconds: 50), () {
           if (mounted) {
             setState(() {
               _isLoading = false;
             });
             // ユーザー情報の初期化を確認
             _ensureUserInitialized();
-          }
-        });
-      }
-    });
 
-    // URLパラメータからタブを設定（GoRouterStateエラー回避、フレーム処理最適化）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // 前のaddPostFrameCallbackと競合しないよう少し遅延
-        Future.delayed(const Duration(milliseconds: 150), () {
-          if (mounted) {
+            // URLパラメータからタブを設定
             try {
               final uri = GoRouterState.of(context).uri;
               final tabParam = uri.queryParameters['tab'];
@@ -77,11 +68,15 @@ class _HomeScreenState extends State<HomeScreen>
                 setState(() {
                   _selectedIndex = 0;
                 });
-                _tabController.index = 0;
               }
             } catch (e) {
-              print('GoRouterState not available: $e');
-              // デフォルトタブを使用
+              if (kDebugMode) {
+                print('GoRouterState not available: $e');
+              }
+              // エラーが発生した場合はデフォルトタブを設定
+              setState(() {
+                _selectedIndex = 0;
+              });
             }
           }
         });
