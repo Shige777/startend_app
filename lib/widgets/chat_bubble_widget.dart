@@ -150,19 +150,21 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // 投稿タイトル
-                            Text(
-                              _currentPost.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: widget.isOwnMessage
-                                    ? Colors.white
-                                    : AppColors.textPrimary,
+                            if (_currentPost.title.isNotEmpty)
+                              Text(
+                                _currentPost.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: widget.isOwnMessage
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
                               ),
-                            ),
 
                             // START/END画像セクション（2枚並び）
-                            const SizedBox(height: 6),
+                            if (_currentPost.title.isNotEmpty)
+                              const SizedBox(height: 6),
                             _buildImageSection(context),
 
                             // START投稿のコメント

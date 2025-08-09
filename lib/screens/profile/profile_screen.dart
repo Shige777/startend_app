@@ -154,8 +154,20 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
+  @override
+  void didUpdateWidget(ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 不要な再読み込みを防ぐため、didUpdateWidgetでのリフレッシュを削除
+    // 必要に応じて手動でリフレッシュを呼び出す
+  }
+
   Future<void> _loadProfileData() async {
-    if (_hasLoadedPosts || _isLoadingProfile) return;
+    if (_hasLoadedPosts || _isLoadingProfile) {
+      if (kDebugMode) {
+        print('プロフィール読み込みスキップ - 既に読み込み済みまたは読み込み中');
+      }
+      return;
+    }
 
     setState(() {
       _isLoadingProfile = true;
@@ -175,12 +187,9 @@ class _ProfileScreenState extends State<ProfileScreen>
             setState(() {});
           }
 
-          // 投稿の読み込みを並行実行
-          await Future.wait([
-            postProvider.updateExpiredPosts(),
-            postProvider.getUserPosts(_profileUser!.id,
-                currentUserId: userProvider.currentUser?.id),
-          ]);
+          // 投稿の読み込み
+          await postProvider.getUserPosts(_profileUser!.id,
+              currentUserId: userProvider.currentUser?.id);
         }
       } else {
         // 他のユーザーのプロフィールの場合
@@ -192,12 +201,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {});
             }
 
-            // 投稿の読み込みを並行実行
-            await Future.wait([
-              postProvider.updateExpiredPosts(),
-              postProvider.getUserPosts(_profileUser!.id,
-                  currentUserId: userProvider.currentUser?.id),
-            ]);
+            // 投稿の読み込み
+            await postProvider.getUserPosts(_profileUser!.id,
+                currentUserId: userProvider.currentUser?.id);
           }
         }
       }
@@ -221,6 +227,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _refreshProfileData() async {
+    // 既に読み込み中の場合はスキップ
+    if (_isLoadingProfile) return;
+
+    setState(() {
+      _isLoadingProfile = true;
+    });
+
     final userProvider = context.read<UserProvider>();
     final postProvider = context.read<PostProvider>();
 
@@ -230,10 +243,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         await userProvider.refreshCurrentUser();
         _profileUser = userProvider.currentUser;
         if (_profileUser != null) {
-          // 期限切れ投稿を自動更新してから投稿を取得
-          await postProvider.updateExpiredPosts();
+          // 投稿を取得（期限切れチェックは削除済み）
           await postProvider.getUserPosts(_profileUser!.id,
               currentUserId: userProvider.currentUser?.id);
+
+          // UIを更新
+          if (mounted) {
+            setState(() {});
+          }
         }
       } else {
         // 他のユーザーのプロフィールの場合
@@ -245,8 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               _profileUser = updatedUser;
             });
 
-            // 期限切れ投稿を自動更新してから投稿を取得
-            await postProvider.updateExpiredPosts();
+            // 投稿を取得（期限切れチェックは削除済み）
             await postProvider.getUserPosts(_profileUser!.id,
                 currentUserId: userProvider.currentUser?.id);
           }
@@ -255,6 +271,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (e) {
       if (kDebugMode) {
         print('プロフィールデータの再読み込みエラー: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
       }
     }
   }
@@ -597,7 +619,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                           ? '99+'
                                           : unreadCount.toString(),
                                       style: const TextStyle(
-                                        color: Colors.white,
+                                        color: Colors.black,
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -624,7 +646,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 // 投稿のソート選択
                 PopupMenuButton<PostSortType>(
-                  icon: const Icon(Icons.sort),
+                  icon: const Icon(Icons.sort, color: Colors.black),
+                  color: Colors.white,
                   tooltip: '並び順',
                   onSelected: (sortType) {
                     setState(() {
@@ -641,9 +664,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_unchecked,
                             size: 16,
+                            color: Colors.black,
                           ),
                           const SizedBox(width: 8),
-                          const Text('START投稿の日付'),
+                          const Text('START投稿の日付',
+                              style: TextStyle(color: Colors.black)),
                         ],
                       ),
                     ),
@@ -656,16 +681,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_unchecked,
                             size: 16,
+                            color: Colors.black,
                           ),
                           const SizedBox(width: 8),
-                          const Text('END投稿の日付'),
+                          const Text('END投稿の日付',
+                              style: TextStyle(color: Colors.black)),
                         ],
                       ),
                     ),
                   ],
                 ),
                 PopupMenuButton<TimePeriod>(
-                  icon: const Icon(Icons.date_range),
+                  icon: const Icon(Icons.date_range, color: Colors.black),
+                  color: Colors.white,
                   onSelected: (period) {
                     setState(() {
                       _selectedPeriod = period;
@@ -681,9 +709,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ? Icons.radio_button_checked
                                       : Icons.radio_button_unchecked,
                                   size: 16,
+                                  color: Colors.black,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(_getPeriodText(period)),
+                                Text(
+                                  _getPeriodText(period),
+                                  style: const TextStyle(color: Colors.black),
+                                ),
                               ],
                             ),
                           ))
@@ -778,7 +810,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             : [
                 // 投稿のソート選択
                 PopupMenuButton<PostSortType>(
-                  icon: const Icon(Icons.sort),
+                  icon: const Icon(Icons.sort, color: Colors.black),
+                  color: Colors.white,
                   tooltip: '並び順',
                   onSelected: (sortType) {
                     setState(() {
@@ -795,9 +828,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_unchecked,
                             size: 16,
+                            color: Colors.black,
                           ),
                           const SizedBox(width: 8),
-                          const Text('START投稿の日付'),
+                          const Text('START投稿の日付',
+                              style: TextStyle(color: Colors.black)),
                         ],
                       ),
                     ),
@@ -810,16 +845,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_unchecked,
                             size: 16,
+                            color: Colors.black,
                           ),
                           const SizedBox(width: 8),
-                          const Text('END投稿の日付'),
+                          const Text('END投稿の日付',
+                              style: TextStyle(color: Colors.black)),
                         ],
                       ),
                     ),
                   ],
                 ),
                 PopupMenuButton<TimePeriod>(
-                  icon: const Icon(Icons.date_range, color: Colors.white),
+                  icon: const Icon(Icons.date_range, color: Colors.black),
                   color: Colors.white,
                   onSelected: (period) {
                     setState(() {

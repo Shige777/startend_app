@@ -91,6 +91,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   void _checkAuthenticationStatus() {
+    if (!mounted) return; // mountedチェックを追加
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     print('WelcomeScreen: Checking authentication status');

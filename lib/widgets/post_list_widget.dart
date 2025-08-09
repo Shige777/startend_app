@@ -43,31 +43,64 @@ class _PostListWidgetState extends State<PostListWidget> {
   @override
   void initState() {
     super.initState();
+    // 初期化は didChangeDependencies で行う
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     // ビルド完了後に非同期処理を実行
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      // 既に投稿が渡されている場合は読み込みをスキップ
-      if (widget.posts == null && !_hasInitialized) {
-        _loadPosts();
+    if (widget.posts == null && !_hasInitialized) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hasInitialized) {
+          _initializePosts();
+        }
+      });
+    }
+  }
+
+  void _initializePosts() async {
+    if (_hasInitialized) return;
+
+    // UserProvider の初期化を待つ
+    final userProvider = context.read<UserProvider>();
+
+    // ユーザー情報がまだ読み込まれていない場合
+    if (userProvider.currentUser == null) {
+      if (userProvider.isLoading) {
+        // 読み込み中の場合は少し待ってから再試行
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted && !_hasInitialized) {
+          _initializePosts();
+        }
+        return;
+      } else {
+        // 読み込み中でない場合は、手動でリフレッシュを実行
+        try {
+          await userProvider.refreshCurrentUser();
+          if (userProvider.currentUser == null) {
+            print('PostListWidget: Failed to get current user after refresh');
+            return;
+          }
+        } catch (e) {
+          print('PostListWidget: Error refreshing current user: $e');
+          return;
+        }
       }
-    });
+    }
+
+    _loadPosts();
   }
 
   void _loadPosts() async {
     if (_hasInitialized) return; // 既に初期化済みの場合はスキップ
+    _hasInitialized = true;
 
     // contextが利用可能かチェック
     if (!mounted) return;
 
     print('PostListWidget: Starting _loadPosts');
     final postProvider = context.read<PostProvider>();
-
-    try {
-      // 期限切れ投稿を自動更新
-      await postProvider.updateExpiredPosts();
-      print('PostListWidget: updateExpiredPosts completed');
-    } catch (e) {
-      print('PostListWidget: updateExpiredPosts error: $e');
-    }
 
     switch (widget.type) {
       case PostListType.following:
@@ -83,6 +116,9 @@ class _PostListWidgetState extends State<PostListWidget> {
             ];
             await postProvider.getFollowingPosts(followingIdsWithSelf,
                 currentUserId: currentUser.id);
+          } else {
+            print(
+                'PostListWidget: currentUser is null, skipping following posts load');
           }
         } catch (e) {
           if (kDebugMode) {
@@ -128,18 +164,68 @@ class _PostListWidgetState extends State<PostListWidget> {
         }
         break;
     }
-
-    if (mounted) {
-      setState(() {
-        _hasInitialized = true;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<PostProvider, UserProvider>(
       builder: (context, postProvider, userProvider, child) {
+        // ユーザー情報がまだ読み込まれていない場合
+        if (userProvider.currentUser == null && userProvider.isLoading) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                LeafLoadingWidget(
+                  size: 50,
+                  color: AppColors.primary,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'ユーザー情報を読み込み中...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // ユーザー情報の読み込みに失敗した場合
+        if (userProvider.currentUser == null &&
+            !userProvider.isLoading &&
+            userProvider.errorMessage != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'ユーザー情報の読み込みに失敗しました',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    userProvider.refreshCurrentUser();
+                  },
+                  child: const Text('再試行'),
+                ),
+              ],
+            ),
+          );
+        }
+
         List<PostModel> posts;
 
         if (widget.posts != null) {

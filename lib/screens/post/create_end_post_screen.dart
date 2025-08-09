@@ -351,6 +351,11 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
           // ユーザー情報を更新（投稿数を含む）
           await userProvider.refreshCurrentUser();
 
+          // ユーザーの投稿一覧も更新（キャッシュをクリアしてから更新）
+          postProvider.clearUserPostsCache(userProvider.currentUser!.id);
+          await postProvider.getUserPosts(userProvider.currentUser!.id,
+              currentUserId: userProvider.currentUser!.id);
+
           if (mounted) {
             // コミュニティ画面に戻る
             if (context.canPop()) {
@@ -403,6 +408,11 @@ class _CreateEndPostScreenState extends State<CreateEndPostScreen> {
 
         // ユーザー情報を更新（投稿数を含む）
         await userProvider.refreshCurrentUser();
+
+        // ユーザーの投稿一覧も更新（キャッシュをクリアしてから更新）
+        postProvider.clearUserPostsCache(userProvider.currentUser!.id);
+        await postProvider.getUserPosts(userProvider.currentUser!.id,
+            currentUserId: userProvider.currentUser!.id);
 
         if (mounted) {
           if (context.canPop()) {

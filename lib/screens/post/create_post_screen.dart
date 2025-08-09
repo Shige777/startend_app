@@ -377,6 +377,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _handleSubmit() async {
+    // フォームバリデーション
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     // 画像が選択されているかチェック
     if (_selectedImageBytes == null) {
       ScaffoldMessenger.of(
@@ -451,6 +456,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         userId: userProvider.currentUser!.id,
         type: PostType.start,
         title: _titleController.text.trim(),
+        comment: _commentController.text.trim().isEmpty
+            ? null
+            : _commentController.text.trim(),
         imageUrl: imageUrl,
         scheduledEndTime: _selectedDateTime,
         privacyLevel: PrivacyLevel.public,

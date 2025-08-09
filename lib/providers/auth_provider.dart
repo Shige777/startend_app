@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -229,8 +230,21 @@ class AuthProvider extends ChangeNotifier {
       await _ensureGoogleSignInInitialized();
 
       // 2. authenticate()を呼び出して認証フローを開始する
-      final GoogleSignInAccount? googleUser =
-          await _googleSignIn.authenticate();
+      // Google Play Services エラーに対する例外処理を追加
+      GoogleSignInAccount? googleUser;
+      try {
+        googleUser = await _googleSignIn.authenticate();
+      } catch (e) {
+        if (kDebugMode) {
+          print('Google Play Services error (possibly emulator): $e');
+        }
+        if (e.toString().contains('Unknown calling package name')) {
+          _setError('エミュレータでのGoogle認証はサポートされていません。実機でお試しください。');
+        } else {
+          _setError('Google認証でエラーが発生しました: $e');
+        }
+        return false;
+      }
 
       if (googleUser == null) {
         // ユーザーが認証をキャンセルした場合

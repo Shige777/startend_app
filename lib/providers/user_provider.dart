@@ -148,32 +148,12 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  // ユーザー情報を取得
+  // ユーザー情報を取得（高速化：投稿数カウントを削除）
   Future<UserModel?> getUser(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         final user = UserModel.fromFirestore(doc);
-
-        // 投稿数を取得して更新（名前やプロフィール画像は更新しない）
-        final postsSnapshot = await _firestore
-            .collection('posts')
-            .where('userId', isEqualTo: userId)
-            .get();
-
-        final actualPostCount = postsSnapshot.docs.length;
-
-        // 投稿数が異なる場合のみ更新
-        if (user.postCount != actualPostCount) {
-          await _firestore.collection('users').doc(userId).update({
-            'postCount': actualPostCount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-          // 更新されたユーザー情報を返す
-          return user.copyWith(postCount: actualPostCount);
-        }
-
         return user;
       }
       return null;
@@ -375,7 +355,7 @@ class UserProvider extends ChangeNotifier {
       final querySnapshot = await _firestore
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .limit(200) // 100から200に増加
+          .limit(100) // 200から100に削減して高速化
           .get();
 
       final users = querySnapshot.docs

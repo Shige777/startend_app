@@ -1,0 +1,82 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile images
+    match /profiles/{userId}/{fileName} {
+      // プロフィール画像の読み取り：認証済みユーザーのみ
+      allow read: if request.auth != null;
+      
+      // プロフィール画像のアップロード・更新・削除：所有者のみ
+      allow write, delete: if request.auth != null && 
+        request.auth.uid == userId &&
+        isValidImageFile() &&
+        isValidFileSize(10 * 1024 * 1024) && // 10MB制限
+        isValidFileName(fileName);
+    }
+    
+    // Post images
+    match /posts/{userId}/{postId}/{fileName} {
+      // 投稿画像の読み取り：認証済みユーザーのみ
+      allow read: if request.auth != null;
+      
+      // 投稿画像のアップロード・更新・削除：所有者のみ
+      allow write, delete: if request.auth != null && 
+        request.auth.uid == userId &&
+        isValidImageFile() &&
+        isValidFileSize(10 * 1024 * 1024) && // 10MB制限
+        isValidFileName(fileName);
+    }
+    
+    // Community images
+    match /communities/{communityId}/{fileName} {
+      // コミュニティ画像の読み取り：認証済みユーザーのみ
+      allow read: if request.auth != null;
+      
+      // コミュニティ画像のアップロード・更新・削除：認証済みユーザーのみ
+      // 注意: 実際にはコミュニティのメンバーシップを確認する必要があります
+      allow write, delete: if request.auth != null && 
+        isValidImageFile() &&
+        isValidFileSize(5 * 1024 * 1024) && // 5MB制限
+        isValidFileName(fileName);
+    }
+    
+    // Helper functions
+    function isValidImageFile() {
+      // 画像ファイルの形式をチェック（より厳密に）
+      return request.resource != null &&
+        request.resource.contentType.matches('image/.*') &&
+        request.resource.contentType in [
+          'image/jpeg', 
+          'image/png', 
+          'image/webp', 
+          'image/gif'
+        ];
+    }
+    
+    function isValidFileSize(maxSize) {
+      // ファイルサイズをチェック
+      return request.resource != null &&
+        request.resource.size <= maxSize &&
+        request.resource.size > 0; // 空ファイルを防ぐ
+    }
+    
+    function isValidFileName(fileName) {
+      // ファイル名の安全性をチェック
+      return fileName.size() > 0 &&
+        fileName.size() <= 255 &&
+        !fileName.matches('.*[<>:"/\\|?*].*') && // 危険な文字を禁止
+        !fileName.matches('^\\..*') && // 隠しファイルを禁止
+        fileName.matches('.*\\.(jpg|jpeg|png|webp|gif)$'); // 拡張子チェック
+    }
+    
+    // Firebase App Checkトークンの検証（セキュリティ強化）
+    function isAppCheckValid() {
+      return request.auth.app != null;
+    }
+    
+    // すべてのアクセスでApp Checkを強制（本番環境推奨）
+    // match /{allPaths=**} {
+    //   allow read, write: if isAppCheckValid();
+    // }
+  }
+}

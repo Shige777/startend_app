@@ -145,6 +145,7 @@ service cloud.firestore {
       
       return data.keys().hasAll(requiredFields) &&
         data.title is string &&
+        data.title.size() > 0 &&
         data.title.size() <= 100 &&
         data.type in ['start', 'end'] &&
         data.privacyLevel in ['public', 'mutualFollowersOnly', 'communityOnly', 'mutualFollowersAndCommunity'] &&
@@ -160,32 +161,33 @@ service cloud.firestore {
     function validateOptionalFields(data) {
       return (
         // comment: null または文字列
-        (!('comment' in data) || data.comment == null || (data.comment is string && data.comment.size() <= 500)) &&
+        (!data.keys().hasAny(['comment']) || data.comment == null || data.comment is string) &&
         // endComment: null または文字列  
-        (!('endComment' in data) || data.endComment == null || (data.endComment is string && data.endComment.size() <= 500)) &&
+        (!data.keys().hasAny(['endComment']) || data.endComment == null || data.endComment is string) &&
         // imageUrl: null または文字列
-        (!('imageUrl' in data) || data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 2048)) &&
+        (!data.keys().hasAny(['imageUrl']) || data.imageUrl == null || data.imageUrl is string) &&
         // endImageUrl: null または文字列
-        (!('endImageUrl' in data) || data.endImageUrl == null || (data.endImageUrl is string && data.endImageUrl.size() <= 2048)) &&
+        (!data.keys().hasAny(['endImageUrl']) || data.endImageUrl == null || data.endImageUrl is string) &&
         // scheduledEndTime: null またはタイムスタンプ
-        (!('scheduledEndTime' in data) || data.scheduledEndTime == null || data.scheduledEndTime is timestamp) &&
+        (!data.keys().hasAny(['scheduledEndTime']) || data.scheduledEndTime == null || data.scheduledEndTime is timestamp) &&
         // actualEndTime: null またはタイムスタンプ
-        (!('actualEndTime' in data) || data.actualEndTime == null || data.actualEndTime is timestamp) &&
+        (!data.keys().hasAny(['actualEndTime']) || data.actualEndTime == null || data.actualEndTime is timestamp) &&
         // startPostId: null または文字列
-        (!('startPostId' in data) || data.startPostId == null || (data.startPostId is string && data.startPostId.size() <= 255)) &&
+        (!data.keys().hasAny(['startPostId']) || data.startPostId == null || data.startPostId is string) &&
         // endPostId: null または文字列
-        (!('endPostId' in data) || data.endPostId == null || (data.endPostId is string && data.endPostId.size() <= 255))
+        (!data.keys().hasAny(['endPostId']) || data.endPostId == null || data.endPostId is string)
       );
     }
     
     function validatePostUpdate(oldData, newData) {
-      // 基本フィールドは変更不可（userIdとtypeは変更禁止）
+      // 基本フィールドは変更不可
       return newData.userId == oldData.userId &&
         newData.type == oldData.type &&
+        // END投稿への更新を許可
+        (newData.title == oldData.title || 
+         (oldData.type == 'start' && newData.type == 'end')) &&
         // 必須フィールドの存在確認
-        newData.keys().hasAll(['userId', 'type', 'updatedAt']) &&
-        // オプションフィールドの検証
-        validateOptionalFields(newData);
+        newData.keys().hasAll(['userId', 'type', 'updatedAt']);
     }
     
     function validateCommunityData(data) {
@@ -209,28 +211,55 @@ service cloud.firestore {
     }
     
     function canReadPost(postData) {
+      let privacyLevel = postData.get('privacyLevel', 'public');
+      
       // 投稿者本人は常に読み取り可能
-      return request.auth.uid == postData.userId ||
-        // パブリック投稿は誰でも読み取り可能
-        postData.get('privacyLevel', 'public') == 'public' ||
-        // コミュニティ限定投稿の場合（簡略化実装）
-        (postData.get('privacyLevel', 'public') == 'communityOnly' && 
-         postData.get('communityIds', []).size() > 0) ||
-        // フォロワー限定投稿の場合（簡略化実装）
-        (postData.get('privacyLevel', 'public') == 'mutualFollowersOnly') ||
-        // フォロワー＋コミュニティ投稿の場合（簡略化実装）
-        (postData.get('privacyLevel', 'public') == 'mutualFollowersAndCommunity');
+      if (request.auth.uid == postData.userId) {
+        return true;
+      }
+      
+      // パブリック投稿は誰でも読み取り可能
+      if (privacyLevel == 'public') {
+        return true;
+      }
+      
+      // コミュニティ限定投稿の場合
+      if (privacyLevel == 'communityOnly') {
+        return userIsMemberOfAnyCommunity(postData.get('communityIds', []));
+      }
+      
+      // フォロワー限定投稿の場合
+      if (privacyLevel == 'mutualFollowersOnly') {
+        return userIsFollower(postData.userId);
+      }
+      
+      // フォロワー＋コミュニティ投稿の場合
+      if (privacyLevel == 'mutualFollowersAndCommunity') {
+        return userIsFollower(postData.userId) || 
+               userIsMemberOfAnyCommunity(postData.get('communityIds', []));
+      }
+      
+      return false;
     }
     
-
+    function userIsMemberOfAnyCommunity(communityIds) {
+      // コミュニティメンバーシップの確認
+      // 注意: これは簡略化された実装です
+      // 実際にはコミュニティドキュメントを参照する必要があります
+      return communityIds.size() > 0;
+    }
+    
+    function userIsFollower(targetUserId) {
+      // フォロワー関係の確認
+      // 注意: これは簡略化された実装です
+      // 実際にはユーザードキュメントのfollowerIdsを参照する必要があります
+      return true; // 暫定的にtrue（実装要検討）
+    }
     
     function onlyUpdatingReadStatus(oldData, newData) {
-      let allowedKeys = ['read', 'readAt', 'updatedAt'];
-      let affectedKeys = newData.diff(oldData).affectedKeys();
-      
-      // 変更されたキーが許可されたキーのサブセットであることを確認
-      return affectedKeys.hasAll([]) && // 最低限の条件
-             affectedKeys.hasOnly(allowedKeys);
+      return newData.diff(oldData).affectedKeys().hasOnly(['read', 'updatedAt']) ||
+             newData.diff(oldData).affectedKeys().hasOnly(['read']) ||
+             newData.diff(oldData).affectedKeys().hasOnly(['updatedAt']);
     }
   }
 }

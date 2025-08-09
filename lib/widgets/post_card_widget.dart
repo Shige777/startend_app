@@ -620,19 +620,20 @@ class _PostCardWidgetState extends State<PostCardWidget>
       height: 280, // 高さを調整
       child: Column(
         children: [
-          // タイトル
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: AppColors.background, // 背景色を統一
-            child: Text(
-              widget.post.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-              textAlign: TextAlign.center,
+          // タイトル（タイトルがある場合のみ表示）
+          if (widget.post.title.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: AppColors.background, // 背景色を統一
+              child: Text(
+                widget.post.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
           // 画像セクション
           Expanded(
             child: Row(

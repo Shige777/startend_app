@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/post_model.dart';
 import '../services/notification_service.dart';
-import '../providers/user_provider.dart';
 
 class PostProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -22,7 +22,7 @@ class PostProvider extends ChangeNotifier {
   // ユーザー投稿のキャッシュ
   Map<String, List<PostModel>> _userPostsCache = {};
   Map<String, DateTime> _userPostsCacheTime = {};
-  static const Duration _cacheExpiry = Duration(minutes: 5); // 5分間キャッシュ
+  static const Duration _cacheExpiry = Duration(minutes: 10); // 10分間キャッシュ（高速化）
 
   List<PostModel> get posts => _posts;
   List<PostModel> get followingPosts => _followingPosts;
@@ -33,13 +33,21 @@ class PostProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
+    if (_isLoading != loading) {
+      _isLoading = loading;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 
   void _setError(String? error) {
-    _errorMessage = error;
-    notifyListeners();
+    if (_errorMessage != error) {
+      _errorMessage = error;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 
   // 読み込み状態をリセット（タブ切り替え時の不要な読み込みを防ぐため）
@@ -76,6 +84,10 @@ class PostProvider extends ChangeNotifier {
       if (todayPosts.length >= 10) {
         _setError('1日の投稿制限（10件）に達しました。明日また投稿してください。');
         return null;
+      }
+
+      if (kDebugMode) {
+        print('投稿作成開始 - Firestoreデータ: ${post.toFirestore()}');
       }
 
       final docRef =
@@ -146,6 +158,9 @@ class PostProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('投稿作成エラー: $e');
         print('投稿データ: ${post.toFirestore()}');
+        if (e.toString().contains('permission-denied')) {
+          print('権限拒否エラー - Firestoreセキュリティルールを確認してください');
+        }
       }
       return null;
     } finally {
@@ -188,11 +203,16 @@ class PostProvider extends ChangeNotifier {
       _followingPosts.removeWhere((post) => post.id == startPostId);
       _communityPosts.removeWhere((post) => post.id == startPostId);
 
-      // 更新された投稿を各リストの先頭に追加（最新として扱う）
+      // 更新された投稿を各リストに追加し、更新時刻順に再ソート
       _userPosts.insert(0, updatedPost);
+      _userPosts.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
       _followingPosts.insert(0, updatedPost);
+      _followingPosts.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
       if (updatedPost.communityIds.isNotEmpty) {
         _communityPosts.insert(0, updatedPost);
+        _communityPosts.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       }
 
       notifyListeners();
@@ -210,7 +230,7 @@ class PostProvider extends ChangeNotifier {
   }
 
   // ユーザー投稿キャッシュをクリア
-  void _clearUserPostsCache(String userId) {
+  void clearUserPostsCache(String userId) {
     _userPostsCache.remove(userId);
     _userPostsCacheTime.remove(userId);
   }
@@ -231,7 +251,7 @@ class PostProvider extends ChangeNotifier {
       final querySnapshot = await _firestore
           .collection('posts')
           .where('userId', whereIn: followingIds)
-          .limit(50)
+          .limit(30) // 50から30に削減して高速化
           .get();
 
       final posts = querySnapshot.docs
@@ -247,12 +267,10 @@ class PostProvider extends ChangeNotifier {
         }
       }
 
-      // クライアント側でソート（END投稿を最新として扱う）
+      // クライアント側でソート（最新の更新順に表示）
       filteredPosts.sort((a, b) {
-        // END投稿がある場合は、actualEndTimeを使用
-        final aTime = a.actualEndTime ?? a.createdAt;
-        final bTime = b.actualEndTime ?? b.createdAt;
-        return bTime.compareTo(aTime);
+        // 最新の更新時刻で比較（END投稿時はupdatedAtが更新されるため）
+        return b.updatedAt.compareTo(a.updatedAt);
       });
 
       _followingPosts = filteredPosts;
@@ -290,7 +308,7 @@ class PostProvider extends ChangeNotifier {
             .collection('posts')
             .where('communityIds', arrayContains: communityId)
             .orderBy('createdAt', descending: false)
-            .limit(50)
+            .limit(30) // 50から30に削減
             .get();
 
         if (kDebugMode) {
@@ -308,7 +326,7 @@ class PostProvider extends ChangeNotifier {
         querySnapshot = await _firestore
             .collection('posts')
             .where('communityIds', arrayContains: communityId)
-            .limit(50)
+            .limit(30) // 50から30に削減
             .get();
 
         if (kDebugMode) {
@@ -389,12 +407,10 @@ class PostProvider extends ChangeNotifier {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
-      // クライアント側でソート（END投稿を最新として扱う）
+      // クライアント側でソート（最新の更新順に表示）
       posts.sort((a, b) {
-        // END投稿がある場合は、actualEndTimeを使用
-        final aTime = a.actualEndTime ?? a.createdAt;
-        final bTime = b.actualEndTime ?? b.createdAt;
-        return bTime.compareTo(aTime);
+        // 最新の更新時刻で比較（END投稿時はupdatedAtが更新されるため）
+        return b.updatedAt.compareTo(a.updatedAt);
       });
 
       _communityPosts = posts;
@@ -418,23 +434,24 @@ class PostProvider extends ChangeNotifier {
       return _userPosts;
     }
 
+    // キャッシュをチェック（ロード状態設定前にチェック）
+    if (_userPostsCache.containsKey(userId)) {
+      final cacheTime = _userPostsCacheTime[userId];
+      if (cacheTime != null &&
+          DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        if (kDebugMode) {
+          print('ユーザー投稿をキャッシュから取得: $userId');
+        }
+        _userPosts = _userPostsCache[userId]!;
+        // キャッシュヒット時はロード状態を設定しない
+        return _userPosts;
+      }
+    }
+
     try {
       _setLoading(true);
       _setError(null);
       _currentUserId = userId;
-
-      // キャッシュをチェック
-      if (_userPostsCache.containsKey(userId)) {
-        final cacheTime = _userPostsCacheTime[userId];
-        if (cacheTime != null &&
-            DateTime.now().difference(cacheTime) < _cacheExpiry) {
-          if (kDebugMode) {
-            print('ユーザー投稿をキャッシュから取得: $userId');
-          }
-          _userPosts = _userPostsCache[userId]!;
-          return _userPosts;
-        }
-      }
 
       if (kDebugMode) {
         print('ユーザー投稿取得開始: $userId');
@@ -459,8 +476,7 @@ class PostProvider extends ChangeNotifier {
         }
       }
 
-      // 期限切れ投稿を自動更新
-      await _checkAndUpdateExpiredPosts();
+      // 期限切れ投稿チェックを削除（高速化）
 
       final querySnapshot = await _firestore
           .collection('posts')
@@ -472,12 +488,10 @@ class PostProvider extends ChangeNotifier {
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
 
-      // END投稿を最新として扱うようにソート
+      // 最新の更新順でソート
       _userPosts.sort((a, b) {
-        // END投稿がある場合は、actualEndTimeを使用
-        final aTime = a.actualEndTime ?? a.createdAt;
-        final bTime = b.actualEndTime ?? b.createdAt;
-        return bTime.compareTo(aTime);
+        // 最新の更新時刻で比較（END投稿時はupdatedAtが更新されるため）
+        return b.updatedAt.compareTo(a.updatedAt);
       });
 
       // キャッシュに保存

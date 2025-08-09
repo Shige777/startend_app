@@ -78,12 +78,11 @@ service firebase.storage {
     
     function isOwnerOrValidFileName(fileName) {
       // ファイル名にユーザーIDが含まれているかチェック
-      // 現在のファイル名形式: {timestamp}_{shortUserId}.jpg
-      // ファイル名にuserIdまたはその一部が含まれていればOK
+      // 現在のファイル名形式: {timestamp}_{userId}.jpg
       return isValidFileName(fileName) && (
-        fileName.matches('.*_' + request.auth.uid + '\\.jpg') ||
-        fileName.matches('.*_.*\\.jpg') // 一時的に緩和
+        fileName.matches('.*_' + request.auth.uid.split('').slice(0, 10).join('') + '\\.jpg') ||
+        fileName.matches('.*_' + request.auth.uid + '\\.jpg')
       );
     }
   }
-} 
+}

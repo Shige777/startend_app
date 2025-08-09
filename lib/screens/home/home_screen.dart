@@ -9,10 +9,8 @@ import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../services/storage_service.dart';
-import '../../services/notification_service.dart';
 import '../../widgets/post_list_widget.dart';
 import '../../widgets/custom_tab_bar.dart';
-import '../../widgets/native_ad_widget.dart';
 import '../community/community_screen.dart';
 import '../../widgets/platform_image_picker.dart';
 import '../profile/profile_screen.dart';
@@ -39,42 +37,54 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
 
-    // 初期化完了後にローディング状態をfalseに設定
+    // 初期化完了後にローディング状態をfalseに設定し、ユーザー情報を確認（フレームレート制御）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
+        // フレーム処理の重複を避けるため、少し遅延させる
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            // ユーザー情報の初期化を確認
+            _ensureUserInitialized();
+          }
         });
       }
     });
 
-    // URLパラメータからタブを設定（GoRouterStateエラー回避）
+    // URLパラメータからタブを設定（GoRouterStateエラー回避、フレーム処理最適化）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        try {
-          final uri = GoRouterState.of(context).uri;
-          final tabParam = uri.queryParameters['tab'];
-          if (tabParam == '1') {
-            setState(() {
-              _selectedIndex = 1; // 軌跡タブ
-            });
-          } else if (tabParam == 'community') {
-            setState(() {
-              _selectedIndex = 0; // 投稿画面
-            });
-            // コミュニティタブを選択
-            _tabController.index = 1;
-          } else {
-            // デフォルトまたは投稿タブ
-            setState(() {
-              _selectedIndex = 0;
-            });
-            _tabController.index = 0;
+        // 前のaddPostFrameCallbackと競合しないよう少し遅延
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (mounted) {
+            try {
+              final uri = GoRouterState.of(context).uri;
+              final tabParam = uri.queryParameters['tab'];
+              if (tabParam == '1') {
+                setState(() {
+                  _selectedIndex = 1; // 軌跡タブ
+                });
+              } else if (tabParam == 'community') {
+                setState(() {
+                  _selectedIndex = 0; // 投稿画面
+                });
+                // コミュニティタブを選択
+                _tabController.index = 1;
+              } else {
+                // デフォルトまたは投稿タブ
+                setState(() {
+                  _selectedIndex = 0;
+                });
+                _tabController.index = 0;
+              }
+            } catch (e) {
+              print('GoRouterState not available: $e');
+              // デフォルトタブを使用
+            }
           }
-        } catch (e) {
-          print('GoRouterState not available: $e');
-          // デフォルトタブを使用
-        }
+        });
       }
     });
   }
@@ -84,6 +94,18 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  // ユーザー情報の初期化を確保
+  void _ensureUserInitialized() async {
+    try {
+      final userProvider = context.read<UserProvider>();
+      if (userProvider.currentUser == null && !userProvider.isLoading) {
+        await userProvider.refreshCurrentUser();
+      }
+    } catch (e) {
+      print('HomeScreen: Error ensuring user initialized: $e');
+    }
   }
 
   @override
@@ -96,11 +118,7 @@ class _HomeScreenState extends State<HomeScreen>
           : _buildContent(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        onTap: _onBottomTabChanged,
         backgroundColor: Colors.white, // 背景色を白に変更
         elevation: 0, // 影を削除
         items: const [
@@ -480,6 +498,23 @@ class _HomeScreenState extends State<HomeScreen>
   void _onTabChanged() {
     // タブが変更されたときの処理
     setState(() {}); // FloatingActionButtonのアイコンを更新
+
+    // ユーザー情報の初期化を確認（特にフォロー中タブに切り替わった時）
+    if (_tabController.index == 0) {
+      _ensureUserInitialized();
+    }
+  }
+
+  void _onBottomTabChanged(int index) {
+    final oldIndex = _selectedIndex;
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    // 軌跡タブに初回切り替え時のみリフレッシュ
+    if (index == 1 && oldIndex != 1) {
+      _ensureUserInitialized();
+    }
   }
 
   void _showImagePickerBottomSheet(
