@@ -354,24 +354,19 @@ class FollowService {
         'approvedAt': FieldValue.serverTimestamp(),
       });
 
-      // フォロー関係を作成
-      final followRef =
-          _firestore.collection('follows').doc('${requesterId}_$targetUserId');
-      batch.set(followRef, {
-        'followerId': requesterId,
-        'followingId': targetUserId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // フォロー数を更新
+      // フォロー関係を作成（現在のデータ構造に合わせて修正）
+      // リクエスター（フォローする側）のfollowingIdsに追加
       final requesterRef = _firestore.collection('users').doc(requesterId);
       batch.update(requesterRef, {
-        'followingCount': FieldValue.increment(1),
+        'followingIds': FieldValue.arrayUnion([targetUserId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // ターゲット（フォローされる側）のfollowerIdsに追加
       final targetRef = _firestore.collection('users').doc(targetUserId);
       batch.update(targetRef, {
-        'followerCount': FieldValue.increment(1),
+        'followerIds': FieldValue.arrayUnion([requesterId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       await batch.commit();
