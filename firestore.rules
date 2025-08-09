@@ -3,24 +3,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users collection
     match /users/{userId} {
-      // 自分のプロフィールは読み書き可能
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 読み取り権限：認証済みユーザー
+      allow read: if request.auth != null;
       
-      // 他のユーザーのプロフィールは読み取りのみ（プライベートアカウントは除く）
-      allow read: if request.auth != null && (
-        !resource.data.get('isPrivate', false) ||
-        request.auth.uid in resource.data.get('followerIds', [])
-      );
-      
-      // 新規ユーザー作成時のバリデーション
+      // 自分のプロフィール作成・更新
       allow create: if request.auth != null && 
         request.auth.uid == userId &&
         validateUserData(request.resource.data);
       
-      // ユーザー更新時のバリデーション
       allow update: if request.auth != null && 
         request.auth.uid == userId &&
         validateUserUpdate(resource.data, request.resource.data);
+      
+      // フォロー・アンフォロー用：認証済みユーザーが他のユーザーのfollowerIdsを更新可能
+      allow update: if request.auth != null && 
+        isFollowUnfollowUpdate(resource.data, request.resource.data);
     }
     
     // Posts collection
@@ -133,25 +130,29 @@ service cloud.firestore {
     }
     
     function validateUserUpdate(oldData, newData) {
-      // 基本フィールドの検証（メールアドレスは変更不可）
-      let hasValidBasicFields = newData.keys().hasAll(['updatedAt']) &&
+      // 基本的な安全性チェック
+      let hasUpdatedAt = newData.keys().hasAny(['updatedAt']);
+      
+      // メールアドレスが存在する場合は変更不可
+      let emailValid = !('email' in newData) || 
+        !('email' in oldData) || 
         newData.email == oldData.email;
       
       // オプションフィールドの検証
       let hasValidOptionalFields = (
-        // displayName: 文字列で50文字以下
+        // displayName: 文字列で50文字以下（存在する場合）
         (!('displayName' in newData) || (newData.displayName is string && newData.displayName.size() > 0 && newData.displayName.size() <= 50)) &&
-        // followingIds: 配列
+        // followingIds: 配列（存在する場合）
         (!('followingIds' in newData) || newData.followingIds is list) &&
-        // followerIds: 配列  
+        // followerIds: 配列（存在する場合）
         (!('followerIds' in newData) || newData.followerIds is list) &&
-        // postCount: 数値
-        (!('postCount' in newData) || newData.postCount is number) &&
-        // その他のフィールドは自由
+        // postCount: 数値（存在する場合）
+        (!('postCount' in newData) || (newData.postCount is number && newData.postCount >= 0)) &&
+        // その他のフィールドは制限なし
         true
       );
       
-      return hasValidBasicFields && hasValidOptionalFields;
+      return hasUpdatedAt && emailValid && hasValidOptionalFields;
     }
     
     function validatePostData(data) {
@@ -245,6 +246,20 @@ service cloud.firestore {
       // 変更されたキーが許可されたキーのサブセットであることを確認
       return affectedKeys.hasAll([]) && // 最低限の条件
              affectedKeys.hasOnly(allowedKeys);
+    }
+    
+    function isFollowUnfollowUpdate(oldData, newData) {
+      // フォロー・アンフォロー操作の場合のみ許可
+      let allowedKeys = ['followingIds', 'followerIds', 'updatedAt'];
+      let affectedKeys = newData.diff(oldData).affectedKeys();
+      
+      // 変更されたキーがフォロー関連のキーのみであることを確認
+      return affectedKeys.hasOnly(allowedKeys) &&
+             // updatedAtは必須
+             'updatedAt' in newData.keys() &&
+             // 基本的なデータ型チェック
+             (!('followingIds' in newData) || newData.followingIds is list) &&
+             (!('followerIds' in newData) || newData.followerIds is list);
     }
   }
 }

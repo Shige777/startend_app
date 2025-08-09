@@ -57,27 +57,49 @@ class FollowService {
     required String followingId,
   }) async {
     try {
+      if (kDebugMode) {
+        print('フォロー解除開始: $followerId -> $followingId');
+      }
+
       final batch = _firestore.batch();
 
       // フォローする側のfollowingIdsから削除
       final followerUserRef = _firestore.collection('users').doc(followerId);
-      batch.update(followerUserRef, {
+      final followerUpdateData = {
         'followingIds': FieldValue.arrayRemove([followingId]),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (kDebugMode) {
+        print('フォロワー更新データ: $followerUpdateData');
+      }
+
+      batch.update(followerUserRef, followerUpdateData);
 
       // フォローされる側のfollowerIdsから削除
       final followingUserRef = _firestore.collection('users').doc(followingId);
-      batch.update(followingUserRef, {
+      final followingUpdateData = {
         'followerIds': FieldValue.arrayRemove([followerId]),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (kDebugMode) {
+        print('フォロー先更新データ: $followingUpdateData');
+      }
+
+      batch.update(followingUserRef, followingUpdateData);
 
       await batch.commit();
+
+      if (kDebugMode) {
+        print('フォロー解除成功');
+      }
+
       return true;
     } catch (e) {
       if (kDebugMode) {
         print('フォロー解除エラー: $e');
+        print('Firestore権限エラーの可能性 - ルールを確認してください');
       }
       return false;
     }
