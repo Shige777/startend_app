@@ -409,6 +409,7 @@ class _PostListWidgetState extends State<PostListWidget> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('投稿削除'),
         content: const Text('この投稿を削除しますか？\nこの操作は取り消せません。'),
         actions: [

@@ -143,6 +143,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('コミュニティを削除'),
         content: const Text('この操作は取り消せません。本当にコミュニティを削除しますか？'),
         actions: [

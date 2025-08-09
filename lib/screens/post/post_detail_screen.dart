@@ -423,6 +423,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Text(AppLocalizations.of(context)!.deletePost),
         content: Text(AppLocalizations.of(context)!.deletePostConfirm),
         actions: [

@@ -2101,6 +2101,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           title: const Text('アカウント削除の確認'),
           content: const Text(
             '本当にアカウントを削除しますか？\n\n'

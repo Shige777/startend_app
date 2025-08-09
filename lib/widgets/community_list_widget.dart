@@ -309,6 +309,7 @@ class _CommunityListWidgetState extends State<CommunityListWidget> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('コミュニティ脱退'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

@@ -860,6 +860,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('メンバー削除'),
         content: const Text('このメンバーをコミュニティから削除しますか？'),
         actions: [
@@ -900,6 +901,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('リーダー移譲'),
         content: const Text('このメンバーを新しいリーダーに任命しますか？\nあなたは通常のメンバーになります。'),
         actions: [
@@ -971,6 +973,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('投稿削除'),
         content: const Text('この投稿を削除しますか？\nこの操作は取り消せません。'),
         actions: [
