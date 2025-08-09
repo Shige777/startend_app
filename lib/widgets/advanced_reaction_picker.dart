@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../constants/app_colors.dart';
+import '../generated/l10n/app_localizations.dart';
 
 class AdvancedReactionPicker extends StatefulWidget {
   final Function(String emoji) onReactionSelected;
@@ -237,7 +238,7 @@ class _AdvancedReactionPickerState extends State<AdvancedReactionPicker> {
               child: Row(
                 children: [
                   Text(
-                    'すべての絵文字',
+                    AppLocalizations.of(context)!.allEmojis,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -270,9 +271,9 @@ class _AdvancedReactionPickerState extends State<AdvancedReactionPicker> {
                     gridPadding: EdgeInsets.zero,
                     recentsLimit: 28,
                     replaceEmojiOnLimitExceed: false,
-                    noRecents: const Text(
-                      '最近使った絵文字なし',
-                      style: TextStyle(fontSize: 20, color: Colors.black26),
+                    noRecents: Text(
+                      AppLocalizations.of(context)!.recentEmojis,
+                      style: const TextStyle(fontSize: 20, color: Colors.black26),
                       textAlign: TextAlign.center,
                     ),
                     loadingIndicator: const SizedBox.shrink(),

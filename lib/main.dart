@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import 'package:timezone/data/latest.dart' as tz;
 
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
+import 'generated/l10n/app_localizations.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/post_provider.dart';
@@ -110,6 +112,16 @@ class MyApp extends StatelessWidget {
           return MaterialApp.router(
             title: 'StartEnd SNS',
             debugShowCheckedModeBanner: false,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('ja'), // 日本語
+              Locale('en'), // 英語
+            ],
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
                 seedColor: AppColors.primary,

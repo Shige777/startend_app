@@ -1,0 +1,181 @@
+{
+  "@@locale": "en",
+  "appTitle": "StartEnd",
+  "@appTitle": {
+    "description": "Application title"
+  },
+  
+  "homeTab": "Home",
+  "@homeTab": {
+    "description": "Home tab"
+  },
+  
+  "searchTab": "Search",
+  "@searchTab": {
+    "description": "Search tab"
+  },
+  
+  "communityTab": "Community",
+  "@communityTab": {
+    "description": "Community tab"
+  },
+  
+  "profileTab": "Profile",
+  "@profileTab": {
+    "description": "Profile tab"
+  },
+  
+  "postNotFound": "Post not found",
+  "@postNotFound": {
+    "description": "Message when post is not found"
+  },
+  
+  "loadPostFailed": "Failed to load post",
+  "@loadPostFailed": {
+    "description": "Message when post loading fails"
+  },
+  
+  "loginRequired": "Login required",
+  "@loginRequired": {
+    "description": "Message when login is required"
+  },
+  
+  "addReactionFailed": "Failed to add reaction",
+  "@addReactionFailed": {
+    "description": "Message when reaction addition fails"
+  },
+  
+  "updateReactionFailed": "Failed to update reaction",
+  "@updateReactionFailed": {
+    "description": "Message when reaction update fails"
+  },
+  
+  "errorOccurred": "An error occurred",
+  "@errorOccurred": {
+    "description": "General error message"
+  },
+  
+  "deletePost": "Delete Post",
+  "@deletePost": {
+    "description": "Delete post dialog title"
+  },
+  
+  "deletePostConfirm": "Are you sure you want to delete this post?\nThis action cannot be undone.",
+  "@deletePostConfirm": {
+    "description": "Delete post confirmation message"
+  },
+  
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button"
+  },
+  
+  "postDeleted": "Post deleted",
+  "@postDeleted": {
+    "description": "Post deletion success message"
+  },
+  
+  "deletePostFailed": "Failed to delete post",
+  "@deletePostFailed": {
+    "description": "Post deletion failure message"
+  },
+  
+  "postDetail": "Post Details",
+  "@postDetail": {
+    "description": "Post detail screen title"
+  },
+  
+  "recentEmojis": "No recent emojis",
+  "@recentEmojis": {
+    "description": "Message when no recent emojis"
+  },
+  
+  "frequentEmojis": "Frequently used emojis",
+  "@frequentEmojis": {
+    "description": "Frequently used emojis section title"
+  },
+  
+  "allEmojis": "All Emojis",
+  "@allEmojis": {
+    "description": "All emoji picker title"
+  },
+  
+  "googleSignInCancelled": "Google sign-in was cancelled",
+  "@googleSignInCancelled": {
+    "description": "Message when Google sign-in is cancelled"
+  },
+  
+  "days": "{count} day(s)",
+  "@days": {
+    "description": "Days display",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "hours": "{count} hour(s)",
+  "@hours": {
+    "description": "Hours display",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "minutes": "{count} minute(s)",
+  "@minutes": {
+    "description": "Minutes display",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTime": "{days} day(s) {hours} hour(s) {minutes} minute(s)",
+  "@elapsedTime": {
+    "description": "Elapsed time display",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTimeHours": "{hours} hour(s) {minutes} minute(s)",
+  "@elapsedTimeHours": {
+    "description": "Elapsed time display with hours and minutes only",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTimeMinutes": "{minutes} minute(s)",
+  "@elapsedTimeMinutes": {
+    "description": "Elapsed time display with minutes only",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
+}

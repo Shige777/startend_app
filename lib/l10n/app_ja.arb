@@ -1,0 +1,181 @@
+{
+  "@@locale": "ja",
+  "appTitle": "StartEnd",
+  "@appTitle": {
+    "description": "アプリのタイトル"
+  },
+  
+  "homeTab": "ホーム",
+  "@homeTab": {
+    "description": "ホームタブ"
+  },
+  
+  "searchTab": "検索",
+  "@searchTab": {
+    "description": "検索タブ"
+  },
+  
+  "communityTab": "コミュニティ",
+  "@communityTab": {
+    "description": "コミュニティタブ"
+  },
+  
+  "profileTab": "プロフィール",
+  "@profileTab": {
+    "description": "プロフィールタブ"
+  },
+  
+  "postNotFound": "投稿が見つかりません",
+  "@postNotFound": {
+    "description": "投稿が見つからない場合のメッセージ"
+  },
+  
+  "loadPostFailed": "投稿の読み込みに失敗しました",
+  "@loadPostFailed": {
+    "description": "投稿読み込み失敗メッセージ"
+  },
+  
+  "loginRequired": "ログインが必要です",
+  "@loginRequired": {
+    "description": "ログインが必要な場合のメッセージ"
+  },
+  
+  "addReactionFailed": "リアクションの追加に失敗しました",
+  "@addReactionFailed": {
+    "description": "リアクション追加失敗メッセージ"
+  },
+  
+  "updateReactionFailed": "リアクションの更新に失敗しました",
+  "@updateReactionFailed": {
+    "description": "リアクション更新失敗メッセージ"
+  },
+  
+  "errorOccurred": "エラーが発生しました",
+  "@errorOccurred": {
+    "description": "一般的なエラーメッセージ"
+  },
+  
+  "deletePost": "投稿削除",
+  "@deletePost": {
+    "description": "投稿削除ダイアログのタイトル"
+  },
+  
+  "deletePostConfirm": "この投稿を削除しますか？\nこの操作は取り消せません。",
+  "@deletePostConfirm": {
+    "description": "投稿削除確認メッセージ"
+  },
+  
+  "cancel": "キャンセル",
+  "@cancel": {
+    "description": "キャンセルボタン"
+  },
+  
+  "delete": "削除",
+  "@delete": {
+    "description": "削除ボタン"
+  },
+  
+  "postDeleted": "投稿を削除しました",
+  "@postDeleted": {
+    "description": "投稿削除完了メッセージ"
+  },
+  
+  "deletePostFailed": "投稿の削除に失敗しました",
+  "@deletePostFailed": {
+    "description": "投稿削除失敗メッセージ"
+  },
+  
+  "postDetail": "投稿詳細",
+  "@postDetail": {
+    "description": "投稿詳細画面のタイトル"
+  },
+  
+  "recentEmojis": "最近使った絵文字なし",
+  "@recentEmojis": {
+    "description": "最近使った絵文字がない場合のメッセージ"
+  },
+  
+  "frequentEmojis": "よく使う絵文字",
+  "@frequentEmojis": {
+    "description": "よく使う絵文字セクションタイトル"
+  },
+  
+  "allEmojis": "すべての絵文字",
+  "@allEmojis": {
+    "description": "すべての絵文字ピッカーのタイトル"
+  },
+  
+  "googleSignInCancelled": "Googleサインインがキャンセルされました",
+  "@googleSignInCancelled": {
+    "description": "Googleサインインキャンセル時のメッセージ"
+  },
+  
+  "days": "{count}日",
+  "@days": {
+    "description": "日数表示",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "hours": "{count}時間",
+  "@hours": {
+    "description": "時間表示",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "minutes": "{count}分",
+  "@minutes": {
+    "description": "分表示",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTime": "{days}日{hours}時間{minutes}分",
+  "@elapsedTime": {
+    "description": "経過時間の表示",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTimeHours": "{hours}時間{minutes}分",
+  "@elapsedTimeHours": {
+    "description": "時間・分のみの経過時間表示",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "elapsedTimeMinutes": "{minutes}分",
+  "@elapsedTimeMinutes": {
+    "description": "分のみの経過時間表示",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
+}

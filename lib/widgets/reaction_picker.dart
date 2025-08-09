@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+import '../generated/l10n/app_localizations.dart';
 
 class ReactionPicker extends StatelessWidget {
   final Function(String emoji) onReactionSelected;
@@ -95,7 +96,7 @@ class ReactionPicker extends StatelessWidget {
           
           // よく使う絵文字セクション
           Text(
-            'よく使う絵文字',
+            AppLocalizations.of(context)!.frequentEmojis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),

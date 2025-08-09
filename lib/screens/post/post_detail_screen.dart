@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../generated/l10n/app_localizations.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/post_provider.dart';
@@ -79,14 +80,14 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('投稿が見つかりません')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.postNotFound)),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('投稿の読み込みに失敗しました: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context)!.loadPostFailed}: $e')),
         );
       }
     } finally {
@@ -100,7 +101,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   void _showReactionPicker(UserModel? currentUser) {
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログインが必要です')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.loginRequired)),
       );
       return;
     }
@@ -157,12 +158,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+              content: Text(postProvider.errorMessage ?? AppLocalizations.of(context)!.addReactionFailed)),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('エラーが発生しました: $e')),
+        SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
     }
   }
@@ -200,12 +201,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+              content: Text(postProvider.errorMessage ?? AppLocalizations.of(context)!.updateReactionFailed)),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('エラーが発生しました: $e')),
+        SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
       );
     }
   }
@@ -222,14 +223,14 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('投稿削除'),
-        content: const Text('この投稿を削除しますか？\nこの操作は取り消せません。'),
+        title: Text(AppLocalizations.of(context)!.deletePost),
+        content: Text(AppLocalizations.of(context)!.deletePostConfirm),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: const Text('キャンセル'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -239,7 +240,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
             ),
-            child: const Text('削除'),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),
@@ -271,13 +272,13 @@ class _PostDetailScreenState extends State<PostDetailScreen>
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('投稿を削除しました')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.postDeleted)),
           );
           // 前の画面に戻る
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('投稿の削除に失敗しました')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.deletePostFailed)),
           );
         }
       }
@@ -285,7 +286,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       if (mounted) {
         Navigator.of(context).pop(); // ローディング終了
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('エラーが発生しました: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context)!.errorOccurred}: $e')),
         );
       }
     }
@@ -334,7 +335,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
             }
           },
         ),
-        title: const Text('投稿詳細'),
+        title: Text(AppLocalizations.of(context)!.postDetail),
         actions: [
           // 投稿者本人の場合のみ削除ボタンを表示
           if (_isPostOwner()) ...[
@@ -438,11 +439,11 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     final minutes = elapsed.inMinutes % 60;
 
     if (days > 0) {
-      return '${days}日${hours}時間${minutes}分';
+      return AppLocalizations.of(context)!.elapsedTime(days, hours, minutes);
     } else if (hours > 0) {
-      return '${hours}時間${minutes}分';
+      return AppLocalizations.of(context)!.elapsedTimeHours(hours, minutes);
     } else {
-      return '${minutes}分';
+      return AppLocalizations.of(context)!.elapsedTimeMinutes(minutes);
     }
   }
 }
