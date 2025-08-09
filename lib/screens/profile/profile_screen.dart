@@ -2284,7 +2284,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               content: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.eco, color: AppColors.flame),
+                  const Icon(Icons.celebration, color: AppColors.flame),
                   const SizedBox(width: 8),
                   Text('${post.title}にリアクションしました'),
                 ],

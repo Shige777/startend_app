@@ -7,6 +7,8 @@ import '../../providers/user_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../widgets/post_card_widget.dart';
+import '../../widgets/reaction_picker.dart';
+import '../../widgets/reaction_display.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -123,6 +125,115 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // リアクション選択画面を表示
+  void _showReactionPicker(UserModel? currentUser) {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    showReactionPicker(context, (emoji) {
+      _addReaction(emoji, currentUser);
+    });
+  }
+
+  // リアクション追加
+  Future<void> _addReaction(String emoji, UserModel currentUser) async {
+    if (_post == null) return;
+
+    try {
+      final postProvider = context.read<PostProvider>();
+      final success = await postProvider.addReaction(_post!.id, emoji, currentUser.id);
+
+      if (success) {
+        // ローカル状態を更新
+        setState(() {
+          final newReactions = Map<String, List<String>>.from(_post!.reactions);
+          if (newReactions[emoji] == null) {
+            newReactions[emoji] = [];
+          }
+          if (!newReactions[emoji]!.contains(currentUser.id)) {
+            newReactions[emoji]!.add(currentUser.id);
+          }
+          _post = _post!.copyWith(reactions: newReactions);
+        });
+
+        // PostProviderの各リストも更新
+        postProvider.updatePostInLists(_post!);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
+    }
+  }
+
+  // リアクションの切り替え（追加/削除）
+  Future<void> _toggleReaction(String emoji, UserModel? currentUser) async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    if (_post == null) return;
+
+    try {
+      final postProvider = context.read<PostProvider>();
+      final hasReaction = _post!.hasReaction(emoji, currentUser.id);
+      
+      bool success;
+      if (hasReaction) {
+        success = await postProvider.removeReaction(_post!.id, emoji, currentUser.id);
+      } else {
+        success = await postProvider.addReaction(_post!.id, emoji, currentUser.id);
+      }
+
+      if (success) {
+        // ローカル状態を更新
+        setState(() {
+          final newReactions = Map<String, List<String>>.from(_post!.reactions);
+          
+          if (hasReaction) {
+            // リアクション削除
+            newReactions[emoji]?.remove(currentUser.id);
+            if (newReactions[emoji]?.isEmpty == true) {
+              newReactions.remove(emoji);
+            }
+          } else {
+            // リアクション追加
+            if (newReactions[emoji] == null) {
+              newReactions[emoji] = [];
+            }
+            if (!newReactions[emoji]!.contains(currentUser.id)) {
+              newReactions[emoji]!.add(currentUser.id);
+            }
+          }
+          
+          _post = _post!.copyWith(reactions: newReactions);
+        });
+
+        // PostProviderの各リストも更新
+        postProvider.updatePostInLists(_post!);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
     }
   }
 
@@ -370,81 +481,25 @@ class _PostDetailScreenState extends State<PostDetailScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  // いいねボタン
-                  InkWell(
-                    onTap: () {
-                      final wasLiked = _isLiked;
-                      _toggleLike();
-                      if (!wasLiked) {
-                        // アニメーションコントローラーをリセットしてから開始
-                        _likeAnimationController.reset();
-                        _likeAnimationController.forward().then((_) {
-                          // アニメーション終了後はそのまま停止
-                        });
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                  // リアクションシステム
+                  Consumer<UserProvider>(
+                    builder: (context, userProvider, child) {
+                      final currentUser = userProvider.currentUser;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AnimatedBuilder(
-                            animation: _likeAnimationController,
-                            builder: (context, child) {
-                              if (_likeAnimationController.status ==
-                                  AnimationStatus.dismissed) {
-                                // 通常時はそのまま
-                                return Icon(
-                                  Icons.eco,
-                                  size: 28,
-                                  color: _isLiked
-                                      ? AppColors.flame
-                                      : AppColors.textSecondary,
-                                );
-                              } else {
-                                // アニメーション中は上から落ちてくる
-                                return SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, -1.0),
-                                    end: const Offset(0, 0),
-                                  ).animate(CurvedAnimation(
-                                    parent: _likeAnimationController,
-                                    curve: Curves.easeOut,
-                                  )),
-                                  child: Transform.rotate(
-                                    angle: _rotationAnimation.value,
-                                    child: Transform.scale(
-                                      scale: _likeAnimation.value,
-                                      child: Icon(
-                                        Icons.eco,
-                                        size: 28,
-                                        color: _isLiked
-                                            ? AppColors.flame
-                                            : AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _post!.likeCount.toString(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: _isLiked
-                                      ? AppColors.flame
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          // リアクション表示
+                          ReactionDisplay(
+                            post: _post!,
+                            currentUserId: currentUser?.id,
+                            onReactionTap: (emoji) => _toggleReaction(emoji, currentUser),
+                            onAddReaction: () => _showReactionPicker(currentUser),
+                            maxDisplayed: 5,
                           ),
                         ],
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),

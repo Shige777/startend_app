@@ -11,6 +11,8 @@ import '../utils/date_time_utils.dart';
 import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
 import '../models/user_model.dart';
+import 'reaction_picker.dart';
+import 'reaction_display.dart';
 
 class PostCardWidget extends StatefulWidget {
   final PostModel post;
@@ -503,103 +505,23 @@ class _PostCardWidgetState extends State<PostCardWidget>
                     horizontal: AppConstants.defaultPadding),
                 child: Row(
                   children: [
-                    // いいねボタン
+                    // リアクションシステム
                     Consumer<UserProvider>(
                       builder: (context, userProvider, child) {
                         final currentUser = userProvider.currentUser;
-                        final isLiked = currentUser != null &&
-                            widget.post.isLikedBy(currentUser.id);
 
-                        return InkWell(
-                          onTap: _isProcessingLike
-                              ? null
-                              : () async {
-                                  if (_isProcessingLike) return;
-
-                                  setState(() {
-                                    _isProcessingLike = true;
-                                  });
-
-                                  final wasLiked = isLiked;
-                                  _toggleLike(context, currentUser);
-
-                                  // いいねを追加した時のみアニメーションを実行
-                                  if (!wasLiked) {
-                                    // アニメーションコントローラーをリセットしてから開始
-                                    _likeAnimationController.reset();
-                                    _likeAnimationController
-                                        .forward()
-                                        .then((_) {
-                                      // アニメーション終了後はそのまま停止
-                                    });
-                                  }
-
-                                  if (mounted) {
-                                    setState(() {
-                                      _isProcessingLike = false;
-                                    });
-                                  }
-                                },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AnimatedBuilder(
-                                  animation: _likeAnimationController,
-                                  builder: (context, child) {
-                                    // アニメーション中は特別な表示、それ以外は通常のアイコン
-                                    if (_likeAnimationController.status ==
-                                        AnimationStatus.forward) {
-                                      return SlideTransition(
-                                        position: _fallingAnimation,
-                                        child: Transform.rotate(
-                                          angle: _rotationAnimation.value,
-                                          child: Transform.scale(
-                                            scale: _likeAnimation.value,
-                                            child: Icon(
-                                              Icons.eco,
-                                              size: 20,
-                                              color: _isProcessingLike
-                                                  ? AppColors.textHint
-                                                  : isLiked
-                                                      ? AppColors.flame
-                                                      : AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      // 通常状態のアイコン
-                                      return Icon(
-                                        Icons.eco,
-                                        size: 20,
-                                        color: _isProcessingLike
-                                            ? AppColors.textHint
-                                            : isLiked
-                                                ? AppColors.flame
-                                                : AppColors.textSecondary,
-                                      );
-                                    }
-                                  },
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  widget.post.likeCount.toString(),
-                                  style: TextStyle(
-                                    color: _isProcessingLike
-                                        ? AppColors.textHint
-                                        : isLiked
-                                            ? AppColors.flame
-                                            : AppColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // リアクション表示
+                            ReactionDisplay(
+                              post: widget.post,
+                              currentUserId: currentUser?.id,
+                              onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
+                              onAddReaction: () => _showReactionPicker(context, currentUser),
+                              maxDisplayed: 4,
                             ),
-                          ),
+                          ],
                         );
                       },
                     ),
@@ -1014,6 +936,130 @@ class _PostCardWidgetState extends State<PostCardWidget>
       ),
       child: chipContent,
     );
+  }
+
+  // リアクション選択画面を表示
+  void _showReactionPicker(BuildContext context, UserModel? currentUser) {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    showReactionPicker(context, (emoji) {
+      _addReaction(context, emoji, currentUser);
+    });
+  }
+
+  // リアクション追加
+  Future<void> _addReaction(BuildContext context, String emoji, UserModel currentUser) async {
+    if (_isProcessingLike) return;
+
+    setState(() {
+      _isProcessingLike = true;
+    });
+
+    try {
+      final postProvider = context.read<PostProvider>();
+      final success = await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
+
+      if (success) {
+        // PostProviderの各リストも更新
+        final updatedPost = widget.post.copyWith(
+          reactions: {
+            ...widget.post.reactions,
+            emoji: [
+              ...(widget.post.reactions[emoji] ?? []),
+              if (!(widget.post.reactions[emoji]?.contains(currentUser.id) ?? false)) currentUser.id,
+            ],
+          },
+        );
+        postProvider.updatePostInLists(updatedPost);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('リアクション追加エラー: $e');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
+    } finally {
+      setState(() {
+        _isProcessingLike = false;
+      });
+    }
+  }
+
+  // リアクションの切り替え（追加/削除）
+  void _toggleReaction(BuildContext context, String emoji, UserModel? currentUser) async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログインが必要です')),
+      );
+      return;
+    }
+
+    if (_isProcessingLike) return;
+
+    setState(() {
+      _isProcessingLike = true;
+    });
+
+    try {
+      final postProvider = context.read<PostProvider>();
+      final hasReaction = widget.post.hasReaction(emoji, currentUser.id);
+      
+      bool success;
+      if (hasReaction) {
+        success = await postProvider.removeReaction(widget.post.id, emoji, currentUser.id);
+      } else {
+        success = await postProvider.addReaction(widget.post.id, emoji, currentUser.id);
+      }
+
+      if (success) {
+        // ローカル状態を更新
+        final newReactions = Map<String, List<String>>.from(widget.post.reactions);
+        
+        if (hasReaction) {
+          // リアクション削除
+          newReactions[emoji]?.remove(currentUser.id);
+          if (newReactions[emoji]?.isEmpty == true) {
+            newReactions.remove(emoji);
+          }
+        } else {
+          // リアクション追加
+          if (newReactions[emoji] == null) {
+            newReactions[emoji] = [];
+          }
+          if (!newReactions[emoji]!.contains(currentUser.id)) {
+            newReactions[emoji]!.add(currentUser.id);
+          }
+        }
+
+        final updatedPost = widget.post.copyWith(reactions: newReactions);
+        postProvider.updatePostInLists(updatedPost);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('リアクション切り替えエラー: $e');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラーが発生しました: $e')),
+      );
+    } finally {
+      setState(() {
+        _isProcessingLike = false;
+      });
+    }
   }
 
   void _toggleLike(BuildContext context, UserModel? currentUser) async {

@@ -34,7 +34,8 @@ class PostModel {
   final List<String> communityIds;
   final List<String> likedByUserIds;
   final int likeCount;
-  final Map<String, List<String>> reactions; // リアクション emoji -> [userId1, userId2, ...]
+  final Map<String, List<String>>
+      reactions; // リアクション emoji -> [userId1, userId2, ...]
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -117,9 +118,10 @@ class PostModel {
 
   static Map<String, List<String>> _parseReactions(dynamic reactionsData) {
     if (reactionsData == null) return {};
-    
+
     try {
-      final Map<String, dynamic> reactionsMap = Map<String, dynamic>.from(reactionsData);
+      final Map<String, dynamic> reactionsMap =
+          Map<String, dynamic>.from(reactionsData);
       return reactionsMap.map((emoji, userIds) {
         return MapEntry(emoji, List<String>.from(userIds ?? []));
       });
