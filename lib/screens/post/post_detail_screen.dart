@@ -147,19 +147,19 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   // PostProviderから最新の投稿データで_postを同期
   void _syncPostWithProvider(PostProvider postProvider) {
     if (_post == null) return;
-    
+
     // 全てのリストから検索
     final allPosts = [
       ...postProvider.userPosts,
       ...postProvider.followingPosts,
       ...postProvider.communityPosts,
     ];
-    
+
     try {
       final updatedPost = allPosts.firstWhere(
         (post) => post.id == _post!.id,
       );
-      
+
       // 更新があった場合のみsetState
       if (updatedPost.reactions != _post!.reactions ||
           updatedPost.likeCount != _post!.likeCount ||
