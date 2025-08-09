@@ -503,30 +503,31 @@ class _PostCardWidgetState extends State<PostCardWidget>
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.defaultPadding),
-                child: Row(
-                  children: [
-                    // リアクションシステム
-                    Consumer<UserProvider>(
-                      builder: (context, userProvider, child) {
-                        final currentUser = userProvider.currentUser;
+                child: Consumer<UserProvider>(
+                  builder: (context, userProvider, child) {
+                    final currentUser = userProvider.currentUser;
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // リアクション表示（強化版）
-                            EnhancedReactionDisplay(
-                              post: widget.post,
-                              currentUserId: currentUser?.id,
-                              onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
-                              onAddReaction: () => _showReactionPicker(context, currentUser),
-                              maxDisplayed: 4,
-                              emojiSize: 20,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // リアクション表示（強化版）- 幅制限を回避
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width - 
+                                      (AppConstants.defaultPadding * 2), // パディング考慮
+                          ),
+                          child: EnhancedReactionDisplay(
+                            post: widget.post,
+                            currentUserId: currentUser?.id,
+                            onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
+                            onAddReaction: () => _showReactionPicker(context, currentUser),
+                            maxDisplayed: 6, // フォロー中タブでは少し多めに表示
+                            emojiSize: 18,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],

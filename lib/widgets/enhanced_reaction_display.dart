@@ -46,23 +46,26 @@ class EnhancedReactionDisplay extends StatelessWidget {
       ..sort((a, b) => b.value.length.compareTo(a.value.length));
 
     if (sortedReactions.isEmpty && showAddButton) {
-      return _buildAddButton(context);
+      return SizedBox(
+        height: 50,
+        child: _buildAddButton(context),
+      );
     }
 
     // 表示するリアクションを制限
     final displayedReactions = sortedReactions.take(maxDisplayed).toList();
     
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 200), // 最大高さ制限
+    return SizedBox(
+      height: 100, // 固定高さでオーバーフロー防止
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: IntrinsicHeight(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               // リアクションボタン（カウントが0でないもののみ）
-              ...displayedReactions.map((entry) {
+              ...displayedReactions.asMap().entries.map((mapEntry) {
+                final index = mapEntry.key;
+                final entry = mapEntry.value;
                 final emoji = entry.key;
                 final userIds = entry.value;
                 final count = userIds.length;
@@ -71,23 +74,32 @@ class EnhancedReactionDisplay extends StatelessWidget {
                 // カウントが0の場合は表示しない（念のため再チェック）
                 if (count == 0) return const SizedBox.shrink();
                 
-                return _buildReactionChip(
-                  context,
-                  emoji,
-                  count,
-                  isReactedByUser,
-                  () => onReactionTap(emoji),
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index < displayedReactions.length - 1 ? 6 : 0,
+                  ),
+                  child: _buildReactionChip(
+                    context,
+                    emoji,
+                    count,
+                    isReactedByUser,
+                    () => onReactionTap(emoji),
+                  ),
                 );
               }),
               
               // 追加のリアクションがある場合の表示
-              if (sortedReactions.length > maxDisplayed)
+              if (sortedReactions.length > maxDisplayed) ...[
+                const SizedBox(width: 6),
                 _buildMoreIndicator(context, sortedReactions.length - maxDisplayed),
+              ],
               
               // 追加ボタン
-              if (showAddButton) _buildAddButton(context),
-            ],
-          ),
+              if (showAddButton) ...[
+                const SizedBox(width: 6),
+                _buildAddButton(context),
+              ],
+          ],
         ),
       ),
     );

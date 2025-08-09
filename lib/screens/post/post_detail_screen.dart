@@ -496,15 +496,20 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // リアクション表示（強化版）
-                          EnhancedReactionDisplay(
-                            post: _post!,
-                            currentUserId: currentUser?.id,
-                            onReactionTap: (emoji) =>
-                                _toggleReaction(emoji, currentUser),
-                            onAddReaction: () =>
-                                _showReactionPicker(currentUser),
-                            maxDisplayed: 6,
-                            emojiSize: 24,
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width - 32, // パディング考慮
+                            ),
+                            child: EnhancedReactionDisplay(
+                              post: _post!,
+                              currentUserId: currentUser?.id,
+                              onReactionTap: (emoji) =>
+                                  _toggleReaction(emoji, currentUser),
+                              onAddReaction: () =>
+                                  _showReactionPicker(currentUser),
+                              maxDisplayed: 8, // 投稿詳細では多めに表示
+                              emojiSize: 22,
+                            ),
                           ),
                         ],
                       );

@@ -50,6 +50,39 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
     );
   }
 
+  // PostProviderと同期
+  void _syncWithProvider(PostProvider postProvider) {
+    // 最新の投稿データを各リストから検索
+    PostModel? updatedPost;
+    
+    // 全てのリストから検索
+    final allPosts = [
+      ...postProvider.userPosts,
+      ...postProvider.followingPosts,
+      ...postProvider.communityPosts,
+    ];
+    
+    try {
+      updatedPost = allPosts.firstWhere(
+        (post) => post.id == _currentPost.id,
+      );
+      
+      // 更新があった場合のみsetState
+      if (updatedPost.reactions != _currentPost.reactions ||
+          updatedPost.likeCount != _currentPost.likeCount ||
+          updatedPost.likedByUserIds != _currentPost.likedByUserIds) {
+        setState(() {
+          _currentPost = updatedPost!;
+        });
+      }
+    } catch (e) {
+      // 投稿が見つからない場合は現在の状態を維持
+      if (kDebugMode) {
+        print('投稿が見つかりませんでした: ${_currentPost.id}');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _likeAnimationController.dispose();
@@ -562,26 +595,14 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
 
     try {
       final postProvider = context.read<PostProvider>();
+      
+      // PostProviderのaddReactionが即座にローカル状態とnotifyListenersを実行
       final success = await postProvider.addReaction(
           _currentPost.id, emoji, currentUser.id);
 
       if (success) {
-        // ローカル状態を更新
-        final newReactions =
-            Map<String, List<String>>.from(_currentPost.reactions);
-        if (newReactions[emoji] == null) {
-          newReactions[emoji] = [];
-        }
-        if (!newReactions[emoji]!.contains(currentUser.id)) {
-          newReactions[emoji]!.add(currentUser.id);
-        }
-
-        setState(() {
-          _currentPost = _currentPost.copyWith(reactions: newReactions);
-        });
-
-        // PostProviderの各リストも更新
-        postProvider.updatePostInLists(_currentPost);
+        // PostProviderから最新状態を同期
+        _syncWithProvider(postProvider);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -632,32 +653,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
       }
 
       if (success) {
-        // ローカル状態を更新
-        final newReactions =
-            Map<String, List<String>>.from(_currentPost.reactions);
-
-        if (hasReaction) {
-          // リアクション削除
-          newReactions[emoji]?.remove(currentUser.id);
-          if (newReactions[emoji]?.isEmpty == true) {
-            newReactions.remove(emoji);
-          }
-        } else {
-          // リアクション追加
-          if (newReactions[emoji] == null) {
-            newReactions[emoji] = [];
-          }
-          if (!newReactions[emoji]!.contains(currentUser.id)) {
-            newReactions[emoji]!.add(currentUser.id);
-          }
-        }
-
-        setState(() {
-          _currentPost = _currentPost.copyWith(reactions: newReactions);
-        });
-
-        // PostProviderの各リストも更新
-        postProvider.updatePostInLists(_currentPost);
+        // PostProviderから最新状態を同期
+        _syncWithProvider(postProvider);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
