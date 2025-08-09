@@ -10,6 +10,7 @@ import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
 import 'advanced_reaction_picker.dart';
 import 'enhanced_reaction_display.dart';
+import 'reaction_display.dart';
 import '../constants/app_colors.dart';
 import '../utils/date_time_utils.dart';
 
@@ -36,45 +37,15 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
   late PostModel _currentPost;
   bool _isUpdating = false;
   late AnimationController _likeAnimationController;
-  late Animation<double> _likeAnimation;
-  late Animation<Offset> _fallingAnimation;
-  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
     _currentPost = widget.post;
     _likeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200), // アニメーション時間を調整
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
-    // 落下アニメーション
-    _fallingAnimation = Tween<Offset>(
-      begin: const Offset(0, -1.0), // 開始位置を調整
-      end: const Offset(0, 0), // 終了位置を0に修正
-    ).animate(CurvedAnimation(
-      parent: _likeAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // 回転アニメーション
-    _rotationAnimation = Tween<double>(
-      begin: -0.2,
-      end: 0.0, // 終了位置を0に修正
-    ).animate(CurvedAnimation(
-      parent: _likeAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // スケールアニメーション
-    _likeAnimation = Tween<double>(
-      begin: 0.8, // 開始サイズを調整
-      end: 1.0, // 終了サイズを調整
-    ).animate(CurvedAnimation(
-      parent: _likeAnimationController,
-      curve: Curves.elasticOut,
-    ));
   }
 
   @override
@@ -537,18 +508,19 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-                                        // リアクション表示（強化版）
-                            EnhancedReactionDisplay(
-                              post: _currentPost,
-                              currentUserId: currentUser?.id,
-                              onReactionTap: (emoji) => _toggleReaction(context, emoji, currentUser),
-                              onAddReaction: () => _showReactionPicker(context, currentUser),
-                              maxDisplayed: 4,
-                              emojiSize: 18,
-                            ),
-            
+            // リアクション表示（強化版）
+            EnhancedReactionDisplay(
+              post: _currentPost,
+              currentUserId: currentUser?.id,
+              onReactionTap: (emoji) =>
+                  _toggleReaction(context, emoji, currentUser),
+              onAddReaction: () => _showReactionPicker(context, currentUser),
+              maxDisplayed: 4,
+              emojiSize: 18,
+            ),
+
             const SizedBox(height: 4),
-            
+
             // ハートボタン（従来のいいね機能）
             LikeButton(
               post: _currentPost,
@@ -577,7 +549,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
   }
 
   // リアクション追加
-  Future<void> _addReaction(BuildContext context, String emoji, UserModel currentUser) async {
+  Future<void> _addReaction(
+      BuildContext context, String emoji, UserModel currentUser) async {
     if (_isUpdating) return;
 
     setState(() {
@@ -586,11 +559,13 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
 
     try {
       final postProvider = context.read<PostProvider>();
-      final success = await postProvider.addReaction(_currentPost.id, emoji, currentUser.id);
+      final success = await postProvider.addReaction(
+          _currentPost.id, emoji, currentUser.id);
 
       if (success) {
         // ローカル状態を更新
-        final newReactions = Map<String, List<String>>.from(_currentPost.reactions);
+        final newReactions =
+            Map<String, List<String>>.from(_currentPost.reactions);
         if (newReactions[emoji] == null) {
           newReactions[emoji] = [];
         }
@@ -606,7 +581,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
         postProvider.updatePostInLists(_currentPost);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの追加に失敗しました')),
         );
       }
     } catch (e) {
@@ -624,7 +600,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
   }
 
   // リアクションの切り替え（追加/削除）
-  void _toggleReaction(BuildContext context, String emoji, UserModel? currentUser) async {
+  void _toggleReaction(
+      BuildContext context, String emoji, UserModel? currentUser) async {
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ログインが必要です')),
@@ -641,18 +618,21 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
     try {
       final postProvider = context.read<PostProvider>();
       final hasReaction = _currentPost.hasReaction(emoji, currentUser.id);
-      
+
       bool success;
       if (hasReaction) {
-        success = await postProvider.removeReaction(_currentPost.id, emoji, currentUser.id);
+        success = await postProvider.removeReaction(
+            _currentPost.id, emoji, currentUser.id);
       } else {
-        success = await postProvider.addReaction(_currentPost.id, emoji, currentUser.id);
+        success = await postProvider.addReaction(
+            _currentPost.id, emoji, currentUser.id);
       }
 
       if (success) {
         // ローカル状態を更新
-        final newReactions = Map<String, List<String>>.from(_currentPost.reactions);
-        
+        final newReactions =
+            Map<String, List<String>>.from(_currentPost.reactions);
+
         if (hasReaction) {
           // リアクション削除
           newReactions[emoji]?.remove(currentUser.id);
@@ -677,7 +657,8 @@ class _ChatBubbleWidgetState extends State<ChatBubbleWidget>
         postProvider.updatePostInLists(_currentPost);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
+          SnackBar(
+              content: Text(postProvider.errorMessage ?? 'リアクションの更新に失敗しました')),
         );
       }
     } catch (e) {
