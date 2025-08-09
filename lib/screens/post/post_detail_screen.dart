@@ -35,12 +35,10 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   PostModel? _post;
   bool _isLoading = false;
 
-
   @override
   void initState() {
     super.initState();
     _post = widget.post; // 初期化を追加
-
 
     // 投稿詳細を読み込む
     _loadPostDetails();
@@ -58,9 +56,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       print('_post already exists, skipping load');
       final userProvider = context.read<UserProvider>();
       final currentUser = userProvider.currentUser;
-      if (currentUser != null) {
-
-      }
+      if (currentUser != null) {}
       return;
     }
 
@@ -79,7 +75,6 @@ class _PostDetailScreenState extends State<PostDetailScreen>
           _post = post;
           final userProvider = context.read<UserProvider>();
           final currentUser = userProvider.currentUser;
-
         });
       } else {
         if (mounted) {
@@ -214,8 +209,6 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       );
     }
   }
-
-
 
   // 投稿者本人かどうかを判定
   bool _isPostOwner() {
@@ -435,8 +428,6 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     );
   }
 
-
-
   // 実際にかかった時間を計算する関数
   String _getElapsedTime() {
     if (_post?.actualEndTime == null) return '';
@@ -454,6 +445,4 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       return '${minutes}分';
     }
   }
-
-
 }

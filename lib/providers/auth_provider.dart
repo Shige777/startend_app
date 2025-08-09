@@ -246,8 +246,6 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-
-
       // 3. 認証情報を取得
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
