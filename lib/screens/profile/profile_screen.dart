@@ -1456,9 +1456,16 @@ class _ProfileScreenState extends State<ProfileScreen>
               if (_profileUser != null && post.userId != _profileUser!.id) {
                 return false;
               }
+
+              // 他のユーザーのコミュニティ投稿表示設定を確認
+              if (_profileUser != null &&
+                  !(_profileUser!.showCommunityPostsToOthers) &&
+                  post.communityIds.isNotEmpty) {
+                return false;
+              }
             }
 
-            // コミュニティ投稿の表示設定を確認
+            // 自分の軌跡画面でのコミュニティ投稿の表示設定を確認
             if (widget.isOwnProfile &&
                 !_showCommunityPosts &&
                 post.communityIds.isNotEmpty) {

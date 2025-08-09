@@ -255,16 +255,19 @@ class PostProvider extends ChangeNotifier {
           .limit(30) // 50から30に削減して高速化
           .get();
 
-      final posts = querySnapshot.docs
+      final allPosts = querySnapshot.docs
           .map((doc) => PostModel.fromFirestore(doc))
-          .where((post) => _shouldShowInFollowing(post, currentUserId))
           .toList();
 
-      // プライベートアカウントの制限を適用
+      // プライバシー設定とアカウント制限を適用
       final filteredPosts = <PostModel>[];
-      for (final post in posts) {
-        if (await _canViewPost(post, currentUserId)) {
-          filteredPosts.add(post);
+      for (final post in allPosts) {
+        // フォロー中タブでの表示判定（コミュニティ投稿のプライバシー設定を含む）
+        if (await _shouldShowInFollowingAsync(post, currentUserId)) {
+          // プライベートアカウントの制限も適用
+          if (await _canViewPost(post, currentUserId)) {
+            filteredPosts.add(post);
+          }
         }
       }
 
@@ -740,6 +743,46 @@ class PostProvider extends ChangeNotifier {
   }
 
   // フォロー中タブでの表示判定
+  Future<bool> _shouldShowInFollowingAsync(PostModel post, String? currentUserId) async {
+    final now = DateTime.now();
+
+    // 自分のコミュニティ投稿は表示しない
+    if (currentUserId != null &&
+        post.userId == currentUserId &&
+        post.communityIds.isNotEmpty) {
+      return false;
+    }
+
+    // 他のユーザーのコミュニティ投稿の場合、プライバシー設定をチェック
+    if (post.communityIds.isNotEmpty) {
+      try {
+        final userDoc = await _firestore.collection('users').doc(post.userId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final showCommunityPostsToOthers = userData['showCommunityPostsToOthers'] ?? true;
+          if (!showCommunityPostsToOthers) {
+            return false; // 他のユーザーにコミュニティ投稿を表示しない設定
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('ユーザー設定取得エラー: $e');
+        }
+        // エラーの場合は非表示にする（安全側に倒す）
+        return false;
+      }
+    }
+
+    // 完了している場合のみ、END投稿（actualEndTime）から24時間以内なら表示
+    if (post.isCompleted && post.actualEndTime != null) {
+      return now.difference(post.actualEndTime!).inHours <= 24;
+    }
+
+    // 未完了投稿と予定なし投稿は常に表示
+    return true;
+  }
+
+  // 同期版の判定関数（互換性のため残しておく）
   bool _shouldShowInFollowing(PostModel post, String? currentUserId) {
     final now = DateTime.now();
 
