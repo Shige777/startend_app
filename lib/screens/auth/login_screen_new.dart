@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    print('LoginScreen: initState called');
+    _isSignUp = true; // デフォルトでサインアップモード
 
     // アニメーションコントローラーの初期化
     _iconAnimationController = AnimationController(
@@ -45,10 +45,10 @@ class _LoginScreenState extends State<LoginScreen>
       vsync: this,
     );
 
-    // UI要素のフェードアニメーション（最初にフェードアウト）
+    // UI要素のフェードアニメーション（最初は表示状態）
     _uiFadeAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.0,
+      end: 1.0, // 常に表示状態に変更
     ).animate(
       CurvedAnimation(
         parent: _iconAnimationController,
@@ -109,21 +109,34 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
+    print('_handleSubmit called - isSignUp: $_isSignUp');
+    print('Email: ${_emailController.text.trim()}');
+    print('Password length: ${_passwordController.text.length}');
+
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
+      return;
+    }
+    print('Form validation passed');
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    print('AuthProvider loading state: ${authProvider.isLoading}');
 
     bool success = false;
     if (_isSignUp) {
+      print('Attempting sign up...');
       success = await authProvider.signUpWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      print('Sign up result: $success');
     } else {
+      print('Attempting sign in...');
       success = await authProvider.signInWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      print('Sign in result: $success');
     }
 
     // ログイン成功時は即座にアニメーション開始
@@ -132,6 +145,7 @@ class _LoginScreenState extends State<LoginScreen>
       _startIconZoomAnimation();
     } else {
       print('Email/Password login failed: success=$success');
+      print('Error message: ${authProvider.errorMessage}');
     }
   }
 
@@ -361,7 +375,10 @@ class _LoginScreenState extends State<LoginScreen>
                               ElevatedButton(
                                 onPressed: authProvider.isLoading
                                     ? null
-                                    : _handleSubmit,
+                                    : () {
+                                        print('Main button tapped!');
+                                        _handleSubmit();
+                                      },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,

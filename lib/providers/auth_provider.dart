@@ -48,17 +48,20 @@ class AuthProvider extends ChangeNotifier {
   // ▲▲▲ ここまで ▲▲▲
 
   AuthProvider() {
+    print('AuthProvider: Constructor called');
     // 初期状態を確実に復元
     _initializeAuthState();
 
     // 認証状態の変更を監視
     _auth.authStateChanges().listen((User? user) {
+      print('AuthProvider: authStateChanges - user: ${user?.uid ?? 'null'}');
       _user = user;
       notifyListeners();
     });
 
     // GoogleSignInの初期化を開始
     _initializeGoogleSignIn();
+    print('AuthProvider: Constructor completed - isLoading: $_isLoading');
   }
 
   // 初期認証状態の復元
@@ -139,6 +142,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
 
+      print('AuthProvider: Starting email signup for $email');
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -146,19 +150,25 @@ class AuthProvider extends ChangeNotifier {
       _user = result.user;
 
       if (_user != null) {
+        print('AuthProvider: User created successfully, UID: ${_user!.uid}');
         await _createOrUpdateUser(_user!);
+        print('AuthProvider: User document created in Firestore');
         _setLoading(false);
         // 認証成功時のみ状態更新を通知
         notifyListeners();
+        print('AuthProvider: Signup completed successfully');
         return true;
       } else {
+        print('AuthProvider: User creation failed - result.user is null');
         _setError('アカウント作成に失敗しました');
         return false;
       }
     } on FirebaseAuthException catch (e) {
+      print('AuthProvider: FirebaseAuthException during signup: ${e.code}');
       _setError(_getErrorMessage(e.code));
       return false;
     } catch (e) {
+      print('AuthProvider: Exception during signup: $e');
       _setError(_getErrorMessage(e.toString()));
       return false;
     } finally {
@@ -421,12 +431,15 @@ class AuthProvider extends ChangeNotifier {
   // ユーザー情報の作成・更新
   Future<void> _createOrUpdateUser(User user) async {
     try {
+      print(
+          'AuthProvider: Creating/updating user in Firestore for UID: ${user.uid}');
       final userDoc = _firestore.collection('users').doc(user.uid);
 
       // 既存のユーザー情報を取得
       final existingDoc = await userDoc.get();
 
       if (existingDoc.exists) {
+        print('AuthProvider: User already exists, updating');
         // 既存ユーザーの場合、名前とプロフィール画像は更新しない
         final userData = {
           'email': user.email,
@@ -435,21 +448,33 @@ class AuthProvider extends ChangeNotifier {
         };
 
         await userDoc.update(userData);
+        print('AuthProvider: User updated successfully');
       } else {
+        print('AuthProvider: Creating new user document');
         // 新規ユーザーの場合、すべての情報を設定
         final userData = {
+          'id': user.uid, // IDフィールドを追加
           'email': user.email,
-          'displayName': user.displayName ?? '',
+          'displayName': user.displayName ?? 'ユーザー', // デフォルト名を設定
           'photoURL': user.photoURL ?? '',
+          'bio': '', // 必要なフィールドを追加
+          'followerIds': [],
+          'followingIds': [],
+          'communityIds': [],
+          'postCount': 0,
+          'isPrivate': false,
+          'requiresApproval': false,
           'lastSignInAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
         await userDoc.set(userData);
+        print('AuthProvider: New user document created successfully');
       }
     } catch (e) {
-      // エラーハンドリング
+      print('AuthProvider: Error creating/updating user: $e');
+      rethrow; // エラーを再throw
     }
   }
 

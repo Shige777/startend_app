@@ -70,25 +70,33 @@ class UserProvider extends ChangeNotifier {
   // ユーザーを取得または作成
   Future<void> _getOrCreateUser(String userId) async {
     int retryCount = 0;
-    const maxRetries = 3;
+    const maxRetries = 5; // リトライ回数を増やす
 
     while (retryCount < maxRetries) {
       try {
         _setLoading(true);
         _setError(null);
 
+        print(
+            'UserProvider: Attempting to get user $userId (retry $retryCount)');
         final userDoc = await _firestore.collection('users').doc(userId).get();
 
         if (userDoc.exists) {
+          print('UserProvider: User found in Firestore');
           _currentUser = UserModel.fromFirestore(userDoc);
           notifyListeners();
           return;
         } else {
+          print('UserProvider: User not found, creating new user');
+          // AuthProviderのユーザー情報を取得
+          final authUser = _authProvider?.currentUser;
+          final email = authUser?.email ?? '';
+
           // 新規ユーザー作成
           final newUser = UserModel(
             id: userId,
             displayName: 'ユーザー',
-            email: '',
+            email: email, // メールアドレスを設定
             bio: '',
             profileImageUrl: '',
             followerIds: [],
@@ -101,22 +109,28 @@ class UserProvider extends ChangeNotifier {
             updatedAt: DateTime.now(),
           );
 
+          print('UserProvider: Creating user in Firestore');
           await _firestore
               .collection('users')
               .doc(userId)
               .set(newUser.toFirestore());
+
           _currentUser = newUser;
+          print('UserProvider: User created successfully');
           notifyListeners();
           return;
         }
       } catch (e) {
+        print(
+            'UserProvider: Error getting/creating user (retry $retryCount): $e');
         retryCount++;
         if (retryCount >= maxRetries) {
-          // 最大試行回数に達した場合
+          print('UserProvider: Max retries reached, setting error');
+          _setError('ユーザー情報の取得に失敗しました: $e');
           return;
         }
-        // 少し待ってから再試行
-        await Future.delayed(Duration(seconds: retryCount));
+        // 指数バックオフで再試行
+        await Future.delayed(Duration(milliseconds: 500 * retryCount));
       }
     }
   }
