@@ -30,14 +30,11 @@ class AuthProvider extends ChangeNotifier {
   void notifyListeners() {
     if (!_suppressNotifications) {
       super.notifyListeners();
-    } else {
-      print('AuthProvider: notifyListeners suppressed');
     }
   }
 
   void suppressNotifications(bool suppress) {
     _suppressNotifications = suppress;
-    print('AuthProvider: notifications ${suppress ? 'suppressed' : 'enabled'}');
   }
 
   String? get currentUserId => _user?.uid; // ログイン中のユーザーIDを返す
@@ -56,7 +53,6 @@ class AuthProvider extends ChangeNotifier {
 
     // 認証状態の変更を監視
     _auth.authStateChanges().listen((User? user) {
-      print('AuthProvider: authStateChanges - user: ${user?.uid ?? 'null'}');
       _user = user;
       notifyListeners();
     });
@@ -71,14 +67,11 @@ class AuthProvider extends ChangeNotifier {
       // 現在のユーザーを取得
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
-        print('AuthProvider: Found existing user: ${currentUser.uid}');
         _user = currentUser;
         notifyListeners();
-      } else {
-        print('AuthProvider: No existing user found');
       }
     } catch (e) {
-      print('AuthProvider: Error initializing auth state: $e');
+      // エラーハンドリング
     }
   }
 
@@ -104,26 +97,19 @@ class AuthProvider extends ChangeNotifier {
 
   void setAgreedToTerms(bool agreed,
       {bool delayNotification = false, bool skipNotification = false}) {
-    print(
-        'AuthProvider: setAgreedToTerms called with: $agreed, delayNotification: $delayNotification, skipNotification: $skipNotification');
     _hasAgreedToTerms = agreed;
-    print('AuthProvider: _hasAgreedToTerms is now: $_hasAgreedToTerms');
 
     if (skipNotification) {
-      print('AuthProvider: skipping notifyListeners');
       return;
     }
 
     if (delayNotification) {
-      print('AuthProvider: delaying notifyListeners');
       // 次のフレームまで通知を遅延
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyListeners();
-        print('AuthProvider: delayed notifyListeners called');
       });
     } else {
       notifyListeners();
-      print('AuthProvider: immediate notifyListeners called');
     }
   }
 
